@@ -1,6 +1,7 @@
 .env
 vendor/
 test_auth
+config/config.json
 config/config.development.json
 config/config.production.json
 secrets/
