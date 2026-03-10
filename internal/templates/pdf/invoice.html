@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Customer Receipt</title>
+    <style>
+        * {
+            margin: 3px 0;
+        }
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            font-size: 12px;
+        }
+        .codes-strip {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 4px 0 6px 0;
+            margin-bottom: 6px;
+            border-bottom: 1px solid #ddd;
+        }
+        .codes-strip .code-left {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .codes-strip .code-right {
+            display: flex;
+            align-items: center;
+        }
+        .codes-strip .qr-img {
+            width: 44px;
+            height: 44px;
+        }
+        .codes-strip .barcode-img {
+            width: 160px;
+            height: 28px;
+        }
+        .codes-strip .code-number {
+            font-size: 9px;
+            font-family: Consolas, monospace;
+            color: #555;
+            letter-spacing: 0.5px;
+        }
+        .header {
+            margin: 60px 0 0 15px;
+        }
+        .header,
+        .footer,
+        .content {
+            margin-bottom: 15px;
+        }
+        .columns {
+            display: flex;
+            justify-content: space-between;
+        }
+        .column {
+            flex: 1;
+        }
+        .column:last-child {
+            text-align: right;
+        }
+        .logo {
+            width: 100px;
+            height: auto;
+            margin-bottom: 10px;
+            display: block;
+        }
+        .header h4 {
+            font-size: 11px;
+            font-weight: 500;
+            margin: 2px 0;
+        }
+        .header-column-h5s h5 {
+            font-weight: 400;
+            font-size: 10px;
+            margin: 2px 0;
+        }
+        .header p {
+            font-size: 10px;
+            margin: 2px 0;
+        }
+        h2 {
+            font-size: 14px !important;
+            font-weight: 600;
+            margin: 5px 0;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 10px;
+            font-size: 10px;
+        }
+        table,
+        th,
+        td {
+            border: 1px solid #ccc;
+        }
+        th,
+        td {
+            text-align: left;
+            padding: 4px;
+        }
+        th {
+            background-color: #f2f2f2;
+            font-weight: 500;
+            font-size: 9px;
+        }
+        .content-table th {
+            background-color: #fff;
+            border: 0;
+            border-bottom: 1px solid #000;
+            font-size: 10px;
+        }
+        .content-table * {
+            border: 0;
+        }
+        .content-table {
+            border: 0;
+        }
+        .content p {
+            font-size: 11px;
+        }
+        .important {
+            font-weight: bold;
+        }
+        .footer p {
+            font-family: Consolas, monospace;
+            font-size: 8px;
+            margin: 1px 0;
+        }
+        .footer h5 {
+            font-family: Consolas, monospace;
+            font-size: 9px;
+            margin: 8px 0 3px 0;
+        }
+                .signature-section {
+            margin-top: 40px;
+            padding-top: 20px;
+            border-top: 1px solid #ddd;
+        }
+        .signature-line {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+            margin-top: 30px;
+        }
+        .signature-line div {
+            flex: 1;
+            margin: 0 20px;
+        }
+        .signature-line .line {
+            border-bottom: 1px solid #000;
+            height: 20px;
+            margin-bottom: 5px;
+        }
+        .signature-line .label {
+            font-size: 9px;
+            text-align: center;
+            color: #666;
+        }
+        .agreement-text {
+            margin-top: 15px;
+            font-size: 8px;
+            color: #333;
+            text-align: center;
+            font-style: italic;
+        }
+    </style>
+</head>
+<body>
+    {{if or .barcode .qrcode}}
+    <div class="codes-strip">
+        <div class="code-left">
+            {{if .qrcode}}
+            <img src="data:image/png;base64,{{.qrcode}}" class="qr-img">
+            {{end}}
+            <span class="code-number">{{.invoice_number}}</span>
+        </div>
+        <div class="code-right">
+            {{if .barcode}}
+            <img src="data:image/png;base64,{{.barcode}}" class="barcode-img">
+            {{end}}
+        </div>
+    </div>
+    {{end}}
+    <div class="header">
+        <div class="columns">
+            <div class="column">
+            {{if .location.logo_path}}
+                <img src="{{.location.logo_path}}" alt="Store Logo" class="logo">
+            {{end}}
+                <h4>{{.location.full_name}}</h4>
+                <h4>{{.location.street_address}}</h4>
+                {{if .location.address_line_2}}
+                <h4>{{.location.address_line_2}}</h4>
+                {{end}}
+                <h4>{{.location.city}}, {{.location.state}} {{.location.postal_code}}</h4>
+                <h4>Phone: {{.location.phone}}</h4>
+            </div>
+            <div style="max-width: 400px;" class="column">
+                <h2>CUSTOMER RECEIPT</h2>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Invoice#</th>
+                            <th>Date</th>
+                            <th>Page</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>{{.invoice_number}}</td>
+                            <td>{{.invoice_date}}</td>
+                            <td>1 of 1</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        <div class="columns">
+            <div class="column">
+                <p>Rep: {{.sold_by}}</p>
+            </div>
+            <div class="column header-column-h5s" style="text-align: left; max-width: 400px;">
+                <h5>{{.patient_name}}</h5>
+                <h5>{{.patient_address}}</h5>
+                <h5>{{.patient_state}}</h5>
+                <h5>{{.patient_phone}}</h5>
+            </div>
+        </div>
+    </div>
+
+    <div class="content">
+        <table class="content-table">
+            <thead>
+                <tr>
+                    <th>Item</th>
+                    <th>Description</th>
+                    <th>Qty</th>
+                    <th>Price</th>
+                    <th>Discount</th>
+                    <th>TAX</th>
+                    <th>Total</th>
+                </tr>
+            </thead>
+            <tbody>
+                {{range .items}}
+<tr>
+    <td>{{.id}}</td>
+    <td>{{.description}}</td>
+    <td>{{.quantity}}</td>
+    <td>{{.price}}</td>
+    <td>{{.discount}}</td>
+    <td>{{.total_tax}}</td>
+    <td>{{.total}}</td>
+</tr>
+{{end}}
+                <tr style="height: 50px;">
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                    <td><span style="border-top: 1px solid #000; padding-top: 8px;">${{.final_amount}}</span></td>
+                </tr>
+                <tr style="height: 100px;">
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                    <td colspan="2">Balance Due</td>
+                    <td><span style="border-top: 1px solid #000; padding-top: 8px;">${{.due_amount}}</span></td>
+                </tr>
+            </tbody>
+        </table>
+        <p>Total balance due on all invoices: ${{.final_amount}}</p>
+    </div>
+
+    {{if .payment_history}}
+    <div class="footer" style="margin-top: 15px;">
+        <h5>PAYMENT HISTORY:</h5>
+        {{range .payment_history}}
+        <p>{{.date}} - {{.type}} - {{.method}} - {{.amount}}</p>
+        {{end}}
+    </div>
+    {{end}}
+
+    <div class="footer">
+        <p style="margin-bottom: 20px;">All orders take a minimum of 10-14 business days.</p>
+        <h5>NOT RESPONSIBLE FOR:</h5>
+        <p>Eyeglasses when receipt is lost.</p>
+        <p>Eyeglasses or deposits left over 60 days.</p>
+        <p>Any damage incurred during the repair of eyeglasses.</p>
+        <p>Customer's own frames or lenses which are being used or repaired.</p>
+        <p style="margin-bottom: 20px;">Layaways left over 30 days.</p>
+        <h5>STORE POLICIES:</h5>
+        <p>Up to 30% restocking fee for Cancellation of Layaway.</p>
+        <p>No refunds or Cancellations on Eyeglasses or Contact Lenses.</p>
+        <p>All eyeglasses are custom made.</p>
+        <p>Layaways - 60 days only.</p>
+        <p>No refunds on Deposits and Layaways - Store Credit Only. Store Credit expires after 1 year from date of original sale.</p>
+        <p style="margin-bottom: 20px;">No refund on any Sunglasses. Store credit or even exchange within 7 days only.</p>
+        <p>All designer frames have a 1 year warranty for manufactures defects, loss, breakage or normal wear and tear is not covered. As will be determined by the manufacturer.</p>
+    </div>
+    <div class="signature-section">
+        <div class="signature-line">
+            <div>
+                <div class="line"></div>
+                <div class="label">Patient Signature</div>
+            </div>
+            <div>
+                <div class="line"></div>
+                <div class="label">Date</div>
+            </div>
+        </div>
+        <div class="agreement-text">
+            <p>I understand the service policy and agree to pay the above total amount according to the card issuer agreement.</p>
+        </div>
+    </div>
+</body>
+</html>

@@ -30,11 +30,14 @@ func StartRedis() {
 }
 
 // InitRedisClient инициализирует клиент Redis
-func InitRedisClient() {
+func InitRedisClient(addr string) {
+	if addr == "" {
+		addr = "localhost:6379"
+	}
 	RDB = redis.NewClient(&redis.Options{
-		Addr: "localhost:6380",
+		Addr: addr,
 	})
-	fmt.Println("Redis client initialized")
+	fmt.Println("Redis client initialized on", addr)
 }
 
 // SetBlockUser блокирует пользователя на `duration`

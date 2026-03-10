@@ -7,7 +7,7 @@ import (
 	"sighthub-backend/config"
 	"sighthub-backend/internal/blacklist"
 
-	//"sighthub-backend/internal/routes"
+	"sighthub-backend/internal/routes"
 	"os"
 	"sighthub-backend/pkg/cache"
 	"time"
@@ -40,8 +40,6 @@ func corsMiddleware(next http.Handler) http.Handler {
 }
 
 func main() {
-	cache.InitRedisClient()
-	cache.StartDailyCachePurge("cache:")
 	// 📦 Конфигурация и база
 	log.Println("Loading config...")
 	cfg, err := config.LoadConfig()
@@ -73,16 +71,22 @@ func main() {
 	}
 	fmt.Println("Database connected successfully!")
 
+	// Redis
+	cache.InitRedisClient(cfg.RedisAddr)
+	cache.StartDailyCachePurge("cache:")
+
 	// 🧹 Blacklist очистка
 	blacklist.StartCleaner(1 * time.Minute)
 
 	// 📡 Роутинг
 	router := mux.NewRouter()
 
-	//routes.InitAuthRoutes(db, router)
+	routes.RegisterAuthRoutes(db, cache.RDB, cfg, router)
+	routes.RegisterHomeRoutes(db, cache.RDB, cfg, router)
 
-	log.Println("Server starting on :5001")
-	if err := http.ListenAndServe(":5001", corsMiddleware(router)); err != nil {
+	addr := ":" + cfg.Port
+	log.Println("Server starting on", addr)
+	if err := http.ListenAndServe(addr, corsMiddleware(router)); err != nil {
 		log.Fatal(err)
 	}
 

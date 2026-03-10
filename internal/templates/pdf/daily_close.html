@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Daily Close Report</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            font-size: 12px;
+            margin: 20px;
+            background-color: #f5f5f5;
+        }
+
+        .report-container {
+            background-color: white;
+            padding: 20px;
+            border: 1px solid #ccc;
+        }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 20px;
+        }
+
+        .store-info {
+            font-weight: bold;
+        }
+
+        .daily-close-box {
+            border: 2px solid black;
+            padding: 10px;
+            text-align: center;
+        }
+
+        .daily-close-title {
+            font-weight: bold;
+            font-size: 16px;
+            margin-bottom: 10px;
+        }
+
+        .store-details {
+            border: 1px solid black;
+            padding: 5px;
+            margin-bottom: 5px;
+        }
+
+        .printed-info {
+            text-align: center;
+            margin: 10px 0;
+            font-size: 10px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 15px;
+        }
+
+        th, td {
+            border: 1px solid black;
+            padding: 4px;
+            text-align: left;
+            font-size: 11px;
+        }
+
+        th {
+            background-color: #f0f0f0;
+            font-weight: bold;
+        }
+
+        .highlight-yellow {
+            background-color: #ffff99;
+        }
+
+        .text-right {
+            text-align: right;
+        }
+
+        .text-center {
+            text-align: center;
+        }
+
+        .total-row {
+            font-weight: bold;
+        }
+
+        .section-title {
+            font-weight: bold;
+            margin: 15px 0 5px 0;
+        }
+
+        .blurred-text {
+            filter: blur(2px);
+            background-color: #ffff99;
+        }
+    </style>
+</head>
+<body>
+    <div class="report-container">
+        <!-- Header Section -->
+        <div class="header">
+            <div class="store-info">
+                <div>{{.store_name}}</div>
+                <div>{{.store_address}}</div>
+                <div>{{.store_city_state}}</div>
+                <div>Phone: {{.store_phone}}</div>
+            </div>
+
+            <div class="daily-close-box">
+                <div class="daily-close-title">DAILY CLOSE</div>
+                <div class="store-details">
+                    <div>STORE</div>
+                    <div>{{.store_code}}</div>
+                </div>
+                <div class="store-details">
+                    <div>Date</div>
+                    <div>{{.report_date}}</div>
+                </div>
+                <div class="store-details">
+                    <div>Page</div>
+                    <div>{{.page_number}}</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="printed-info">
+            Printed: {{.printed_by}} {{.print_datetime}}
+        </div>
+
+        <!-- Sales Section -->
+        <table>
+            <thead>
+                <tr>
+                    <th>Invoice #</th>
+                    <th>Customer Name</th>
+                    <th>Total</th>
+                    <th>Taxable</th>
+                    <th>Tax</th>
+                    <th>Bal Due</th>
+                    <th>Prep / Sell</th>
+                </tr>
+            </thead>
+            <tbody>
+                {{range .invoices}}
+                <tr>
+                    <td>{{.number}}</td>
+                    <td>{{.customer_name}}</td>
+                    <td class="text-right">{{.total}}</td>
+                    <td class="text-right">{{.taxable}}</td>
+                    <td class="text-right">{{.tax}}</td>
+                    <td class="text-right">{{.balance_due}}</td>
+                    <td>{{.prep_sell}}</td>
+                </tr>
+                {{end}}
+
+                <tr class="highlight-yellow total-row">
+                    <td colspan="2">Gross Revenue</td>
+                    <td class="text-right">${{.gross_revenue}}</td>
+                    <td colspan="4"></td>
+                </tr>
+                <tr class="highlight-yellow">
+                    <td colspan="2">Inter Company</td>
+                    <td class="text-right">${{.inter_company}}</td>
+                    <td colspan="4"></td>
+                </tr>
+                <tr class="highlight-yellow total-row">
+                    <td colspan="2">Total Tax Collected</td>
+                    <td class="text-right">${{.total_tax}}</td>
+                    <td colspan="4"></td>
+                </tr>
+                <tr class="highlight-yellow total-row">
+                    <td colspan="2">Net Revenue</td>
+                    <td class="text-right">${{.net_revenue}}</td>
+                    <td colspan="4"></td>
+                </tr>
+                <tr class="highlight-yellow">
+                    <td colspan="2">Taxable Sales</td>
+                    <td class="text-right">${{.taxable_sales}}</td>
+                    <td colspan="4"></td>
+                </tr>
+            </tbody>
+        </table>
+
+        <!-- Payments Section -->
+        <table>
+            <thead>
+                <tr>
+                    <th>Invoice #</th>
+                    <th>Customer Name</th>
+                    <th>Payment</th>
+                    <th>Paid By</th>
+                    <th>Bal Due</th>
+                    <th>DL / CC</th>
+                    <th>EXP</th>
+                    <th>User</th>
+                </tr>
+            </thead>
+            <tbody>
+                {{range .payments}}
+                <tr>
+                    <td>{{.invoice_number}}</td>
+                    <td>{{.customer_name}}</td>
+                    <td class="text-right">{{.amount}}</td>
+                    <td>{{.payment_method}}</td>
+                    <td class="text-right">{{.balance_due}}</td>
+                    <td class="blurred-text">{{.dl_cc}}</td>
+                    <td>{{.expiry}}</td>
+                    <td>{{.user}}</td>
+                </tr>
+                {{end}}
+
+                <tr class="highlight-yellow total-row">
+                    <td colspan="2">Total Payments</td>
+                    <td class="text-right">${{.total_payments}}</td>
+                    <td colspan="5"></td>
+                </tr>
+                <tr class="highlight-yellow total-row">
+                    <td colspan="2">Change in AR</td>
+                    <td class="text-right">${{.change_in_ar}}</td>
+                    <td colspan="5"></td>
+                </tr>
+            </tbody>
+        </table>
+
+        <!-- Payment Types Summary -->
+        <table>
+            <thead>
+                <tr>
+                    <th>Type</th>
+                    <th>Computer</th>
+                    <th>Count Sheet</th>
+                    <th>Computer Swiped</th>
+                    <th>Difference</th>
+                </tr>
+            </thead>
+            <tbody>
+                {{range .payment_types}}
+                <tr {{if .highlight}}class="highlight-yellow"{{end}}>
+                    <td>{{.type}}</td>
+                    <td class="text-right">{{.computer}}</td>
+                    <td class="text-right">{{.count_sheet}}</td>
+                    <td class="text-right">{{.computer_swiped}}</td>
+                    <td class="text-right">{{.difference}}</td>
+                </tr>
+                {{end}}
+
+                <tr class="highlight-yellow total-row">
+                    <td>Total</td>
+                    <td class="text-right">{{.total_computer}}</td>
+                    <td class="text-right">{{.total_count_sheet}}</td>
+                    <td class="text-right">{{.total_computer_swiped}}</td>
+                    <td class="text-right">{{.total_difference}}</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+<div class="section-title">Transfer Credit Summary</div>
+<table>
+    <thead>
+        <tr>
+            <th>Description</th>
+            <th class="text-right">Amount</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td>Positive Credits</td>
+            <td class="text-right">${{.transfer_credit_summary.positive}}</td>
+        </tr>
+        <tr>
+            <td>Negative Credits</td>
+            <td class="text-right">${{.transfer_credit_summary.negative}}</td>
+        </tr>
+        <tr class="total-row highlight-yellow">
+            <td>Total Credits</td>
+            <td class="text-right">${{.transfer_credit_summary.total}}</td>
+        </tr>
+    </tbody>
+</table>
+</body>
+</html>

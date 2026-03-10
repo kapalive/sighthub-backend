@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Count Sheet - {{.store_name}}</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #f5f5f5;
+        }
+
+        .count-sheet {
+            background-color: white;
+            padding: 20px;
+            max-width: 800px;
+            margin: 0 auto;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 30px;
+        }
+
+        .store-info h1 {
+            margin: 0;
+            font-size: 18px;
+            font-weight: bold;
+        }
+
+        .store-info p {
+            margin: 2px 0;
+            font-size: 14px;
+        }
+
+        .sheet-info {
+            text-align: right;
+        }
+
+        .sheet-info table {
+            border-collapse: collapse;
+            border: 2px solid #000;
+        }
+
+        .sheet-info td {
+            border: 1px solid #000;
+            padding: 5px 10px;
+            font-size: 12px;
+        }
+
+        .printed-info {
+            text-align: center;
+            margin: 20px 0;
+            font-size: 12px;
+        }
+
+        .content {
+            display: flex;
+            gap: 40px;
+        }
+
+        .cash-section, .electronic-section {
+            flex: 1;
+        }
+
+        .section-title {
+            font-weight: bold;
+            font-size: 16px;
+            margin-bottom: 10px;
+        }
+
+        .count-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .count-table td {
+            padding: 3px 8px;
+            font-size: 14px;
+            border-bottom: 1px solid #ddd;
+        }
+
+        .count-table td:first-child {
+            text-align: left;
+        }
+
+        .count-table td:last-child {
+            text-align: right;
+            width: 60px;
+        }
+
+        .highlighted {
+            background-color: #ffff99;
+        }
+
+        .total-row {
+            font-weight: bold;
+            border-top: 2px solid #000;
+            background-color: #ffff99;
+        }
+
+        .total-row td {
+            padding: 8px;
+            font-size: 16px;
+        }
+
+        @media print {
+            body {
+                background-color: white;
+                margin: 0;
+            }
+
+            .count-sheet {
+                box-shadow: none;
+                padding: 10px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="count-sheet">
+        <!-- Header -->
+        <div class="header">
+            <div class="store-info">
+                <h1>{{.store_name}}</h1>
+                <p>{{.store_address}}</p>
+                <p>{{.store_city}}, {{.store_state}} {{.store_zip}}</p>
+                <p>Phone: {{.store_phone}}</p>
+            </div>
+
+            <div class="sheet-info">
+                <table>
+                    <tr>
+                        <td><strong>STORE</strong></td>
+                        <td><strong>Date</strong></td>
+                        <td><strong>Page</strong></td>
+                    </tr>
+                    <tr>
+                        <td>{{.store_code}}</td>
+                        <td>{{.count_date}}</td>
+                        <td>{{.page_number}} of {{.total_pages}}</td>
+                    </tr>
+                </table>
+            </div>
+        </div>
+
+        <div class="printed-info">
+            Printed: {{.printed_by}} {{.printed_date}}
+        </div>
+
+        <!-- Main Content -->
+        <div class="content">
+            <!-- Cash Section -->
+            <div class="cash-section">
+                <div class="section-title">Cash:</div>
+                <table class="count-table">
+                    {{range .cash_denominations}}
+                    <tr {{if .highlight}}class="highlighted"{{end}}>
+                        <td>{{.value}}</td>
+                        <td>{{.count}}</td>
+                    </tr>
+                    {{end}}
+
+                    <tr {{if .receipts_in_drawer.highlight}}class="highlighted"{{end}}>
+                        <td>Receipts in drawer</td>
+                        <td>{{.receipts_in_drawer.amount}}</td>
+                    </tr>
+
+                    <tr {{if .minus_opening_cash.highlight}}class="highlighted"{{end}}>
+                        <td>Minus Opening Cash</td>
+                        <td>{{.minus_opening_cash.amount}}</td>
+                    </tr>
+
+                    <tr class="total-row">
+                        <td>Total Cash</td>
+                        <td>{{.total_cash}}</td>
+                    </tr>
+                </table>
+            </div>
+
+            <!-- Electronic Section -->
+            <div class="electronic-section">
+                <div class="section-title">Electronic:</div>
+                <table class="count-table">
+                    {{range .electronic_payments}}
+                    <tr {{if .highlight}}class="highlighted"{{end}}>
+                        <td>{{.name}}</td>
+                        <td>{{.amount}}</td>
+                    </tr>
+                    {{end}}
+                </table>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

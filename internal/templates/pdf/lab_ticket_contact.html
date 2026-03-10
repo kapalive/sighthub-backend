@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+
+    <meta charset="UTF-8">
+    <title>Lab Ticket &amp; Invoice #{{.lab_ticket.number_ticket}} - {{.invoice.invoice_number}} </title>
+    <style>
+        body {
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            line-height: 1.2;
+            margin: 0;
+            padding: 10px;
+            width: 8.5in;
+        }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 2px solid #000;
+            padding-bottom: 5px;
+            margin-bottom: 10px;
+        }
+
+        .header-left {
+            font-weight: bold;
+            font-size: 14px;
+        }
+
+        .header-right {
+            text-align: right;
+        }
+
+        .barcode {
+            font-family: 'Libre Barcode 128', monospace;
+            font-size: 24px;
+        }
+
+        .main-content {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 15px;
+        }
+
+        .patient-info {
+            width: 60%;
+        }
+
+        .invoice-info {
+            width: 35%;
+            text-align: right;
+        }
+
+        .prescription-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 15px 0;
+            font-size: 11px;
+        }
+
+        .prescription-table th,
+        .prescription-table td {
+            border: 1px solid #000;
+            padding: 4px 6px;
+            text-align: center;
+        }
+
+        .prescription-table th {
+            background-color: #f0f0f0;
+            font-weight: bold;
+        }
+
+        .prescription-table td:first-child {
+            font-weight: bold;
+            text-align: left;
+        }
+
+        .info-section {
+            margin: 10px 0;
+            font-size: 11px;
+        }
+
+        .info-section strong {
+            font-weight: bold;
+        }
+
+        .status-fields {
+            margin-top: 10px;
+        }
+
+        .status-line {
+            display: flex;
+            justify-content: space-between;
+            margin: 2px 0;
+            border-bottom: 1px solid #000;
+            padding-bottom: 2px;
+        }
+
+        .lens-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 15px 0;
+            font-size: 11px;
+        }
+
+        .lens-table th,
+        .lens-table td {
+            border: 1px solid #000;
+            padding: 4px 6px;
+            text-align: center;
+        }
+
+        .lens-table thead {
+            background-color: #f4f4f4;
+        }
+
+        .lens-table th {
+            font-weight: 600;
+            color: #333;
+        }
+
+        .lens-table tr:nth-child(even) {
+            background-color: #fafafa;
+        }
+
+        .lens-table tbody td {
+            color: #222;
+        }
+
+        .invoice-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 15px 0;
+            font-size: 11px;
+        }
+
+        .invoice-table th,
+        .invoice-table td {
+            text-align: left;
+            vertical-align: top;
+        }
+    </style>
+</head>
+
+<body>
+    <!-- Header -->
+    <div class="header">
+        <div class="header-left">
+            <span>
+                <img src="data:image/png;base64,{{.qrcode}}" style="width:30px;">
+            </span>
+            **** {{.lab_ticket.location.full_name}} LAB TICKET #{{.lab_ticket.invoice_number}} ****
+        </div>
+        <div class="header-right" style="display: flex; gap: 5px; align-items: center">
+            <div>PRINTED: {{.lab_ticket.date_create}}</div>
+            <div class="barcode">
+                <img src="data:image/png;base64,{{.barcode}}" style="width:120px;height:20px">
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="main-content">
+        <!-- Patient Information -->
+        <div class="patient-info">
+            <div><strong>{{.invoice.patient_info.full_name}}</strong> &nbsp;&nbsp;</div>
+            <div>
+                {{.invoice.patient_info.address.line1}}
+                {{if .invoice.patient_info.address.line2}}
+                {{.invoice.patient_info.address.line2}}
+                {{end}}
+            </div>
+
+            <div>{{.invoice.patient_info.address.city}}, {{.invoice.patient_info.address.state}} {{.invoice.patient_info.address.postal_code}}</div>
+            <div>H: N/A &nbsp; M: {{.invoice.patient_info.phone}} &nbsp; W: N/A</div>
+            <div>{{.invoice.patient_info.email}} {{if .invoice.patient_info.dob}}&nbsp; DOB: {{.invoice.patient_info.dob}}{{end}}</div>
+            {{if .invoice.insurance_holder_info}}
+            <div>{{.invoice.insurance_holder_info.company_code}} &nbsp; Group #: {{.invoice.insurance_holder_info.group_number}}</div>
+            {{end}}
+
+
+            <table class="prescription-table">
+                <thead>
+                    <tr>
+                        <th></th>
+                        <th>BC</th>
+                        <th>DIA</th>
+                        <th>PWR</th>
+                        <th>CYL</th>
+                        <th>AXIS</th>
+                        <th>ADD</th>
+                        <th>COLOR</th>
+                        <th>TYPE</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>OD</strong></td>
+                        <td>{{.lab_ticket.contact_powers.od_bc}}</td>
+                        <td>{{.lab_ticket.contact_powers.od_dia}}</td>
+                        <td>{{.lab_ticket.contact_powers.od_pwr}}</td>
+                        <td>{{.lab_ticket.contact_powers.od_cyl}}</td>
+                        <td>{{.lab_ticket.contact_powers.od_axis}}</td>
+                        <td>{{.lab_ticket.contact_powers.od_add}}</td>
+                        <td>{{.lab_ticket.contact_powers.od_color}}</td>
+                        <td>{{.lab_ticket.contact_powers.od_type}}</td>
+                    </tr>
+                    <tr>
+                        <td><strong>OS</strong></td>
+                        <td>{{.lab_ticket.contact_powers.os_bc}}</td>
+                        <td>{{.lab_ticket.contact_powers.os_dia}}</td>
+                        <td>{{.lab_ticket.contact_powers.os_pwr}}</td>
+                        <td>{{.lab_ticket.contact_powers.os_cyl}}</td>
+                        <td>{{.lab_ticket.contact_powers.os_axis}}</td>
+                        <td>{{.lab_ticket.contact_powers.os_add}}</td>
+                        <td>{{.lab_ticket.contact_powers.os_color}}</td>
+                        <td>{{.lab_ticket.contact_powers.os_type}}</td>
+                    </tr>
+                </tbody>
+            </table>
+
+
+
+            <div class="notes-section">
+                <span class="notes-label">Notes:</span>
+                <div class="notes-content">
+                    {{.lab_ticket.our_note}}
+                </div>
+            </div>
+        </div>
+
+        <!-- Invoice Information -->
+        <div class="invoice-info">
+            <div><strong>INVOICE #</strong> &nbsp; {{.invoice.invoice_number}}</div>
+            <div style="margin-top: 0px;">{{.lab_ticket.date_create}}</div>
+            <div style="margin-top: 10px;"><strong>STATUS</strong> &nbsp; {{.lab_ticket.status}}</div>
+            <div style="margin-top: 10px;"><strong>LAB</strong> &nbsp; {{.lab_ticket.lab}}</div>
+            <div style="margin-top: 5px;"><strong>REP</strong> &nbsp; {{.lab_ticket.employee_full_name}}</div>
+            <div style="margin-top: 5px;"><strong>VENDOR</strong> &nbsp; ________________</div>
+            <div style="margin-top: 5px;"><strong>REF #</strong> &nbsp; ________________</div>
+            <div style="margin-top: 5px;"><strong>SURFACED</strong> &nbsp; ________________</div>
+            <div style="margin-top: 5px;"><strong>INSPECTED</strong> &nbsp; ________________</div>
+            <div style="margin-top: 5px;"><strong>EDGED</strong> &nbsp; ________________</div>
+            <div style="margin-top: 5px;"><strong>FINAL INS</strong> &nbsp; ________________</div>
+        </div>
+    </div>
+
+
+
+    <div style="font-size: 11px; max-width: 250px;">
+        <div style="display: flex; justify-content: space-between;">
+            <div><strong>TOTAL</strong></div>
+            <div>${{.invoice.final_amount}}</div>
+        </div>
+        <div style="display: flex; justify-content: space-between;">
+            <div><strong>PAID</strong></div>
+            <div>${{.invoice.paid}}</div>
+        </div>
+        <div style="display: flex; justify-content: space-between;">
+            <div><strong>DUE</strong></div>
+            <div>${{.invoice.due_amount}}</div>
+        </div>
+
+        <div style="height: 0.5rem;"></div>
+
+        <div style="display: flex; justify-content: space-between; gap: 5px;">
+            <div>PROMISED</div>
+            <div>{{.lab_ticket.date_promise}}</div>
+        </div>
+
+        <div style="height: 0.5rem;"></div>
+
+        <div><strong>NOTE</strong></div>
+        <div><strong>NOTIFIED:</strong> &nbsp; __________</div>
+    </div>
+    </div>
+
+</body>
+
+</html>

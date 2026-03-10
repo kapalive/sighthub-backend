@@ -52,6 +52,7 @@ type Patient struct {
 	MailingList *bool `gorm:"column:mailing_list" json:"mailing_list,omitempty"`
 	Survey      *bool `gorm:"column:survey"       json:"survey,omitempty"`
 
+	LocationID          *int64 `gorm:"column:location_id"           json:"location_id,omitempty"`
 	PreferredLanguageID *int64 `gorm:"column:preferred_language_id" json:"preferred_language_id,omitempty"`
 
 	// Связи можно добавить позже, когда будут пакеты:

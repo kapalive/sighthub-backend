@@ -1,0 +1,470 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+
+    <meta charset="UTF-8">
+    <title>Lab Ticket &amp; Invoice #{{.lab_ticket.number_ticket}} - {{.invoice.invoice_number}} </title>
+    <style>
+        body {
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            line-height: 1.2;
+            margin: 0;
+            padding: 10px;
+            width: 8.5in;
+        }
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 2px solid #000;
+            padding-bottom: 5px;
+            margin-bottom: 10px;
+        }
+        .header-left {
+            font-weight: bold;
+            font-size: 14px;
+        }
+        .header-right {
+            text-align: right;
+        }
+        .barcode {
+            font-family: 'Libre Barcode 128', monospace;
+            font-size: 24px;
+        }
+        .main-content {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 15px;
+        }
+        .patient-info {
+            width: 60%;
+        }
+        .invoice-info {
+            width: 35%;
+            text-align: right;
+        }
+        .prescription-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 15px 0;
+            font-size: 11px;
+        }
+        .prescription-table th,
+        .prescription-table td {
+            border: 1px solid #000;
+            padding: 4px 6px;
+            text-align: center;
+        }
+        .prescription-table th {
+            background-color: #f0f0f0;
+            font-weight: bold;
+        }
+        .prescription-table td:first-child {
+            font-weight: bold;
+            text-align: left;
+        }
+        .info-section {
+            margin: 10px 0;
+            font-size: 11px;
+        }
+        .info-section strong {
+            font-weight: bold;
+        }
+        .status-fields {
+            margin-top: 10px;
+        }
+        .status-line {
+            display: flex;
+            justify-content: space-between;
+            margin: 2px 0;
+            border-bottom: 1px solid #000;
+            padding-bottom: 2px;
+        }
+         .lens-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 15px 0;
+            font-size: 11px;
+        }
+        .lens-table th,
+        .lens-table td {
+            border: 1px solid #000;
+            padding: 4px 6px;
+            text-align: center;
+        }
+        .lens-table thead {
+            background-color: #f4f4f4;
+        }
+
+        .lens-table th {
+            font-weight: 600;
+            color: #333;
+        }
+
+        .lens-table tr:nth-child(even) {
+            background-color: #fafafa;
+        }
+
+        .lens-table tbody td {
+            color: #222;
+        }
+        .invoice-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 15px 0;
+            font-size: 11px;
+        }
+        .invoice-table th,
+        .invoice-table td {
+            text-align: left;
+            vertical-align: top;
+        }
+
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <div class="header">
+        <div class="header-left">
+            <span>
+                <img src="data:image/png;base64,{{.qrcode}}" style="width:30px;">
+            </span>
+            **** {{.lab_ticket.location.full_name}} LAB TICKET #{{.lab_ticket.invoice_number}} ****
+        </div>
+        <div class="header-right" style="display: flex; gap: 5px; align-items: center">
+            <div>PRINTED: {{.lab_ticket.date_create}}</div>
+            <div class="barcode">
+                <img src="data:image/png;base64,{{.barcode}}" style="width:120px;height:20px">
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="main-content">
+        <!-- Patient Information -->
+        <div class="patient-info">
+            <div><strong>{{.invoice.patient_info.full_name}}</strong> &nbsp;&nbsp;</div>
+            <div>
+                {{.invoice.patient_info.address.line1}}
+                   {{if .invoice.patient_info.address.line2}}
+                   {{.invoice.patient_info.address.line2}}
+                    {{end}}
+            </div>
+
+            <div>{{.invoice.patient_info.address.city}}, {{.invoice.patient_info.address.state}} {{.invoice.patient_info.address.postal_code}}</div>
+            <div>H: N/A &nbsp; M: {{.invoice.patient_info.phone}} &nbsp; W: N/A</div>
+            <div>{{.invoice.patient_info.email}} {{if .invoice.patient_info.dob}}&nbsp; DOB: {{.invoice.patient_info.dob}}{{end}}</div>
+            {{if .invoice.insurance_holder_info}}
+            <div>{{.invoice.insurance_holder_info.company_code}} &nbsp; Group #: {{.invoice.insurance_holder_info.group_number}}</div>
+            {{end}}
+
+               <!-- Prescription Table for Glasses -->
+            {{if .lab_ticket.powers}}
+                <table class="prescription-table">
+                    <thead>
+                        <tr>
+                            <th></th>
+                            <th>SPH</th>
+                            <th>CYL</th>
+                            <th>AXIS</th>
+                            <th>ADD</th>
+                            <th>DPD</th>
+                            <th>NPD</th>
+                            <th>SEG</th>
+                            <th>PRISM H</th>
+                            <th>PRISM V</th>
+                            <th>BC</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><strong>OD</strong></td>
+                            <td>{{.lab_ticket.powers.od_sph}}</td>
+                            <td>{{.lab_ticket.powers.od_cyl}}</td>
+                            <td>{{.lab_ticket.powers.od_axis}}</td>
+                            <td>{{.lab_ticket.powers.od_add}}</td>
+                            <td>{{.lab_ticket.powers.od_dt}}</td>
+                            <td>{{.lab_ticket.powers.od_nr}}</td>
+                            <td>{{.lab_ticket.powers.od_seg_hd}}</td>
+                            <td>{{if .lab_ticket.powers.od_h_prism}}{{.lab_ticket.powers.od_h_prism}} {{.lab_ticket.powers.od_h_prism_direction}}{{end}}</td>
+                            <td>{{if .lab_ticket.powers.od_v_prism}}{{.lab_ticket.powers.od_v_prism}} {{.lab_ticket.powers.od_v_prism_direction}}{{end}}</td>
+                            <td>{{.lab_ticket.powers.od_bc}}</td>
+                        </tr>
+                        <tr>
+                            <td><strong>OS</strong></td>
+                            <td>{{.lab_ticket.powers.os_sph}}</td>
+                            <td>{{.lab_ticket.powers.os_cyl}}</td>
+                            <td>{{.lab_ticket.powers.os_axis}}</td>
+                            <td>{{.lab_ticket.powers.os_add}}</td>
+                            <td>{{.lab_ticket.powers.os_dt}}</td>
+                            <td>{{.lab_ticket.powers.os_nr}}</td>
+                            <td>{{.lab_ticket.powers.os_seg_hd}}</td>
+                            <td>{{if .lab_ticket.powers.os_h_prism}}{{.lab_ticket.powers.os_h_prism}} {{.lab_ticket.powers.os_h_prism_direction}}{{end}}</td>
+                            <td>{{if .lab_ticket.powers.os_v_prism}}{{.lab_ticket.powers.os_v_prism}} {{.lab_ticket.powers.os_v_prism_direction}}{{end}}</td>
+                            <td>{{.lab_ticket.powers.os_bc}}</td>
+                        </tr>
+                    </tbody>
+                </table>
+            {{end}}
+
+
+            <div class="info-section">
+                <strong>Frame:</strong> {{.lab_ticket.frame.brand_name}} {{.lab_ticket.frame.frame_name}} {{.lab_ticket.frame.color}}  | Origin: {{.lab_ticket.frame.frame_source}}
+            </div>
+
+            <!-- Contact Lens Table -->
+            {{if .lab_ticket.contact_powers}}
+            <table class="prescription-table">
+                <thead>
+                    <tr>
+                        <th></th>
+                        <th>BC</th>
+                        <th>DIA</th>
+                        <th>PWR</th>
+                        <th>CYL</th>
+                        <th>AXIS</th>
+                        <th>ADD</th>
+                        <th>COLOR</th>
+                        <th>TYPE</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>OD</strong></td>
+                        <td>{{.lab_ticket.contact_powers.od_bc}}</td>
+                        <td>{{.lab_ticket.contact_powers.od_dia}}</td>
+                        <td>{{.lab_ticket.contact_powers.od_pwr}}</td>
+                        <td>{{.lab_ticket.contact_powers.od_cyl}}</td>
+                        <td>{{.lab_ticket.contact_powers.od_axis}}</td>
+                        <td>{{.lab_ticket.contact_powers.od_add}}</td>
+                        <td>{{.lab_ticket.contact_powers.od_color}}</td>
+                        <td>{{.lab_ticket.contact_powers.od_type}}</td>
+                    </tr>
+                    <tr>
+                        <td><strong>OS</strong></td>
+                        <td>{{.lab_ticket.contact_powers.os_bc}}</td>
+                        <td>{{.lab_ticket.contact_powers.os_dia}}</td>
+                        <td>{{.lab_ticket.contact_powers.os_pwr}}</td>
+                        <td>{{.lab_ticket.contact_powers.os_cyl}}</td>
+                        <td>{{.lab_ticket.contact_powers.os_axis}}</td>
+                        <td>{{.lab_ticket.contact_powers.os_add}}</td>
+                        <td>{{.lab_ticket.contact_powers.os_color}}</td>
+                        <td>{{.lab_ticket.contact_powers.os_type}}</td>
+                    </tr>
+                </tbody>
+            </table>
+            {{end}}
+
+            <!-- Frame and Lens Information -->
+            <div class="info-section">
+                <br>
+                {{if .lab_ticket.frame}}
+                <div><strong>LENS TYPE:</strong> &nbsp;&nbsp;&nbsp; {{.lab_ticket.lens.lens_type_color}}</div>
+                <div><strong>MATERIAL:</strong></div>
+                {{if .lab_ticket.add_services}}
+                {{range .lab_ticket.add_services}}
+                <div><strong>LENS OPTION:</strong> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; {{.name}}{{if .description}} &nbsp;&nbsp;&nbsp; {{.description}}{{end}}</div>
+                {{end}}
+                {{else}}
+                {{end}}
+                {{end}}
+            </div>
+
+            <table class="lens-table">
+                <thead>
+                    <tr>
+                        <th>SR-COAT</th>
+                        <th>UV</th>
+                        <th>AR</th>
+                        <th>FPD</th>
+                        <th>DRILL</th>
+                        <th>A</th>
+                        <th>B</th>
+                        <th>DBL</th>
+                        <th>ED</th>
+                        <th>TINT</th>
+                        <th>TEMP</th>
+                        <th>BC</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>{{if .lab_ticket.lens_features.sr_cost}}Y{{else}}N{{end}}</td>
+                        <td>{{if .lab_ticket.lens_features.uv}}Y{{else}}Y{{end}}</td>
+                        <td>{{if .lab_ticket.lens_features.ar}}Y{{else}}Y{{end}}</td>
+                        <td>{{if .lab_ticket.lens_features.send}}Y{{else}}N{{end}}</td>
+                        <td>{{if .lab_ticket.lens_features.drill}}Y{{else}}N{{end}}</td>
+                        <td>{{.lab_ticket.frame.size_lens_width}}</td>
+                        <td>{{.lab_ticket.frame.b_dim}}</td>
+                        <td>{{.lab_ticket.frame.size_bridge_width}}</td>
+                        <td>{{.lab_ticket.frame.ed}}</td>
+                        <td>{{if .lab_ticket.lens_features.tint}}Y{{else}}N{{end}}</td>
+                        <td>{{.lab_ticket.frame.size_temple_length}}</td>
+                        <td>{{.lab_ticket.frame.bc}}</td>
+                    </tr>
+                </tbody>
+            </table>
+
+
+            <div class="notes-section">
+                <span class="notes-label">Notes:</span>
+                <div class="notes-content">
+                    {{.lab_ticket.our_note}}
+                </div>
+            </div>
+        </div>
+
+        <!-- Invoice Information -->
+        <div class="invoice-info">
+            <div><strong>INVOICE #</strong> &nbsp; {{.invoice.invoice_number}}</div>
+            <div style="margin-top: 0px;">{{.lab_ticket.date_create}}</div>
+            <div style="margin-top: 10px;"><strong>STATUS</strong> &nbsp; {{.lab_ticket.status}}</div>
+            <div style="margin-top: 10px;"><strong>LAB</strong> &nbsp; {{.lab_ticket.lab}}</div>
+            <div style="margin-top: 5px;"><strong>REP</strong> &nbsp; {{.lab_ticket.employee_full_name}}</div>
+            <div style="margin-top: 5px;"><strong>VENDOR</strong> &nbsp; ________________</div>
+            <div style="margin-top: 5px;"><strong>REF #</strong> &nbsp; ________________</div>
+            <div style="margin-top: 5px;"><strong>SURFACED</strong> &nbsp; ________________</div>
+            <div style="margin-top: 5px;"><strong>INSPECTED</strong> &nbsp; ________________</div>
+            <div style="margin-top: 5px;"><strong>EDGED</strong> &nbsp; ________________</div>
+            <div style="margin-top: 5px;"><strong>FINAL INS</strong> &nbsp; ________________</div>
+        </div>
+    </div>
+
+
+    <div style="display: flex; justify-content: space-between; margin-top: 10px;">
+        <div style="font-size: 11px;">
+            <div><strong>FULL SERVICES</strong></div>
+
+            {{if .lab_ticket.lens_items}}
+
+                {{range .lab_ticket.lens_items}}
+                    <div>{{.name}}</div>
+
+                    {{if .material}}<div>{{.material}}</div>{{end}}
+                {{end}}
+            {{end}}
+
+            {{if .lab_ticket.add_services}}
+                {{range .lab_ticket.add_services}}
+                    <div>{{.name}}</div>
+                {{end}}
+            {{end}}
+
+            {{if .lab_ticket.frame}}
+                <div>FRAME: {{.lab_ticket.frame.frame_name}}</div>
+            {{end}}
+        </div>
+
+        <div style="font-size: 11px; max-width: 250px;">
+            <div style="display: flex; justify-content: space-between;">
+              <div><strong>TOTAL</strong></div>
+              <div>${{.invoice.final_amount}}</div>
+            </div>
+            <div style="display: flex; justify-content: space-between;">
+              <div><strong>PAID</strong></div>
+              <div>${{.invoice.paid}}</div>
+            </div>
+            <div style="display: flex; justify-content: space-between;">
+              <div><strong>DUE</strong></div>
+              <div>${{.invoice.due_amount}}</div>
+            </div>
+
+            <div style="height: 0.5rem;"></div>
+
+            <div style="display: flex; justify-content: space-between; gap: 5px;">
+              <div>PROMISED</div>
+              <div>{{.lab_ticket.date_promise}}</div>
+            </div>
+
+            <div style="height: 0.5rem;"></div>
+
+            <div><strong>NOTE</strong></div>
+            <div><strong>NOTIFIED:</strong> &nbsp; __________</div>
+        </div>
+    </div>
+
+        <div class="invoice-section">
+            <table class="invoice-table">
+                <thead>
+                    <tr>
+                        <th>Item</th>
+                        <th>Description</th>
+                        <th>Qty</th>
+                        <th>Price</th>
+                        <th>Disc</th>
+                        <th>Tax</th>
+                        <th>Total</th>
+                    </tr>
+                </thead>
+                <tbody>
+
+                    {{range .invoice.items}}
+                    <tr>
+                        <td>{{.id}}</td>
+                        <td>{{.description}}</td>
+                        <td>{{.quantity}}</td>
+                        <td>{{.price}}</td>
+                        <td>{{.discount}}</td>
+                        <td>{{.total_tax}}</td>
+                        <td>{{.total}}</td>
+                    </tr>
+
+                    {{end}}
+                    <tr class="total-row">
+                        <td colspan="5"></td>
+                        <td><strong>Subtotal</strong></td>
+                        <td> <strong>{{.invoice.total_amount}}</strong></td>
+                    </tr>
+                    <tr class="total-row">
+                        <td colspan="5"></td>
+                        <td><strong>Discount</strong></td>
+                        <td><strong>{{.invoice.discount}}</strong></td>
+                    </tr>
+                    <tr class="total-row">
+                        <td colspan="5"></td>
+                        <td><strong>Tax</strong></td>
+                        <td><strong>{{.invoice.tax_amount}}</strong></td>
+                    </tr>
+                    <tr class="total-row">
+                        <td colspan="5"></td>
+                        <td><strong>Total</strong></td>
+                        <td><strong>{{.invoice.final_amount}}</strong></td>
+                    </tr>
+                </tbody>
+            </table>
+
+             <table class="invoice-table" style="margin-top: 20px">
+               <thead>
+                    <tr>
+                        <th colspan="2">Date</th>
+                        <th colspan="3 ">Method</th>
+                        <th>Employee</th>
+                        <th>Amount</th>
+
+                    </tr>
+                </thead>
+                <tbody>
+                    {{if .invoice.payment_history}}
+                        {{range .invoice.payment_history}}
+                        <tr>
+                            <td colspan="2">{{.date}} </td>
+                            <td colspan="3">{{.method}}</td>
+                            <td>{{.employee}}</td>
+                            <td>{{.amount}}</td>
+                        </tr>
+                        {{end}}
+                        <tr class="total-row">
+                            <td colspan="5"></td>
+                            <td><strong>Due</strong></td>
+                            <td><strong>{{.invoice.due_amount}}</strong></td>
+
+                        </tr>
+                    {{end}}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</body>
+</html>

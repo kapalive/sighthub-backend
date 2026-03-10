@@ -1,111 +1,117 @@
 package auth
 
 import (
-	"crypto/sha256"
-	"encoding/hex"
+	"context"
 	"errors"
 	"net/http"
-	"os"
 	"strings"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
-	"golang.org/x/crypto/bcrypt"
+	"github.com/google/uuid"
 )
 
-// Секретный ключ (нужно хранить в .env.go)
-var JWTSecret = []byte(os.Getenv("JWT_SECRET_KEY"))
+const (
+	AccessTokenTTL  = 6 * time.Hour
+	RefreshTokenTTL = 9 * time.Hour
+)
 
-// JWTClaims структура для claims токена
-type JWTClaims struct {
+type contextKey string
+
+const usernameCtxKey contextKey = "username"
+
+// Claims — JWT claims, соответствует Python payload структуре
+type Claims struct {
 	Username string `json:"username"`
 	jwt.RegisteredClaims
 }
 
-// Время жизни токенов
-const TokenTTL = time.Hour * 8 // later set time.Minute * 20 // 20 minutes
-const RefreshTokenTTL = time.Hour * 24 * 7
-
-// generateTokens создает access и refresh токены
-func GenerateTokens(email string) (string, string, error) {
-	// Access token
-	accessTokenClaims := jwt.MapClaims{
-		"sub": email,
-		"exp": time.Now().Add(TokenTTL).Unix(),
+// GenerateAccessToken создаёт access token с уникальным jti.
+// Возвращает (tokenString, jti, error).
+func GenerateAccessToken(username, secret string) (string, string, error) {
+	jti := uuid.NewString()
+	claims := Claims{
+		Username: username,
+		RegisteredClaims: jwt.RegisteredClaims{
+			Subject:   username,
+			ID:        jti,
+			ExpiresAt: jwt.NewNumericDate(time.Now().UTC().Add(AccessTokenTTL)),
+		},
 	}
-	accessToken := jwt.NewWithClaims(jwt.SigningMethodHS256, accessTokenClaims)
-	accessTokenString, err := accessToken.SignedString(JWTSecret)
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	str, err := token.SignedString([]byte(secret))
+	return str, jti, err
+}
+
+// GenerateRefreshToken создаёт refresh token с уникальным jti.
+// Возвращает (tokenString, jti, error).
+func GenerateRefreshToken(username, secret string) (string, string, error) {
+	jti := uuid.NewString()
+	claims := Claims{
+		Username: username,
+		RegisteredClaims: jwt.RegisteredClaims{
+			Subject:   username,
+			ID:        jti,
+			ExpiresAt: jwt.NewNumericDate(time.Now().UTC().Add(RefreshTokenTTL)),
+		},
+	}
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	str, err := token.SignedString([]byte(secret))
+	return str, jti, err
+}
+
+// ParseToken проверяет и парсит JWT токен.
+func ParseToken(tokenStr, secret string) (*Claims, error) {
+	token, err := jwt.ParseWithClaims(tokenStr, &Claims{}, func(t *jwt.Token) (interface{}, error) {
+		if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
+			return nil, errors.New("unexpected signing method")
+		}
+		return []byte(secret), nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	claims, ok := token.Claims.(*Claims)
+	if !ok || !token.Valid {
+		return nil, errors.New("invalid token")
+	}
+	return claims, nil
+}
+
+// ParseJTINoVerify извлекает jti и username без проверки подписи.
+// Используется при logout/blacklist старых или просроченных токенов.
+func ParseJTINoVerify(tokenStr string) (jti, username string, err error) {
+	p := jwt.NewParser()
+	claims := &Claims{}
+	_, _, err = p.ParseUnverified(tokenStr, claims)
 	if err != nil {
 		return "", "", err
 	}
-
-	// Refresh token
-	refreshTokenClaims := jwt.MapClaims{
-		"sub": email,
-		"exp": time.Now().Add(RefreshTokenTTL).Unix(),
+	if claims.ID == "" {
+		return "", "", errors.New("token missing jti")
 	}
-	refreshToken := jwt.NewWithClaims(jwt.SigningMethodHS256, refreshTokenClaims)
-	refreshTokenString, err := refreshToken.SignedString(JWTSecret)
-	if err != nil {
-		return "", "", err
-	}
-
-	return accessTokenString, refreshTokenString, nil
+	return claims.ID, claims.Username, nil
 }
 
-// HashToken хеширует токен перед сохранением в БД
-func HashToken(token string) (string, error) {
-	hash, err := bcrypt.GenerateFromPassword([]byte(token), bcrypt.DefaultCost)
-	return string(hash), err
-}
-
-func HashEmail(email string) string {
-	hash := sha256.Sum256([]byte(email))
-	return hex.EncodeToString(hash[:])
-}
-
-// Вспомогательная функция извлечения токена
+// ExtractTokenFromHeader извлекает Bearer токен из заголовка Authorization.
 func ExtractTokenFromHeader(r *http.Request) string {
-	authHeader := r.Header.Get("Authorization")
-	parts := strings.SplitN(authHeader, " ", 2)
+	h := r.Header.Get("Authorization")
+	parts := strings.SplitN(h, " ", 2)
 	if len(parts) == 2 && strings.EqualFold(parts[0], "Bearer") {
 		return parts[1]
 	}
 	return ""
 }
 
-func ParseToken(tokenString string, secretKey []byte) (*jwt.RegisteredClaims, error) {
-	token, err := jwt.ParseWithClaims(tokenString, &jwt.RegisteredClaims{}, func(token *jwt.Token) (interface{}, error) {
-		return []byte(secretKey), nil
-	})
-
-	if err != nil {
-		return nil, err
+// UsernameFromContext возвращает username, установленный JWTMiddleware.
+func UsernameFromContext(ctx context.Context) string {
+	if v, ok := ctx.Value(usernameCtxKey).(string); ok {
+		return v
 	}
-
-	if claims, ok := token.Claims.(*jwt.RegisteredClaims); ok && token.Valid {
-		return claims, nil
-	}
-
-	return nil, errors.New("invalid token")
+	return ""
 }
 
-// ExtractUserID достает userID (sub) из access token
-func ExtractUserID(tokenString string) (string, error) {
-	token, err := jwt.ParseWithClaims(tokenString, &jwt.RegisteredClaims{}, func(token *jwt.Token) (interface{}, error) {
-		return JWTSecret, nil
-	})
-
-	if err != nil {
-		return "", err
-	}
-
-	if claims, ok := token.Claims.(*jwt.RegisteredClaims); ok && token.Valid {
-		if claims.Subject == "" {
-			return "", errors.New("token does not contain subject")
-		}
-		return claims.Subject, nil
-	}
-
-	return "", errors.New("invalid token")
+// WithUsername устанавливает username в context (используется middleware).
+func WithUsername(ctx context.Context, username string) context.Context {
+	return context.WithValue(ctx, usernameCtxKey, username)
 }

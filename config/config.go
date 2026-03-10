@@ -1,162 +1,151 @@
-// internal/config/config.go
 package config
 
 import (
+	"encoding/json"
 	"log"
 	"os"
 	"strings"
-
-	"github.com/joho/godotenv"
 )
 
-// Config — все переменные окружения, включая то, что у тебя в .env.
-// Ничего не убирал, только добавил новые поля.
 type Config struct {
+	// App
+	AppEnv string `json:"app_env"`
+	Debug  bool   `json:"debug"`
+	Port   string `json:"port"`
+
 	// Secrets
-	SecretKey        string
-	JWTSecretKey     string
-	RefreshSecretKey string
+	SecretKey        string `json:"secret_key"`
+	JWTSecretKey     string `json:"jwt_secret_key"`
+	RefreshSecretKey string `json:"refresh_secret_key"`
 
 	// DB
-	DBUsername string
-	DBPassword string
-	DBHost     string
-	DBPort     string
-	DBName     string
+	DBUsername string `json:"db_username"`
+	DBPassword string `json:"db_password"`
+	DBHost     string `json:"db_host"`
+	DBPort     string `json:"db_port"`
+	DBName     string `json:"db_name"`
 
-	// HTTP
-	Port string
+	// Storage / URLs
+	UploadAPIURL     string `json:"upload_api_url"`
+	DownloadAPIURL   string `json:"download_api_url"`
+	StorageServerURI string `json:"storage_server_uri"`
 
-	// URLs (старые поля)
-	UploadAPIURL     string
-	DownloadAPIURL   string
-	StorageServerURI string
-
-	// Recaptcha / Google (старые поля)
-	RecaptchaSiteKey       string
-	RecaptchaSecretKey     string
-	GoogleProjectID        string
-	GoogleApplicationCreds string // GOOGLE_APPLICATION_CREDENTIALS (путь к JSON)
-	FlaskEnv               string
+	// reCAPTCHA / Google
+	RecaptchaSiteKey       string `json:"recaptcha_site_key"`
+	RecaptchaSecretKey     string `json:"recaptcha_secret_key"`
+	GoogleProjectID        string `json:"google_project_id"`
+	GoogleApplicationCreds string `json:"google_application_credentials"`
 
 	// Cookies
-	CookieSameSite string
-	CookieSecure   bool
+	CookieSameSite string `json:"cookie_samesite"`
+	CookieSecure   bool   `json:"cookie_secure"`
 
-	// New: PayPal
-	PayPalClientID     string
-	PayPalClientSecret string
-	PayPalMerchantID   string
+	// JWT / Signing
+	PrivateKeyPath string `json:"private_key_path"`
+	Issuer         string `json:"issuer"`
 
-	// New: domains (разобраны в слайс)
-	DomainsRaw string   // исходная строка из .env
-	Domains    []string // разобранный список доменов
+	// SMTP / Email
+	SMTPHost          string `json:"smtp_host"`
+	SMTPPort          string `json:"smtp_port"`
+	SMTPUsername      string `json:"smtp_username"`
+	SMTPPassword      string `json:"smtp_password"`
+	EmailSender       string `json:"email_sender"`
+	AliasEmailSender  string `json:"alias_email_sender"`
+	AliasEmailReciper string `json:"alias_email_reciper"`
 
-	// New: Sezzle / Afterpay
-	SezzlePrivateKey   string
-	SezzlePublicKey    string
-	AfterpayPrivateKey string
-	AfterpayMerchantID string
+	// SMS
+	SMSApiURL     string `json:"sms_api_url"`
+	SMSApiToken   string `json:"sms_api_token"`
+	SMSHmacSecret string `json:"sms_hmac_secret"`
 
-	// New: SMTP / email
-	SMTPHost     string
-	SMTPPort     string
-	SMTPUsername string
-	SMTPPassword string
-	EmailSender  string
+	// SRFax
+	SRFaxURL       string `json:"srfax_url"`
+	SRFaxAccountID string `json:"srfax_account_id"`
+	SRFaxPassword  string `json:"srfax_password"`
+	SRFaxCallerID  string `json:"srfax_caller_id"`
 
-	AliasEmailSender  string
-	AliasEmailReciper string
+	// Twilio
+	TwilioAccountSID          string `json:"twilio_account_sid"`
+	TwilioAuthToken           string `json:"twilio_auth_token"`
+	TwilioPhoneNumber         string `json:"twilio_phone_number"`
+	TwilioCampaignSID         string `json:"twilio_campaign_sid"`
+	TwilioMessagingServiceSID string `json:"twilio_messaging_service_sid"`
+	TwilioBrandSID            string `json:"twilio_brand_sid"`
 
-	// New: Telnyx
-	TelnyxAPIKey     string
-	TelnyxPublicKey  string
-	TelnyxFromNumber string
+	// Helpdesk
+	HelpdeskForwardURL  string `json:"helpdesk_forward_url"`
+	HelpdeskForwardHMAC string `json:"helpdesk_forward_hmac"`
+	HelpdeskReplyHMAC   string `json:"helpdesk_reply_hmac"`
 
-	// New: Front/Back URLs
-	BackendURL  string
-	FrontendURL string
+	// PayPal
+	PayPalClientID     string `json:"paypal_client_id"`
+	PayPalClientSecret string `json:"paypal_client_secret"`
+	PayPalMerchantID   string `json:"paypal_merchant_id"`
 
-	// New: Firebase Storage
-	FirebaseBucket        string // FIREBASE_BUCKET (например arts-of-optics-b919b.appspot.com)
-	FirebaseDefaultPrefix string // опционально: FIREBASE_DEFAULT_PREFIX
+	// Sezzle / Afterpay
+	SezzlePrivateKey   string `json:"sezzle_private_key"`
+	SezzlePublicKey    string `json:"sezzle_public_key"`
+	AfterpayPrivateKey string `json:"afterpay_private_key"`
+	AfterpayMerchantID string `json:"afterpay_merchant_id"`
+
+	// Telnyx
+	TelnyxAPIKey     string `json:"telnyx_api_key"`
+	TelnyxPublicKey  string `json:"telnyx_public_key"`
+	TelnyxFromNumber string `json:"telnyx_from_number"`
+
+	// Front/Back URLs
+	BackendURL  string `json:"backend_url"`
+	FrontendURL string `json:"frontend_url"`
+
+	// Redis
+	RedisAddr string `json:"redis_addr"`
+
+	// Firebase Storage
+	FirebaseBucket        string `json:"firebase_bucket"`
+	FirebaseDefaultPrefix string `json:"firebase_default_prefix"`
+
+	// Domains (raw строка из JSON, разбирается в Domains)
+	DomainsRaw string   `json:"domains"`
+	Domains    []string `json:"-"`
+
+	// Zeiss OAuth
+	ZeissAppBaseURL        string `json:"zeiss_app_base_url"`
+	ZeissAuthorizeURL      string `json:"zeiss_authorize_url"`
+	ZeissTokenURL          string `json:"zeiss_token_url"`
+	ZeissPolicy            string `json:"zeiss_policy"`
+	ZeissFrontRedirectPath string `json:"zeiss_front_redirect_path"`
+	ZeissFrontCallbackPath string `json:"zeiss_front_callback_path"`
+	ZeissClientID          string `json:"zeiss_client_id"`
+	ZeissOAuthState        string `json:"zeiss_oauth_state"`
 }
 
-// LoadConfig — грузит .env (если есть рядом/в WD) и собирает конфиг
+// LoadConfig читает config/config.json (production) или config/config.development.json
+// в зависимости от переменной окружения APP_ENV.
+// Можно явно указать файл через CONFIG_FILE.
 func LoadConfig() (*Config, error) {
-	// Загружаем .env (если нет — просто используем переменные окружения)
-	if err := godotenv.Load(); err != nil {
-		log.Println(".env file not found, using environment variables")
+	configFile := os.Getenv("CONFIG_FILE")
+	if configFile == "" {
+		appEnv := os.Getenv("APP_ENV")
+		if appEnv == "development" {
+			configFile = "config/config.development.json"
+		} else {
+			configFile = "config/config.json"
+		}
 	}
 
-	cfg := &Config{
-		// Secrets
-		SecretKey:        os.Getenv("SECRET_KEY"),
-		JWTSecretKey:     os.Getenv("JWT_SECRET_KEY"),
-		RefreshSecretKey: os.Getenv("REFRESH_SECRET_KEY"),
+	data, err := os.ReadFile(configFile)
+	if err != nil {
+		log.Printf("config file %q not found: %v", configFile, err)
+		data = []byte("{}")
+	}
 
-		// DB
-		DBUsername: os.Getenv("DB_USERNAME"),
-		DBPassword: os.Getenv("DB_PASSWORD"),
-		DBHost:     os.Getenv("DB_HOST"),
-		DBPort:     os.Getenv("DB_PORT"),
-		DBName:     os.Getenv("DB_NAME"),
+	cfg := &Config{}
+	if err := json.Unmarshal(data, cfg); err != nil {
+		return nil, err
+	}
 
-		// HTTP
-		Port: os.Getenv("PORT"),
-
-		// URLs (старые поля)
-		UploadAPIURL:     os.Getenv("UPLOAD_API_URL"),
-		DownloadAPIURL:   os.Getenv("DOWNLOAD_API_URL"),
-		StorageServerURI: os.Getenv("STORAGE_SERVER_URI"),
-
-		// Recaptcha / Google (старые поля)
-		RecaptchaSiteKey:       os.Getenv("RECAPTCHA_SITE_KEY"),
-		RecaptchaSecretKey:     os.Getenv("RECAPTCHA_SECRET_KEY"),
-		GoogleProjectID:        os.Getenv("GOOGLE_PROJECT_ID"),
-		GoogleApplicationCreds: os.Getenv("GOOGLE_APPLICATION_CREDENTIALS"),
-		FlaskEnv:               os.Getenv("FLASK_ENV"),
-
-		// Cookies
-		CookieSameSite: os.Getenv("COOKIE_SAMESITE"),
-		CookieSecure:   os.Getenv("COOKIE_SECURE") == "true",
-
-		// PayPal
-		PayPalClientID:     os.Getenv("PAYPAL_CLIENT_ID"),
-		PayPalClientSecret: os.Getenv("PAYPAL_CLIENT_SECRET"),
-		PayPalMerchantID:   os.Getenv("PAYPAL_MERCHANT_ID"),
-
-		// Domains
-		DomainsRaw: os.Getenv("DOMAINS"),
-
-		// Sezzle / Afterpay
-		SezzlePrivateKey:   os.Getenv("SEZZLE_PRIVATE_KEY"),
-		SezzlePublicKey:    os.Getenv("SEZZLE_PUBLIC_KEY"),
-		AfterpayPrivateKey: os.Getenv("AFTERPAY_PRIVATE_KEY"),
-		AfterpayMerchantID: os.Getenv("AFTERPAY_MERCHANT_ID"),
-
-		// SMTP / email
-		SMTPHost:     os.Getenv("SMTP_HOST"),
-		SMTPPort:     os.Getenv("SMTP_PORT"),
-		SMTPUsername: os.Getenv("SMTP_USERNAME"),
-		SMTPPassword: os.Getenv("SMTP_PASSWORD"),
-		EmailSender:  os.Getenv("EMAIL_SENDER"),
-
-		AliasEmailSender:  os.Getenv("ALIAS_EMAIL_SENDER"),
-		AliasEmailReciper: os.Getenv("ALIAS_EMAIL_RECIPER"),
-
-		// Telnyx
-		TelnyxAPIKey:     os.Getenv("TELNYX_API_KEY"),
-		TelnyxPublicKey:  os.Getenv("TELNYX_PUBLIC_KEY"),
-		TelnyxFromNumber: os.Getenv("TELNYX_FROM_NUMBER"),
-
-		// Front/Back
-		BackendURL:  os.Getenv("BACKEND_URL"),
-		FrontendURL: os.Getenv("FRONTEND_URL"),
-
-		// Firebase
-		FirebaseBucket:        os.Getenv("FIREBASE_BUCKET"),
-		FirebaseDefaultPrefix: os.Getenv("FIREBASE_DEFAULT_PREFIX"),
+	if cfg.RedisAddr == "" {
+		cfg.RedisAddr = "localhost:6379"
 	}
 
 	// Разобрать домены в массив

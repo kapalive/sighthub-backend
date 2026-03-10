@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Referral Letter</title>
+    <style>
+        @media print {
+            body { margin: 0; }
+            .no-print { display: none; }
+        }
+
+        body {
+            font-family: 'Times New Roman', serif;
+            font-size: 11pt;
+            line-height: 1.2;
+            color: #000;
+            max-width: 8.5in;
+            margin: 0px;
+            padding: 0px;
+            background: white;
+        }
+
+        .letterhead {
+            text-align: center;
+            border-bottom: 1px solid #000;
+            padding-bottom: 8px;
+            margin-bottom: 10px;
+        }
+
+        .letterhead h1 {
+            font-size: 16pt;
+            font-weight: bold;
+            color: #000;
+            margin: 0;
+        }
+
+        .date-line {
+            text-align: right;
+            font-size: 10pt;
+            margin-bottom: 7px;
+        }
+
+        .header-section {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 10px;
+            font-size: 10pt;
+        }
+
+        .recipient-info, .sender-info {
+            width: 48%;
+        }
+
+        .recipient-info {
+            border-left: 2px solid #000;
+            padding-left: 8px;
+        }
+
+        .info-label {
+            font-weight: bold;
+            font-size: 9pt;
+            text-transform: uppercase;
+        }
+
+        .info-value {
+            margin-bottom: 6px;
+            font-size: 10pt;
+        }
+
+        .patient-banner {
+            border: 1px solid #000;
+            padding: 10px;
+            margin: 15px 0;
+        }
+
+        .patient-banner h2 {
+            font-size: 12pt;
+            margin: 0 0 8px 0;
+            border-bottom: 1px solid #000;
+            padding-bottom: 3px;
+        }
+
+        .patient-details {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+            font-size: 10pt;
+        }
+
+        .letter-title {
+            text-align: center;
+            font-size: 14pt;
+            font-weight: bold;
+            margin: 15px 0 12px 0;
+            text-transform: uppercase;
+        }
+
+        .content-section {
+            margin-bottom: 12px;
+        }
+
+        .content-section h3 {
+            font-size: 11pt;
+            font-weight: bold;
+            margin: 0 0 6px 0;
+            border-bottom: 1px solid #000;
+            padding-bottom: 2px;
+        }
+
+        .content-section p {
+            margin: 0 0 8px 0;
+            text-align: justify;
+            font-size: 10pt;
+        }
+
+        .intro-text {
+            font-style: italic;
+            border: 1px solid #000;
+            padding: 8px;
+            margin-bottom: 12px;
+        }
+
+        .drawing-section {
+            text-align: center;
+            margin: 15px 0;
+            border: 1px solid #000;
+            padding: 10px;
+        }
+
+        .drawing-section h3 {
+            margin-bottom: 10px;
+            border-bottom: 1px solid #000;
+            padding-bottom: 3px;
+        }
+
+        .drawing-section img {
+            max-width: 100%;
+            max-height: 300px;
+            border: 1px solid #000;
+        }
+
+        .signature-area {
+            margin-top: 25px;
+            page-break-inside: avoid;
+        }
+
+        .signature-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-top: 15px;
+        }
+
+        .signature-box {
+            border: 1px solid #000;
+            height: 60px;
+            position: relative;
+        }
+
+        .signature-label {
+            position: absolute;
+            bottom: 3px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 9pt;
+        }
+
+        .doctor-info {
+            font-size: 10pt;
+        }
+
+        .footer {
+            margin-top: 20px;
+            padding-top: 8px;
+            border-top: 1px solid #000;
+            text-align: center;
+            font-size: 8pt;
+        }
+
+        /* Print optimizations */
+        @page {
+            margin: 0.5in;
+            size: letter;
+        }
+    </style>
+</head>
+<body>
+    <div class="letterhead">
+        <h1>Medical Referral Letter</h1>
+    </div>
+
+    <div class="date-line">
+        Date: <script>document.write(new Date().toLocaleDateString());</script>
+    </div>
+
+    <div class="header-section">
+        <div class="recipient-info">
+            <div class="info-label">To:</div>
+            <div class="info-value">
+                <strong>{{if .to_doctor}}{{.to_doctor.first_name}}{{else}}N/A{{end}} {{if .to_doctor}}{{.to_doctor.last_name}}{{else}}N/A{{end}}</strong><br>
+                Fax: {{if .to_doctor}}{{.to_doctor.fax}}{{else}}N/A{{end}}
+            </div>
+
+            <div class="info-label">CC:</div>
+            <div class="info-value">
+                {{if .cc_doctor}}{{.cc_doctor.first_name}}{{else}}N/A{{end}} {{if .cc_doctor}}{{.cc_doctor.last_name}}{{else}}N/A{{end}}<br>
+                Fax: {{if .cc_doctor}}{{.cc_doctor.fax}}{{else}}N/A{{end}}
+            </div>
+        </div>
+
+        <div class="sender-info">
+            <div class="info-label">From:</div>
+            <div class="info-value">
+                <strong>{{if .from_doctor}}{{.from_doctor.first_name}}{{else}}N/A{{end}} {{if .from_doctor}}{{.from_doctor.last_name}}{{else}}N/A{{end}}</strong><br>
+                {{.from_doctor.job_title}}
+            </div>
+
+            {{if and .from_doctor .from_doctor.provider}}
+            <div class="info-label">Provider:</div>
+            <div class="info-value">
+                <strong>{{.from_doctor.provider.name}}</strong><br>
+                {{.from_doctor.provider.address}}<br>
+                {{.from_doctor.provider.phone}}
+            </div>
+            {{end}}
+        </div>
+    </div>
+
+    <div class="patient-banner">
+        <h2>Patient Information</h2>
+        <div class="patient-details">
+            <div>
+                <div class="info-label">Patient Name:</div>
+                <div><strong>{{.patient.first_name}} {{.patient.last_name}}</strong></div>
+            </div>
+            <div>
+                <div class="info-label">Date of Birth:</div>
+                <div>{{.patient.dob}}</div>
+            </div>
+            <div>
+                <div class="info-label">Address:</div>
+                <div>{{.patient.address}}</div>
+            </div>
+            <div>
+                <div class="info-label">Phone:</div>
+                <div>{{.patient.phone}}</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="letter-title">{{.title}}</div>
+
+    <div class="intro-text">
+        {{.intro}}
+    </div>
+
+    <div class="content-section">
+        <h3>Clinical Tests Performed</h3>
+        <p>{{.tests}}</p>
+    </div>
+
+    <div class="content-section">
+        <h3>Clinical Findings &amp; Recommendations</h3>
+        <p>{{.issue}}</p>
+    </div>
+
+    {{if .drawing}}
+    <div class="drawing-section">
+        <h3>External SLE Examination Image</h3>
+        <img src="{{.drawing}}" style="height: 200px" alt="External SLE Drawing">
+    </div>
+    {{end}}
+
+    <div class="signature-area">
+        <p>Thank you for your professional consideration of this referral.</p>
+        <p>Sincerely,</p>
+
+        <div class="signature-grid">
+            <div class="doctor-info">
+                <strong>{{.from_doctor.printing_name}}</strong><br>
+                {{.from_doctor.job_title}}<br>
+                License Number: {{.from_doctor.dr_npi_number}}<br>
+                NPI: {{.from_doctor.dr_npi_number}}
+            </div>
+
+            <div class="signature-box">
+                <div class="signature-label">Signature</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="footer">
+        <p>Generated by EyeSync System</p>
+    </div>
+</body>
+</html>

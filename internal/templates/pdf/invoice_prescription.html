@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Lab Ticket</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+        }
+        h1, h2 {
+            color: #333;
+        }
+        .codes-strip {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 4px 0 6px 0;
+            margin-bottom: 8px;
+            border-bottom: 1px solid #ddd;
+        }
+        .codes-strip .code-left {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .codes-strip .code-right {
+            display: flex;
+            align-items: center;
+        }
+        .codes-strip .qr-img {
+            width: 44px;
+            height: 44px;
+        }
+        .codes-strip .barcode-img {
+            width: 160px;
+            height: 28px;
+        }
+        .codes-strip .code-number {
+            font-size: 9px;
+            font-family: Consolas, monospace;
+            color: #555;
+            letter-spacing: 0.5px;
+        }
+        .header, .footer {
+            text-align: center;
+        }
+        .details, .parameters, .notes {
+            margin-top: 20px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+        }
+        th {
+            background-color: #f2f2f2;
+        }
+    </style>
+</head>
+<body>
+    {{if or .barcode .qrcode}}
+    <div class="codes-strip">
+        <div class="code-left">
+            {{if .qrcode}}
+            <img src="data:image/png;base64,{{.qrcode}}" class="qr-img">
+            {{end}}
+            <span class="code-number">{{.ticket_number}}</span>
+        </div>
+        <div class="code-right">
+            {{if .barcode}}
+            <img src="data:image/png;base64,{{.barcode}}" class="barcode-img">
+            {{end}}
+        </div>
+    </div>
+    {{end}}
+    <div class="header">
+        <h1>Bronx Vision Center</h1>
+        <p>417 East 138th Street, Bronx, NY 10454</p>
+        <p>Phone: 917-891-8555</p>
+        <hr>
+    </div>
+
+    <div class="details">
+        <h2>Lab Ticket</h2>
+        <p>Ticket #: {{.ticket_number}}</p>
+        <p>Date: {{.date}}</p>
+        <p>Patient: {{.patient_name}}</p>
+    </div>
+
+    <div class="parameters">
+        <h3>Prescription Details</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>SPH</th>
+                    <th>CYL</th>
+                    <th>AXIS</th>
+                    <th>ADD</th>
+                    <th>DISTPD</th>
+                    <th>NEARPD</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>{{.od_sph}}</td>
+                    <td>{{.od_cyl}}</td>
+                    <td>{{.od_axis}}</td>
+                    <td>{{.add}}</td>
+                    <td>{{.distpd}}</td>
+                    <td>{{.nearpd}}</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <div class="notes">
+        <h3>Lens and Frame Details</h3>
+        <p>Lens Type: {{.lens_type}}</p>
+        <p>Material: {{.material}}</p>
+        <p>Frame: {{.frame_details}}</p>
+    </div>
+
+    <div class="footer">
+        <hr>
+        <p>Note: {{.notes}}</p>
+    </div>
+</body>
+</html>

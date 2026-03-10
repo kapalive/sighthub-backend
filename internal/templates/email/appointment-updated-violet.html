@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Appointment Updated (Violet)</title>
+</head>
+<body style="margin:0; font-family: Arial, sans-serif; background:#f1f5f9;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:500px; margin:0 auto; background:#fff; border-radius:16px; box-shadow:0 10px 15px -3px rgba(0,0,0,0.1); border:1px solid #e9d5ff;">
+        <tr>
+            <td style="padding:32px 24px; text-align:center; background:linear-gradient(135deg, #8b5cf6 0%, #a855f7 50%, #c026d3 100%);">
+                <p style="margin:0; font-size:11px; font-weight:600; color:rgba(233,213,255,1); letter-spacing:0.1em; text-transform:uppercase;">Appointment change</p>
+                <h2 style="margin:4px 0 0 0; font-size:24px; font-weight:700; color:#fff; text-shadow:0 1px 2px rgba(0,0,0,0.1);">Your appointment has been rescheduled</h2>
+            </td>
+        </tr>
+        <tr>
+            <td style="padding:24px; color:#334155; font-size:15px; line-height:1.6;">
+                <p style="margin:0 0 16px 0;">Hello {{.patient_name}},</p>
+                <p style="margin:0 0 16px 0;">We are writing to confirm that your appointment has been rescheduled.</p>
+                <p style="margin:0 0 16px 0;"><strong>When:</strong> {{.appointment_date}} at {{.appointment_time}}<br><strong>With:</strong> {{.provider_name}}<br><strong>Where:</strong> {{.location}}</p>
+                <p style="margin:0 0 16px 0;">Please arrive a few minutes early. Contact us if you need to make further changes.</p>
+                <p style="margin:24px 0 0 0; color:#64748b;">Best regards,<br><strong>Your Care Team</strong></p>
+            </td>
+        </tr>
+        <tr>
+            <td style="padding:12px 24px; border-top:1px solid #e9d5ff; text-align:center; font-size:12px; color:#64748b;">— {{.organization_name}}</td>
+        </tr>
+    </table>
+</body>
+</html>
