@@ -186,11 +186,13 @@ func (r *InventoryRepo) SearchBySKU(sku string, locationID int64) ([]InventoryLi
 func (r *InventoryRepo) GetItemStatuses() []string {
 	return []string{
 		string(types.StatusInventoryReadyForSale),
-		string(types.StatusInventorySOLD),
+		string(types.StatusInventoryDefective),
+		string(types.StatusInventoryOnReturn),
 		string(types.StatusInventoryICTToReceiveInMN),
 		string(types.StatusInventoryICTSentAndNotReceived),
+		string(types.StatusInventorySOLD),
 		string(types.StatusInventoryMissing),
-		string(types.StatusInventoryOnReturn),
+		string(types.StatusInventoryRemoved),
 	}
 }
 

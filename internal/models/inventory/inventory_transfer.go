@@ -3,7 +3,8 @@ package inventory
 
 import (
 	"fmt"
-	"sighthub-backend/internal/models/interfaces" // Импортируем интерфейсы
+	"sighthub-backend/internal/models/interfaces"
+	"sighthub-backend/internal/models/types"
 	"time"
 )
 
@@ -16,7 +17,7 @@ type InventoryTransfer struct {
 	DateTransfer   time.Time `gorm:"column:date_transfer;default:CURRENT_TIMESTAMP" json:"date_transfer"`
 	TransferredBy  int64     `gorm:"column:transferred_by" json:"transferred_by"`
 	ReceivedBy     int64     `gorm:"column:received_by" json:"received_by"`
-	StatusItems    string    `gorm:"column:status_items;not null" json:"status_items"`
+	StatusItems    types.StatusItemsInventory `gorm:"column:status_items;not null" json:"status_items"`
 	InvoiceID      int64     `gorm:"column:invoice_id;not null" json:"invoice_id"`
 	OldInvoiceID   *int64    `gorm:"column:old_invoice_id" json:"old_invoice_id,omitempty"`
 	InvoiceFrom    *int64    `gorm:"column:invoice_from" json:"invoice_from,omitempty"`

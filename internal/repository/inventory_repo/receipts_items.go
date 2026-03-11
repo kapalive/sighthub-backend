@@ -7,6 +7,7 @@ import (
 
 	"gorm.io/gorm"
 	"sighthub-backend/internal/models/inventory"
+	"sighthub-backend/internal/models/types"
 )
 
 type ReceiptsItemsRepo struct{ DB *gorm.DB }
@@ -58,7 +59,7 @@ func (r *ReceiptsItemsRepo) Confirm(invoiceID, inventoryID int64) (*inventory.Re
 		}
 		return tx.Model(&inventory.Inventory{}).
 			Where("id_inventory = ?", inventoryID).
-			Update("status_items_inventory", "available").Error
+			Update("status_items_inventory", types.StatusInventoryReadyForSale).Error
 	})
 	return ri, err
 }

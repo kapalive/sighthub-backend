@@ -83,6 +83,7 @@ func main() {
 
 	routes.RegisterAuthRoutes(db, cache.RDB, cfg, router)
 	routes.RegisterHomeRoutes(db, cache.RDB, cfg, router)
+	routes.RegisterFrameLibraryRoutes(db, cache.RDB, cfg, router)
 
 	addr := ":" + cfg.Port
 	log.Println("Server starting on", addr)

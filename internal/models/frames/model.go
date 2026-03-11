@@ -32,6 +32,7 @@ type Model struct {
 	Color             *string             `gorm:"column:color"                           json:"color,omitempty"`
 	MfgNumber         *string             `gorm:"column:mfg_number;type:varchar(50)"     json:"mfg_number,omitempty"`
 	MfrSerialNumber   *string             `gorm:"column:mfr_serial_number;type:varchar(100)" json:"mfr_serial_number,omitempty"`
+	Accessories       *string             `gorm:"column:accessories;type:text"           json:"accessories,omitempty"`
 
 	// Relationships
 	Product         *Product                `gorm:"foreignKey:ProductID;references:IDProduct" json:"product,omitempty"`
@@ -65,6 +66,7 @@ func (m *Model) ToMap() map[string]interface{} {
 		"color":               m.Color,
 		"mfg_number":          m.MfgNumber,
 		"mfr_serial_number":   m.MfrSerialNumber,
+		"accessories":         m.Accessories,
 	}
 
 	if m.Product != nil {

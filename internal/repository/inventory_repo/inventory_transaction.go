@@ -7,6 +7,7 @@ import (
 
 	"gorm.io/gorm"
 	"sighthub-backend/internal/models/inventory"
+	"sighthub-backend/internal/models/types"
 )
 
 type InventoryTransactionRepo struct{ DB *gorm.DB }
@@ -38,7 +39,7 @@ type CreateTransactionInput struct {
 	TransferredBy    int64
 	InvoiceID        int64
 	OldInvoiceID     *int64
-	StatusItems      string
+	StatusItems      types.StatusItemsInventory
 	TransactionType  string
 	InventoryCountID *int64
 	Notes            *string

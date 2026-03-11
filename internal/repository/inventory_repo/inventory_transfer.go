@@ -7,6 +7,7 @@ import (
 
 	"gorm.io/gorm"
 	"sighthub-backend/internal/models/inventory"
+	"sighthub-backend/internal/models/types"
 )
 
 type InventoryTransferRepo struct{ DB *gorm.DB }
@@ -46,7 +47,7 @@ type CreateTransferInput struct {
 	ToLocationID   int64
 	TransferredBy  int64
 	ReceivedBy     int64
-	StatusItems    string
+	StatusItems    types.StatusItemsInventory
 	InvoiceID      int64
 	OldInvoiceID   *int64
 	InvoiceFrom    *int64
@@ -93,7 +94,7 @@ func (r *InventoryTransferRepo) CreateWithTx(tx *gorm.DB, inp CreateTransferInpu
 }
 
 // UpdateStatus обновляет статус трансфера.
-func (r *InventoryTransferRepo) UpdateStatus(id int64, status string) error {
+func (r *InventoryTransferRepo) UpdateStatus(id int64, status types.StatusItemsInventory) error {
 	return r.DB.Model(&inventory.InventoryTransfer{}).
 		Where("id_transfer = ?", id).
 		Update("status_items", status).Error
