@@ -84,6 +84,10 @@ func main() {
 	routes.RegisterAuthRoutes(db, cache.RDB, cfg, router)
 	routes.RegisterHomeRoutes(db, cache.RDB, cfg, router)
 	routes.RegisterFrameLibraryRoutes(db, cache.RDB, cfg, router)
+	routes.RegisterPriceBookRoutes(db, cache.RDB, cfg, router)
+	routes.RegisterTasksRoutes(db, cache.RDB, cfg, router)
+	routes.RegisterTimecardRoutes(db, cache.RDB, cfg, router)
+	routes.RegisterInvoiceRoutes(db, cache.RDB, cfg, router)
 
 	addr := ":" + cfg.Port
 	log.Println("Server starting on", addr)
