@@ -228,12 +228,13 @@ func (s *Service) GetTransfers(el *EmpLocation, f TransferFilter) ([]map[string]
 		}
 
 		result = append(result, map[string]interface{}{
-			"invoice_id":     inv.IDInvoice,
-			"invoice_number": inv.NumberInvoice,
-			"from_location":  fromName,
-			"to_location":    toName,
-			"date_create":    inv.DateCreate.Format(time.RFC3339),
-			"status_invoice": statusName,
+			"invoice_id":        inv.IDInvoice,
+			"invoice_number":    inv.NumberInvoice,
+			"from_location":     fromName,
+			"to_location":       toName,
+			"date_create":       inv.DateCreate.Format(time.RFC3339),
+			"status_invoice_id": inv.StatusInvoiceID,
+			"status_invoice":    statusName,
 		})
 	}
 	if result == nil {

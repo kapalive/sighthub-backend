@@ -408,7 +408,7 @@ func (s *Service) GetShippingServices() ([]map[string]interface{}, error) {
 // ─── Payment Methods ──────────────────────────────────────────────────────────
 
 func (s *Service) GetReturnPaymentMethods() ([]map[string]interface{}, error) {
-	allowedIDs := []int{1, 2, 3, 4, 5, 6, 22}
+	allowedIDs := []int{1, 2, 3, 4, 5, 6, 22, 26}
 	var methods []general.PaymentMethod
 	s.db.Where("id_payment_method IN ?", allowedIDs).Order("method_name").Find(&methods)
 	var result []map[string]interface{}

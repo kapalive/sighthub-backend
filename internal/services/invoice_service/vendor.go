@@ -23,7 +23,7 @@ type CreateVendorInvoiceRequest struct {
 	Tax              float64  `json:"tax"`
 	InvoiceTotal     float64  `json:"invoice_total"`
 	OrderRef         string   `json:"order_ref"`
-	DiscountReceived int      `json:"discount_received"`
+	DiscountReceived float64  `json:"discount_received"`
 	Notes            *string  `json:"notes"`
 }
 
@@ -119,7 +119,7 @@ func (s *Service) CreateVendorInvoice(el *EmpLocation, req CreateVendorInvoiceRe
 	shipment := invModel.Shipment{
 		VendorID:          req.VendorID,
 		LocationID:        int64(el.Location.IDLocation),
-		BrandID:           inv.LocationID, // brand_id from invoice if available
+		// brand_id — Python uses invoice.brand_id but Invoice model doesn't have BrandID
 		QtyOk:             qtyOk,
 		QtyHold:           qtyHold,
 		QtyShort:          qtyShort,

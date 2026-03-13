@@ -22,15 +22,17 @@ type ReceiptFilter struct {
 }
 
 type ReceiptInvoiceRow struct {
-	IDInvoice       int64  `json:"id_invoice"`
-	CreatedDate     string `json:"created_date"`
-	NumberInvoice   string `json:"number_invoice"`
-	TotalAmount     string `json:"total_amount"`
-	FinalAmount     string `json:"final_amount"`
-	Due             string `json:"due"`
-	Quantity        int    `json:"quantity"`
-	VendorName      string `json:"vendor_name"`
-	VendorInvoiceID *int64 `json:"vendor_invoice_id"`
+	IDInvoice         int64   `json:"id_invoice"`
+	CreatedDate       string  `json:"created_date"`
+	NumberInvoice     string  `json:"number_invoice"`
+	TotalAmount       string  `json:"total_amount"`
+	FinalAmount       string  `json:"final_amount"`
+	Due               string  `json:"due"`
+	Quantity          int     `json:"quantity"`
+	VendorName        string  `json:"vendor_name"`
+	VendorInvoiceID   *int64  `json:"vendor_invoice_id"`
+	StatusInvoiceID   int64   `json:"status_invoice_id"`
+	StatusInvoiceName *string `json:"status_invoice"`
 }
 
 // GetReceipts returns invoices grouped by vendor or from-location.
@@ -108,16 +110,26 @@ func (s *Service) GetReceipts(el *EmpLocation, f ReceiptFilter) (map[string][]Re
 			}
 		}
 
+		var statusInvoiceName *string
+		if inv.StatusInvoiceID != 0 {
+			var si invoices.StatusInvoice
+			if s.db.First(&si, inv.StatusInvoiceID).Error == nil {
+				statusInvoiceName = &si.StatusInvoiceValue
+			}
+		}
+
 		row := ReceiptInvoiceRow{
-			IDInvoice:       inv.IDInvoice,
-			CreatedDate:     inv.DateCreate.UTC().Format(time.RFC3339),
-			NumberInvoice:   inv.NumberInvoice,
-			TotalAmount:     fmtFloat(inv.TotalAmount),
-			FinalAmount:     fmtFloat(inv.FinalAmount),
-			Due:             fmtFloat(inv.Due),
-			Quantity:        inv.Quantity,
-			VendorName:      groupName,
-			VendorInvoiceID: vendorInvoiceID,
+			IDInvoice:         inv.IDInvoice,
+			CreatedDate:       inv.DateCreate.UTC().Format(time.RFC3339),
+			NumberInvoice:     inv.NumberInvoice,
+			TotalAmount:       fmtFloat(inv.TotalAmount),
+			FinalAmount:       fmtFloat(inv.FinalAmount),
+			Due:               fmtFloat(inv.Due),
+			Quantity:          inv.Quantity,
+			VendorName:        groupName,
+			VendorInvoiceID:   vendorInvoiceID,
+			StatusInvoiceID:   inv.StatusInvoiceID,
+			StatusInvoiceName: statusInvoiceName,
 		}
 		grouped[groupName] = append(grouped[groupName], row)
 	}
@@ -402,6 +414,7 @@ func (s *Service) PayTransfer(el *EmpLocation, invoiceID int64) (*PayTransferRes
 		inv.Due = paidAmount
 	}
 	inv.Due = 0
+	inv.StatusInvoiceID = 24 // Paid
 
 	empID := int64(el.Employee.IDEmployee)
 	pmID := int64(1)

@@ -98,18 +98,31 @@ func (s *Service) CreateInvoice(el *EmpLocation, req CreateInvoiceRequest) (*Cre
 	}
 	empID := int64(el.Employee.IDEmployee)
 
+	// Foreign transfer = internal invoice to a location that is NOT the current store's warehouse
+	var statusInvID int64
+	if invoiceType == "I" && toLocID != nil {
+		isForeign := true
+		if el.Location.WarehouseID != nil && *toLocID == int64(*el.Location.WarehouseID) {
+			isForeign = false
+		}
+		if isForeign {
+			statusInvID = 25 // Sent to Store
+		}
+	}
+
 	inv := invoices.Invoice{
-		NumberInvoice: invoiceNumber,
-		DateCreate:    time.Now(),
-		Discount:      &req.Discount,
-		TotalAmount:   totalAmount,
-		FinalAmount:   finalAmount,
-		Due:           due,
-		Quantity:      len(inventoryItems),
-		EmployeeID:    &empID,
-		LocationID:    int64(el.Location.IDLocation),
-		ToLocationID:  toLocID,
-		VendorID:      vendorID,
+		NumberInvoice:   invoiceNumber,
+		DateCreate:      time.Now(),
+		Discount:        &req.Discount,
+		TotalAmount:     totalAmount,
+		FinalAmount:     finalAmount,
+		Due:             due,
+		Quantity:        len(inventoryItems),
+		EmployeeID:      &empID,
+		LocationID:      int64(el.Location.IDLocation),
+		ToLocationID:    toLocID,
+		VendorID:        vendorID,
+		StatusInvoiceID: statusInvID,
 	}
 	if err := s.db.Create(&inv).Error; err != nil {
 		return nil, err
@@ -258,6 +271,12 @@ func (s *Service) UpdateInvoice(el *EmpLocation, invoiceID int64, dateCreate *st
 	}
 	if inv.PatientID != 0 {
 		return nil, fmt.Errorf("%w: patient invoices cannot be updated", ErrBadRequest)
+	}
+	// For transfer invoices, only allow adding items if status = 25 (Sent to Store)
+	if strings.HasPrefix(inv.NumberInvoice, "I") && inv.ToLocationID != nil {
+		if inv.StatusInvoiceID != 25 {
+			return nil, fmt.Errorf("%w: cannot add items: invoice status must be 'Sent to Store'", ErrForbidden)
+		}
 	}
 	if len(items) == 0 {
 		return nil, fmt.Errorf("%w: no items provided", ErrBadRequest)
@@ -527,18 +546,28 @@ func (s *Service) ViewInvoice(el *EmpLocation, invoiceID int64) (map[string]inte
 		})
 	}
 
+	var statusInvoiceName *string
+	if inv.StatusInvoiceID != 0 {
+		var si invoices.StatusInvoice
+		if s.db.First(&si, inv.StatusInvoiceID).Error == nil {
+			statusInvoiceName = &si.StatusInvoiceValue
+		}
+	}
+
 	return map[string]interface{}{
-		"invoice_id":       inv.IDInvoice,
-		"number_invoice":   inv.NumberInvoice,
-		"employee":         el.Employee.FirstName + " " + el.Employee.LastName,
-		"date_create":      inv.DateCreate.Format(time.RFC3339),
-		"location_name":    loc.FullName,
-		"to_location_name": toLocName,
-		"total_quantity":   inv.Quantity,
-		"total_cost":       fmtFloat(inv.TotalAmount),
-		"final_amount":     fmtFloat(inv.FinalAmount),
-		"due":              fmtFloat(inv.Due),
-		"transactions":     txData,
+		"invoice_id":        inv.IDInvoice,
+		"number_invoice":    inv.NumberInvoice,
+		"employee":          el.Employee.FirstName + " " + el.Employee.LastName,
+		"date_create":       inv.DateCreate.Format(time.RFC3339),
+		"location_name":     loc.FullName,
+		"to_location_name":  toLocName,
+		"total_quantity":    inv.Quantity,
+		"total_cost":        fmtFloat(inv.TotalAmount),
+		"final_amount":      fmtFloat(inv.FinalAmount),
+		"due":               fmtFloat(inv.Due),
+		"status_invoice_id": inv.StatusInvoiceID,
+		"status_invoice":    statusInvoiceName,
+		"transactions":      txData,
 	}, nil
 }
 

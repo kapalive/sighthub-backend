@@ -695,6 +695,89 @@ func (h *Handler) GetLocations(w http.ResponseWriter, r *http.Request) {
 	jsonResponse(w, result, http.StatusOK)
 }
 
+// ─── Invoice Status ───────────────────────────────────────────────────────────
+
+// PUT /api/invoice/{invoice_id}/status
+func (h *Handler) UpdateInvoiceStatus(w http.ResponseWriter, r *http.Request) {
+	id, err := pathInt64(r, "invoice_id")
+	if err != nil {
+		jsonError(w, "invalid invoice_id", http.StatusBadRequest)
+		return
+	}
+	var body struct {
+		StatusInvoiceID *int `json:"status_invoice_id"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil || body.StatusInvoiceID == nil {
+		jsonError(w, "status_invoice_id is required", http.StatusBadRequest)
+		return
+	}
+	result, err := h.svc.UpdateInvoiceStatus(id, *body.StatusInvoiceID)
+	if err != nil {
+		jsonError(w, err.Error(), httpStatus(err))
+		return
+	}
+	jsonResponse(w, result, http.StatusOK)
+}
+
+// GET /api/invoice/statuses
+func (h *Handler) GetInvoiceStatuses(w http.ResponseWriter, r *http.Request) {
+	result, err := h.svc.GetInvoiceStatuses()
+	if err != nil {
+		jsonError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	jsonResponse(w, result, http.StatusOK)
+}
+
+// GET /api/invoice/patient_returns
+func (h *Handler) GetPatientReturns(w http.ResponseWriter, r *http.Request) {
+	username := pkgAuth.UsernameFromContext(r.Context())
+	el, err := h.svc.GetEmpLocation(username)
+	if err != nil {
+		jsonError(w, err.Error(), http.StatusNotFound)
+		return
+	}
+
+	var dateFrom, dateTo *time.Time
+	if v := r.URL.Query().Get("date_from"); v != "" {
+		t, err := time.Parse("2006-01-02", v)
+		if err == nil {
+			dateFrom = &t
+		}
+	}
+	if v := r.URL.Query().Get("date_to"); v != "" {
+		t, err := time.Parse("2006-01-02", v)
+		if err == nil {
+			t = t.Add(23*time.Hour + 59*time.Minute + 59*time.Second)
+			dateTo = &t
+		}
+	}
+
+	result, err := h.svc.GetPatientReturns(el, dateFrom, dateTo)
+	if err != nil {
+		jsonError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	jsonResponse(w, result, http.StatusOK)
+}
+
+// GET /api/invoice/transfer-locations?type=local|foreign
+func (h *Handler) GetTransferLocations(w http.ResponseWriter, r *http.Request) {
+	username := pkgAuth.UsernameFromContext(r.Context())
+	el, err := h.svc.GetEmpLocation(username)
+	if err != nil {
+		jsonError(w, err.Error(), http.StatusNotFound)
+		return
+	}
+	transferType := r.URL.Query().Get("type")
+	result, err := h.svc.GetTransferLocations(el, transferType)
+	if err != nil {
+		jsonError(w, err.Error(), httpStatus(err))
+		return
+	}
+	jsonResponse(w, result, http.StatusOK)
+}
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 func pathInt64(r *http.Request, key string) (int64, error) {

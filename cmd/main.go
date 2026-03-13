@@ -93,6 +93,7 @@ func main() {
 	routes.RegisterTasksRoutes(db, cache.RDB, cfg, router)
 	routes.RegisterTimecardRoutes(db, cache.RDB, cfg, router)
 	routes.RegisterInvoiceRoutes(db, cache.RDB, cfg, router)
+	routes.RegisterOrderedInventoryRoutes(db, cache.RDB, cfg, router)
 	routes.RegisterLicenseRoutes(db, router)
 	routes.RegisterQuestionnaireRoutes(db, cache.RDB, cfg, router)
 	routes.RegisterAppointmentBookRoutes(db, cache.RDB, cfg, router)

@@ -50,6 +50,10 @@ func RegisterInvoiceRoutes(db *gorm.DB, rdb *redis.Client, cfg *config.Config, r
 	read.HandleFunc("/transfers", h.GetTransfers).Methods("GET")
 	read.HandleFunc("/shipment/{shipment_id}", h.GetShipment).Methods("GET")
 	read.HandleFunc("/vendor_invoice/{id}", h.GetVendorInvoice).Methods("GET")
+	read.HandleFunc("/statuses", h.GetInvoiceStatuses).Methods("GET")
+	read.HandleFunc("/patient_returns", h.GetPatientReturns).Methods("GET")
+	read.HandleFunc("/transfer-locations", h.GetTransferLocations).Methods("GET")
+	read.HandleFunc("/{invoice_id}/status", h.UpdateInvoiceStatus).Methods("PUT")
 
 	// ─── Create ───────────────────────────────────────────────────────────────
 	create := api.NewRoute().Subrouter()
