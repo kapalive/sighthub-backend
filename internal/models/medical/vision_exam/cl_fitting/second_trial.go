@@ -17,6 +17,10 @@ type SecondTrial struct {
 	OsAxis            *string `gorm:"column:os_axis;type:varchar(255)"                 json:"os_axis,omitempty"`
 	OdAdd             *string `gorm:"column:od_add;type:varchar(255)"                  json:"od_add,omitempty"`
 	OsAdd             *string `gorm:"column:os_add;type:varchar(255)"                  json:"os_add,omitempty"`
+	OdDva20           *string `gorm:"column:od_dva_20;type:varchar(255)"               json:"od_dva_20,omitempty"`
+	OsDva20           *string `gorm:"column:os_dva_20;type:varchar(255)"               json:"os_dva_20,omitempty"`
+	OdNva20           *string `gorm:"column:od_nva_20;type:varchar(255)"               json:"od_nva_20,omitempty"`
+	OsNva20           *string `gorm:"column:os_nva_20;type:varchar(255)"               json:"os_nva_20,omitempty"`
 	Trial             bool    `gorm:"column:trial;not null;default:false"              json:"trial"`
 	Final             bool    `gorm:"column:final;not null;default:false"              json:"final"`
 	NeedToOrder       bool    `gorm:"column:need_to_order;not null;default:false"      json:"need_to_order"`
@@ -29,6 +33,8 @@ func (s *SecondTrial) ToMap() map[string]interface{} {
 	return map[string]interface{}{
 		"id_second_trial": s.IDSecondTrial,
 		"od_brand": s.OdBrand, "os_brand": s.OsBrand,
+		"od_dva_20": s.OdDva20, "os_dva_20": s.OsDva20,
+		"od_nva_20": s.OdNva20, "os_nva_20": s.OsNva20,
 		"trial": s.Trial, "final": s.Final,
 		"need_to_order": s.NeedToOrder, "dispense_from_stock": s.DispenseFromStock,
 		"front_desk_note": s.FrontDeskNote, "type_add": s.TypeAdd,

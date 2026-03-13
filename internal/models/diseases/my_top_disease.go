@@ -9,6 +9,7 @@ type MyTopDisease struct {
 	Code           string  `gorm:"column:code;type:varchar(20);not null"             json:"code"`
 	Title          string  `gorm:"column:title;type:varchar(255);not null"           json:"title"`
 	GroupSet       *string `gorm:"column:group_set;type:varchar(255)"                json:"group_set,omitempty"`
+	EmployeeID     *int64  `gorm:"column:employee_id"                                json:"employee_id,omitempty"`
 }
 
 func (MyTopDisease) TableName() string { return "my_top_disease" }
@@ -21,5 +22,6 @@ func (m *MyTopDisease) ToMap() map[string]interface{} {
 		"code":              m.Code,
 		"title":             m.Title,
 		"group_set":         m.GroupSet,
+		"employee_id":       m.EmployeeID,
 	}
 }

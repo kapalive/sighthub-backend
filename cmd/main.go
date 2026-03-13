@@ -103,6 +103,17 @@ func main() {
 	routes.RegisterDoctorDeskRoutes(db, cache.RDB, cfg, router)
 	exameye.RegisterExamEyeRoutes(db, cache.RDB, cfg, router)
 	exameye.RegisterHistoryRoutes(db, cache.RDB, cfg, router)
+	exameye.RegisterCcHpiRoutes(db, cache.RDB, cfg, router)
+	exameye.RegisterPreliminaryRoutes(db, cache.RDB, cfg, router)
+	exameye.RegisterRefractionRoutes(db, cache.RDB, cfg, router)
+	exameye.RegisterClFittingRoutes(db, cache.RDB, cfg, router)
+	exameye.RegisterExternalSleRoutes(db, cache.RDB, cfg, router)
+	exameye.RegisterPosteriorRoutes(db, cache.RDB, cfg, router)
+	exameye.RegisterSpecialRoutes(db, cache.RDB, cfg, router)
+	exameye.RegisterAssessmentRoutes(db, cache.RDB, cfg, router)
+	exameye.RegisterReferralRoutes(db, cache.RDB, cfg, router)
+	exameye.RegisterSuperRoutes(db, cache.RDB, cfg, router)
+	exameye.RegisterSLRPRoutes(db, cache.RDB, cfg, router)
 
 	addr := ":" + cfg.Port
 	log.Println("Server starting on", addr)
