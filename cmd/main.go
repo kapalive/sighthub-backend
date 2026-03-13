@@ -96,6 +96,7 @@ func main() {
 	routes.RegisterOrderedInventoryRoutes(db, cache.RDB, cfg, router)
 	routes.RegisterPosTerminalRoutes(db, cache.RDB, cfg, router)
 	routes.RegisterReportAccountingRoutes(db, cache.RDB, cfg, router)
+	routes.RegisterReportDailyRoutes(db, cache.RDB, cfg, router)
 	routes.RegisterLicenseRoutes(db, router)
 	routes.RegisterQuestionnaireRoutes(db, cache.RDB, cfg, router)
 	routes.RegisterAppointmentBookRoutes(db, cache.RDB, cfg, router)
@@ -128,6 +129,8 @@ func main() {
 	routes.RegisterDailyCloseRoutes(db, cache.RDB, cfg, router)
 	routes.RegisterDashboardRoutes(db, cache.RDB, cfg, router)
 	routes.RegisterInventoryRoutes(db, cache.RDB, cfg, router)
+	routes.RegisterReportInventoryRoutes(db, cache.RDB, cfg, router)
+	routes.RegisterReportLibraryRoutes(db, cache.RDB, cfg, router)
 
 	addr := ":" + cfg.Port
 	log.Println("Server starting on", addr)
