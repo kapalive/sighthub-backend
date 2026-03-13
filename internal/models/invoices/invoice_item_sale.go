@@ -20,6 +20,8 @@ type InvoiceItemSale struct {
 	Taxable       *bool    `gorm:"column:taxable"                                              json:"taxable"` // nullable
 	TotalTax      float64  `gorm:"column:total_tax;type:numeric(10,4);not null;default:0"      json:"total_tax"`
 	InsBalance    *float64 `gorm:"column:ins_balance;type:numeric(10,2)"                       json:"ins_balance"` // nullable
+	SaleKey       *string  `gorm:"column:sale_key;type:varchar(50)"                            json:"sale_key,omitempty"`
+	PtBalance     *float64 `gorm:"column:pt_balance;type:numeric(10,2)"                        json:"pt_balance"` // nullable
 
 	// Связь с Invoice (тот же пакет)
 	Invoice *Invoice `gorm:"foreignKey:InvoiceID;references:IDInvoice" json:"invoice,omitempty"`
@@ -42,6 +44,8 @@ func (i *InvoiceItemSale) ToMap() map[string]interface{} {
 		"taxable":         i.Taxable,
 		"total_tax":       i.TotalTax,
 		"ins_balance":     i.InsBalance,
+		"sale_key":        i.SaleKey,
+		"pt_balance":      i.PtBalance,
 	}
 }
 

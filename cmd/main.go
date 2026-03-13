@@ -88,6 +88,15 @@ func main() {
 	routes.RegisterTasksRoutes(db, cache.RDB, cfg, router)
 	routes.RegisterTimecardRoutes(db, cache.RDB, cfg, router)
 	routes.RegisterInvoiceRoutes(db, cache.RDB, cfg, router)
+	routes.RegisterLicenseRoutes(db, router)
+	routes.RegisterQuestionnaireRoutes(db, cache.RDB, cfg, router)
+	routes.RegisterAppointmentBookRoutes(db, cache.RDB, cfg, router)
+	routes.RegisterRequestAppointmentRoutes(db, router)
+	routes.RegisterEmailTemplateRoutes(db, cache.RDB, cfg, router)
+	routes.RegisterHelpdeskRoutes(db, cache.RDB, cfg, router)
+	routes.RegisterEmployeeRoutes(db, cache.RDB, cfg, router)
+	routes.RegisterStoreRoutes(db, cache.RDB, cfg, router)
+	routes.RegisterPatientRoutes(db, cache.RDB, cfg, router)
 
 	addr := ":" + cfg.Port
 	log.Println("Server starting on", addr)
