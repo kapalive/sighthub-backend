@@ -434,6 +434,16 @@ func (h *Handler) RemoveOffDay(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]string{"message": "Off day removed", "date": removed})
 }
 
+// GET /job-titles
+func (h *Handler) GetJobTitles(w http.ResponseWriter, r *http.Request) {
+	titles, err := h.svc.GetJobTitles()
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, titles)
+}
+
 func parseTimecardDateRange(r *http.Request) (time.Time, time.Time) {
 	today := time.Now()
 	start := time.Date(today.Year(), today.Month(), 1, 0, 0, 0, 0, time.UTC)

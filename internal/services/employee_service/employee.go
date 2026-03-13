@@ -30,14 +30,16 @@ func New(db *gorm.DB) *Service {
 // --- DTOs ---
 
 type EmployeeListItem struct {
-	LastName  string  `json:"last_name"`
-	FirstName string  `json:"first_name"`
-	Username  *string `json:"username"`
-	Email     *string `json:"email"`
-	ID        int     `json:"id"`
-	Doctor    bool    `json:"doctor"`
-	Erx       bool    `json:"erx"`
-	Active    bool    `json:"active"`
+	LastName   string  `json:"last_name"`
+	FirstName  string  `json:"first_name"`
+	Username   *string `json:"username"`
+	Email      *string `json:"email"`
+	ID         int     `json:"id"`
+	Doctor     bool    `json:"doctor"`
+	JobTitleID *int64  `json:"job_title_id"`
+	JobTitle   *string `json:"job_title"`
+	Erx        bool    `json:"erx"`
+	Active     bool    `json:"active"`
 }
 
 type EmployeeGeneralResponse struct {
@@ -57,6 +59,8 @@ type EmployeeGeneralResponse struct {
 	StartDate       *string `json:"start_date"`
 	TerminationDate *string `json:"termination_date"`
 	Active          string  `json:"active"`
+	JobTitleID      *int64  `json:"job_title_id"`
+	JobTitle        *string `json:"job_title"`
 	ReferralSig     string  `json:"referral_signature"`
 	SignatureImg    *string `json:"signature_img"`
 }
@@ -69,6 +73,7 @@ type AddEmployeeInput struct {
 	ProviderInfo map[string]interface{} `json:"provider_info"`
 	LocationID   int                    `json:"location_id"`
 	Signature    *string                `json:"signature"`
+	JobTitleID   *int64                 `json:"job_title_id"`
 }
 
 type UpdateEmployeeInput struct {
@@ -78,11 +83,14 @@ type UpdateEmployeeInput struct {
 	ProviderInfo map[string]interface{} `json:"provider_info"`
 	LocationID   int                    `json:"location_id"`
 	Signature    *string                `json:"signature"`
+	JobTitleID   *int64                 `json:"job_title_id"`
 }
 
 type EmployeeDetailResponse struct {
 	LocationID   *int64                 `json:"location_id"`
 	Provider     bool                   `json:"provider"`
+	JobTitleID   *int64                 `json:"job_title_id"`
+	JobTitle     *string                `json:"job_title"`
 	General      map[string]interface{} `json:"general"`
 	Signature    *string                `json:"signature"`
 	Roles        []string               `json:"roles"`
@@ -181,9 +189,14 @@ func (s *Service) ListEmployees() ([]EmployeeListItem, error) {
 	for _, emp := range employees {
 		var jt empModel.JobTitle
 		isDoctor := false
+		var jtID *int64
+		var jtTitle *string
 		if emp.JobTitleID != nil {
-			s.db.First(&jt, *emp.JobTitleID)
-			isDoctor = jt.Doctor
+			if s.db.First(&jt, *emp.JobTitleID).Error == nil {
+				isDoctor = jt.Doctor
+				jtID = emp.JobTitleID
+				jtTitle = &jt.Title
+			}
 		}
 		var sig empModel.ElectronReferralSignature
 		erx := s.db.Where("employee_id = ?", emp.IDEmployee).First(&sig).Error == nil
@@ -196,14 +209,16 @@ func (s *Service) ListEmployees() ([]EmployeeListItem, error) {
 			loginActive = login.Active
 		}
 		result = append(result, EmployeeListItem{
-			LastName:  emp.LastName,
-			FirstName: emp.FirstName,
-			Username:  username,
-			Email:     emp.Email,
-			ID:        emp.IDEmployee,
-			Doctor:    isDoctor,
-			Erx:       erx,
-			Active:    loginActive,
+			LastName:   emp.LastName,
+			FirstName:  emp.FirstName,
+			Username:   username,
+			Email:      emp.Email,
+			ID:         emp.IDEmployee,
+			Doctor:     isDoctor,
+			JobTitleID: jtID,
+			JobTitle:   jtTitle,
+			Erx:        erx,
+			Active:     loginActive,
 		})
 	}
 	return result, nil
@@ -220,10 +235,16 @@ func (s *Service) GetEmployeeGeneral(currentUsername string) (*EmployeeGeneralRe
 	}
 
 	isDoctor := "No"
+	var jtID *int64
+	var jtTitle *string
 	if emp.JobTitleID != nil {
 		var jt empModel.JobTitle
-		if s.db.First(&jt, *emp.JobTitleID).Error == nil && jt.Doctor {
-			isDoctor = "Yes"
+		if s.db.First(&jt, *emp.JobTitleID).Error == nil {
+			if jt.Doctor {
+				isDoctor = "Yes"
+			}
+			jtID = emp.JobTitleID
+			jtTitle = &jt.Title
 		}
 	}
 
@@ -245,6 +266,8 @@ func (s *Service) GetEmployeeGeneral(currentUsername string) (*EmployeeGeneralRe
 		Doctor:        isDoctor,
 		Email:         emp.Email,
 		Active:        "N",
+		JobTitleID:    jtID,
+		JobTitle:      jtTitle,
 		ReferralSig:   refSig,
 		SignatureImg:  sigImg,
 	}
@@ -342,9 +365,21 @@ func (s *Service) GetEmployee(employeeID int) (*EmployeeDetailResponse, error) {
 		}
 	}
 
+	var jtID *int64
+	var jtTitle *string
+	if emp.JobTitleID != nil {
+		var jt empModel.JobTitle
+		if s.db.First(&jt, *emp.JobTitleID).Error == nil {
+			jtID = emp.JobTitleID
+			jtTitle = &jt.Title
+		}
+	}
+
 	return &EmployeeDetailResponse{
 		LocationID:   emp.StorePayrollID,
 		Provider:     isProvider,
+		JobTitleID:   jtID,
+		JobTitle:     jtTitle,
 		General:      general,
 		Signature:    emp.Signature,
 		Roles:        roleNames,
@@ -427,7 +462,9 @@ func (s *Service) AddEmployee(currentUsername string, input AddEmployeeInput) (i
 			newEmp.Signature = &cleaned
 		}
 
-		if input.Provider {
+		if input.JobTitleID != nil {
+			newEmp.JobTitleID = input.JobTitleID
+		} else if input.Provider {
 			jid := int64(1)
 			newEmp.JobTitleID = &jid
 		} else {
@@ -539,7 +576,9 @@ func (s *Service) UpdateEmployee(currentUsername string, employeeID int, input U
 			emp.StorePayrollID = &lid
 		}
 
-		if input.Provider {
+		if input.JobTitleID != nil {
+			emp.JobTitleID = input.JobTitleID
+		} else if input.Provider {
 			jid := int64(1)
 			emp.JobTitleID = &jid
 		} else {
@@ -841,6 +880,20 @@ func (s *Service) RemoveOffDay(employeeID int, dateStr string) (string, error) {
 		s.db.Delete(&cal)
 	}
 	return target.Format("2006-01-02"), nil
+}
+
+// --- Job Titles ---
+
+func (s *Service) GetJobTitles() ([]map[string]interface{}, error) {
+	var titles []empModel.JobTitle
+	if err := s.db.Order("title").Find(&titles).Error; err != nil {
+		return nil, err
+	}
+	result := make([]map[string]interface{}, 0, len(titles))
+	for _, t := range titles {
+		result = append(result, t.ToMap())
+	}
+	return result, nil
 }
 
 // --- Helpers ---

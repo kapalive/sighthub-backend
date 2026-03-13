@@ -68,6 +68,9 @@ func RegisterEmployeeRoutes(db *gorm.DB, rdb *redis.Client, cfg *config.Config, 
 	api.HandleFunc("/{employee_id:[0-9]+}/commissions/{commission_id:[0-9]+}", comm.UpdateCommission).Methods("PUT")
 	api.HandleFunc("/{employee_id:[0-9]+}/commissions", comm.CreateCommission).Methods("POST")
 
+	// Job titles
+	api.HandleFunc("/job-titles", emp.GetJobTitles).Methods("GET")
+
 	// Permissions — block-based (15 blocks)
 	permBlocks := map[string]int{
 		"docktor_desk":       1,
