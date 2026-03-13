@@ -8,6 +8,7 @@ import (
 	"sighthub-backend/internal/blacklist"
 
 	"sighthub-backend/internal/routes"
+	exameye "sighthub-backend/internal/routes/exam_eye"
 	"os"
 	"sighthub-backend/pkg/cache"
 	"time"
@@ -97,6 +98,11 @@ func main() {
 	routes.RegisterEmployeeRoutes(db, cache.RDB, cfg, router)
 	routes.RegisterStoreRoutes(db, cache.RDB, cfg, router)
 	routes.RegisterPatientRoutes(db, cache.RDB, cfg, router)
+	routes.RegisterProfileRoutes(db, cache.RDB, cfg, router)
+	routes.RegisterARReportRoutes(db, cache.RDB, cfg, router)
+	routes.RegisterDoctorDeskRoutes(db, cache.RDB, cfg, router)
+	exameye.RegisterExamEyeRoutes(db, cache.RDB, cfg, router)
+	exameye.RegisterHistoryRoutes(db, cache.RDB, cfg, router)
 
 	addr := ":" + cfg.Port
 	log.Println("Server starting on", addr)
