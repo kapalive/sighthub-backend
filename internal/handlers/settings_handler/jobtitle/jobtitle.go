@@ -1,4 +1,4 @@
-package smtp
+package jobtitle
 
 import (
 	"encoding/json"
@@ -25,8 +25,13 @@ func jsonOK(w http.ResponseWriter, data interface{}) {
 	json.NewEncoder(w).Encode(data)
 }
 
+func pathID(r *http.Request) int {
+	id, _ := strconv.Atoi(mux.Vars(r)["id"])
+	return id
+}
+
 func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
-	data, err := h.svc.ListSMTP()
+	data, err := h.svc.ListJobTitles()
 	if err != nil {
 		jsonError(w, err.Error(), 500)
 		return
@@ -34,23 +39,20 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 	jsonOK(w, data)
 }
 
-func (h *Handler) Get(w http.ResponseWriter, r *http.Request) {
-	id, _ := strconv.Atoi(mux.Vars(r)["id"])
-	data, err := h.svc.GetSMTP(id)
-	if err != nil {
-		jsonError(w, err.Error(), 404)
-		return
-	}
-	jsonOK(w, data)
-}
-
 func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
-	var body map[string]interface{}
+	var body struct {
+		Title      string  `json:"title"`
+		ShortTitle *string `json:"short_title"`
+	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		jsonError(w, "Invalid JSON", 400)
 		return
 	}
-	data, err := h.svc.CreateSMTP(body)
+	if body.Title == "" {
+		jsonError(w, "title is required", 400)
+		return
+	}
+	data, err := h.svc.CreateJobTitle(body.Title, body.ShortTitle)
 	if err != nil {
 		jsonError(w, err.Error(), 400)
 		return
@@ -61,13 +63,15 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
-	id, _ := strconv.Atoi(mux.Vars(r)["id"])
-	var body map[string]interface{}
+	var body struct {
+		Title      string  `json:"title"`
+		ShortTitle *string `json:"short_title"`
+	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		jsonError(w, "Invalid JSON", 400)
 		return
 	}
-	data, err := h.svc.UpdateSMTP(id, body)
+	data, err := h.svc.UpdateJobTitle(pathID(r), body.Title, body.ShortTitle)
 	if err != nil {
 		jsonError(w, err.Error(), 400)
 		return
@@ -75,11 +79,10 @@ func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
 	jsonOK(w, data)
 }
 
-func (h *Handler) Test(w http.ResponseWriter, r *http.Request) {
-	id, _ := strconv.Atoi(mux.Vars(r)["id"])
-	if err := h.svc.TestSMTP(id); err != nil {
-		jsonError(w, err.Error(), 500)
+func (h *Handler) Delete(w http.ResponseWriter, r *http.Request) {
+	if err := h.svc.DeleteJobTitle(pathID(r)); err != nil {
+		jsonError(w, err.Error(), 400)
 		return
 	}
-	jsonOK(w, map[string]string{"message": "SMTP connection successful"})
+	jsonOK(w, map[string]string{"message": "Deleted"})
 }
