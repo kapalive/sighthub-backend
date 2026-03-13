@@ -48,11 +48,11 @@ type CreateTransactionInput struct {
 // Create записывает транзакцию инвентаря.
 func (r *InventoryTransactionRepo) Create(inp CreateTransactionInput) (*inventory.InventoryTransaction, error) {
 	txn := &inventory.InventoryTransaction{
-		InventoryID:      inp.InventoryID,
-		FromLocationID:   inp.FromLocationID,
-		ToLocationID:     inp.ToLocationID,
+		InventoryID:      &inp.InventoryID,
+		FromLocationID:   &inp.FromLocationID,
+		ToLocationID:     &inp.ToLocationID,
 		TransferredBy:    inp.TransferredBy,
-		InvoiceID:        inp.InvoiceID,
+		InvoiceID:        &inp.InvoiceID,
 		OldInvoiceID:     inp.OldInvoiceID,
 		StatusItems:      inp.StatusItems,
 		TransactionType:  inp.TransactionType,
@@ -69,11 +69,11 @@ func (r *InventoryTransactionRepo) Create(inp CreateTransactionInput) (*inventor
 // CreateWithTx создаёт транзакцию внутри существующей DB-транзакции.
 func (r *InventoryTransactionRepo) CreateWithTx(tx *gorm.DB, inp CreateTransactionInput) (*inventory.InventoryTransaction, error) {
 	txn := &inventory.InventoryTransaction{
-		InventoryID:      inp.InventoryID,
-		FromLocationID:   inp.FromLocationID,
-		ToLocationID:     inp.ToLocationID,
+		InventoryID:      &inp.InventoryID,
+		FromLocationID:   &inp.FromLocationID,
+		ToLocationID:     &inp.ToLocationID,
 		TransferredBy:    inp.TransferredBy,
-		InvoiceID:        inp.InvoiceID,
+		InvoiceID:        &inp.InvoiceID,
 		OldInvoiceID:     inp.OldInvoiceID,
 		StatusItems:      inp.StatusItems,
 		TransactionType:  inp.TransactionType,

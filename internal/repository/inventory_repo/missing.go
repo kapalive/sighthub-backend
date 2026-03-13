@@ -46,7 +46,7 @@ func (r *MissingRepo) Create(inp CreateMissingInput) (*inventory.Missing, error)
 		InventoryCountID: inp.InventoryCountID,
 		InventoryID:      inp.InventoryID,
 		LocationID:       inp.LocationID,
-		BrandID:          inp.BrandID,
+		BrandID:          &inp.BrandID,
 		ModelID:          inp.ModelID,
 		Quantity:         inp.Quantity,
 		Cost:             inp.Cost,

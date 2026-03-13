@@ -1345,7 +1345,10 @@ func (s *Service) AddItemsToInvoice(username string, invoiceID int64, input AddI
 							var activeIC invModel.InventoryCount
 							if tx.Where("id_inventory_count = ? AND status = true", missingInCount.InventoryCountID).First(&activeIC).Error == nil {
 								locIntID := loc.IDLocation
-								brandIntID := int(missingInCount.BrandID)
+								brandIntID := 0
+								if missingInCount.BrandID != nil {
+									brandIntID = int(*missingInCount.BrandID)
+								}
 								tx.Create(&invModel.TempCountInventory{
 									InventoryID:      frame.IDInventory,
 									LocationID:       locIntID,

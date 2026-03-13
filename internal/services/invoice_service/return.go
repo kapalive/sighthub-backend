@@ -210,10 +210,10 @@ func (s *Service) CreateReturnInvoice(el *EmpLocation, req CreateReturnInvoiceRe
 		s.db.Save(&r.item)
 
 		txn := invModel.InventoryTransaction{
-			InventoryID:     r.item.IDInventory,
-			FromLocationID:  r.item.LocationID,
+			InventoryID:     &r.item.IDInventory,
+			FromLocationID:  &r.item.LocationID,
 			TransferredBy:   empID,
-			InvoiceID:       r.item.InvoiceID,
+			InvoiceID:       &r.item.InvoiceID,
 			OldInvoiceID:    &r.item.InvoiceID,
 			StatusItems:     "On Return",
 			TransactionType: "ReturnToVendor",
@@ -327,10 +327,10 @@ func (s *Service) UpdateReturnInvoice(el *EmpLocation, returnInvoiceID int64, re
 		s.db.Save(&item)
 
 		txn := invModel.InventoryTransaction{
-			InventoryID:     item.IDInventory,
-			FromLocationID:  item.LocationID,
+			InventoryID:     &item.IDInventory,
+			FromLocationID:  &item.LocationID,
 			TransferredBy:   empID,
-			InvoiceID:       item.InvoiceID,
+			InvoiceID:       &item.InvoiceID,
 			OldInvoiceID:    &item.InvoiceID,
 			StatusItems:     "On Return",
 			TransactionType: "ReturnToVendor",
@@ -370,10 +370,10 @@ func (s *Service) DeleteReturnInvoice(returnInvoiceID int64) error {
 			s.db.Save(&item)
 
 			txn := invModel.InventoryTransaction{
-				InventoryID:     item.IDInventory,
-				ToLocationID:    item.LocationID,
+				InventoryID:     &item.IDInventory,
+				ToLocationID:    &item.LocationID,
 				TransferredBy:   1,
-				InvoiceID:       item.InvoiceID,
+				InvoiceID:       &item.InvoiceID,
 				OldInvoiceID:    &item.InvoiceID,
 				StatusItems:     "Ready for Sale",
 				TransactionType: "UndoReturnToVendor",

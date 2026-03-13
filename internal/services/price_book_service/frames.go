@@ -349,9 +349,9 @@ func (s *Service) CreateCustomGlasses(inventoryID int, employeeID int64, in Cust
 	hasLastTx := tx.Where("inventory_id = ?", inventoryID).
 		Order("id_transaction DESC").First(&lastTx).Error == nil
 
-	fromLoc := inv.LocationID
-	toLoc := inv.LocationID
-	invoiceID := inv.InvoiceID
+	fromLoc := &inv.LocationID
+	toLoc := &inv.LocationID
+	invoiceID := &inv.InvoiceID
 	if hasLastTx {
 		fromLoc = lastTx.FromLocationID
 		toLoc = lastTx.ToLocationID
@@ -360,7 +360,7 @@ func (s *Service) CreateCustomGlasses(inventoryID int, employeeID int64, in Cust
 
 	notes := fmt.Sprintf("old_model_id=%d;new_model_id=%d", *inv.ModelID, newModel.IDModel)
 	itx := inventory.InventoryTransaction{
-		InventoryID:     inv.IDInventory,
+		InventoryID:     &inv.IDInventory,
 		FromLocationID:  fromLoc,
 		ToLocationID:    toLoc,
 		TransferredBy:   employeeID,
@@ -473,11 +473,11 @@ func (s *Service) RevertCustomGlasses(inventoryID int, employeeID int64, pbPrice
 
 	notes := fmt.Sprintf("old_model_id=%d;restored_model_id=%d", currentModelID, oldModelID)
 	revertTx := inventory.InventoryTransaction{
-		InventoryID:     inv.IDInventory,
-		FromLocationID:  inv.LocationID,
-		ToLocationID:    inv.LocationID,
+		InventoryID:     &inv.IDInventory,
+		FromLocationID:  &inv.LocationID,
+		ToLocationID:    &inv.LocationID,
 		TransferredBy:   employeeID,
-		InvoiceID:       inv.InvoiceID,
+		InvoiceID:       &inv.InvoiceID,
 		StatusItems:     inv.StatusItemsInventory,
 		TransactionType: "RevertToRegular",
 		Notes:           &notes,

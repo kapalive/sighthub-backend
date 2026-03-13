@@ -124,6 +124,7 @@ func main() {
 	routes.RegisterClaimRoutes(db, cache.RDB, cfg, router)
 	routes.RegisterDailyCloseRoutes(db, cache.RDB, cfg, router)
 	routes.RegisterDashboardRoutes(db, cache.RDB, cfg, router)
+	routes.RegisterInventoryRoutes(db, cache.RDB, cfg, router)
 
 	addr := ":" + cfg.Port
 	log.Println("Server starting on", addr)

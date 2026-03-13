@@ -168,7 +168,10 @@ func (s *Service) GetReceipt(invoiceID int64) (*GetReceiptResult, error) {
 		var txns []invModel.InventoryTransaction
 		s.db.Where("invoice_id = ?", invoiceID).Find(&txns)
 		for _, t := range txns {
-			if row := s.buildItemRow(t.InventoryID, "I", t.DateTransaction); row != nil {
+			if t.InventoryID == nil {
+				continue
+			}
+			if row := s.buildItemRow(*t.InventoryID, "I", t.DateTransaction); row != nil {
 				items = append(items, *row)
 			}
 		}
@@ -261,7 +264,7 @@ func (s *Service) ConfirmReceipt(el *EmpLocation, req ConfirmReceiptRequest) (*C
 		return nil, fmt.Errorf("%w: no transfer record found for this item", ErrNotFound)
 	}
 
-	if txn.ToLocationID != int64(el.Location.IDLocation) {
+	if txn.ToLocationID == nil || *txn.ToLocationID != int64(el.Location.IDLocation) {
 		return nil, fmt.Errorf("%w: item is not meant to be received by the current location", ErrForbidden)
 	}
 
@@ -274,15 +277,24 @@ func (s *Service) ConfirmReceipt(el *EmpLocation, req ConfirmReceiptRequest) (*C
 
 	if len(inv.NumberInvoice) > 0 && inv.NumberInvoice[0] == 'I' {
 		txn.StatusItems = "Ready for Sale"
-		txn.ToLocationID = locID
+		txn.ToLocationID = &locID
 		s.db.Save(&txn)
 
+		fromLocID := int64(0)
+		if txn.FromLocationID != nil {
+			fromLocID = *txn.FromLocationID
+		}
+		txnInvoiceID := int64(0)
+		if txn.InvoiceID != nil {
+			txnInvoiceID = *txn.InvoiceID
+		}
+
 		newTxn := invModel.InventoryTransaction{
-			InventoryID:     item.IDInventory,
+			InventoryID:     &item.IDInventory,
 			FromLocationID:  txn.FromLocationID,
-			ToLocationID:    locID,
+			ToLocationID:    &locID,
 			TransferredBy:   txn.TransferredBy,
-			InvoiceID:       req.InvoiceID,
+			InvoiceID:       &req.InvoiceID,
 			StatusItems:     "Ready for Sale",
 			TransactionType: "Received from location",
 			DateTransaction: now,
@@ -291,13 +303,13 @@ func (s *Service) ConfirmReceipt(el *EmpLocation, req ConfirmReceiptRequest) (*C
 
 		transfer := invModel.InventoryTransfer{
 			InventoryID:    item.IDInventory,
-			FromLocationID: txn.FromLocationID,
+			FromLocationID: fromLocID,
 			ToLocationID:   locID,
 			TransferredBy:  txn.TransferredBy,
 			ReceivedBy:     empID,
 			StatusItems:    "Ready for Sale",
-			InvoiceID:      txn.InvoiceID,
-			InvoiceFrom:    &txn.InvoiceID,
+			InvoiceID:      txnInvoiceID,
+			InvoiceFrom:    txn.InvoiceID,
 			InvoiceTo:      &req.InvoiceID,
 		}
 		s.db.Create(&transfer)
@@ -317,10 +329,10 @@ func (s *Service) ConfirmReceipt(el *EmpLocation, req ConfirmReceiptRequest) (*C
 		s.db.Create(&ri)
 
 		newTxn := invModel.InventoryTransaction{
-			InventoryID:     item.IDInventory,
-			ToLocationID:    locID,
+			InventoryID:     &item.IDInventory,
+			ToLocationID:    &locID,
 			TransferredBy:   empID,
-			InvoiceID:       vi.InvoiceID,
+			InvoiceID:       &vi.InvoiceID,
 			StatusItems:     "Ready for Sale",
 			TransactionType: "Received from Vendor",
 			DateTransaction: now,
@@ -344,7 +356,10 @@ func (s *Service) ConfirmReceipt(el *EmpLocation, req ConfirmReceiptRequest) (*C
 		var txns []invModel.InventoryTransaction
 		s.db.Where("invoice_id = ?", inv.IDInvoice).Find(&txns)
 		for _, t := range txns {
-			if row := s.buildItemRow(t.InventoryID, "I", t.DateTransaction); row != nil {
+			if t.InventoryID == nil {
+				continue
+			}
+			if row := s.buildItemRow(*t.InventoryID, "I", t.DateTransaction); row != nil {
 				respItems = append(respItems, *row)
 			}
 		}

@@ -62,7 +62,7 @@ type CreateCountSheetInput struct {
 func (r *InventoryCountRepo) Create(inp CreateCountSheetInput) (*inventory.InventoryCount, error) {
 	now := time.Now()
 	ic := &inventory.InventoryCount{
-		BrandID:           inp.BrandID,
+		BrandID:           &inp.BrandID,
 		LocationID:        inp.LocationID,
 		Status:            true,
 		PrepByDate:        inp.PrepByDate,

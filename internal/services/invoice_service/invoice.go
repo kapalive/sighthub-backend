@@ -173,11 +173,11 @@ func (s *Service) CreateInvoice(el *EmpLocation, req CreateInvoiceRequest) (*Cre
 					item.IDInventory, inv.NumberInvoice)),
 			})
 			s.db.Create(&invModel.InventoryTransaction{
-				InventoryID:     item.IDInventory,
-				FromLocationID:  int64(el.Location.IDLocation),
-				ToLocationID:    effectiveToLocID,
+				InventoryID:     &item.IDInventory,
+				FromLocationID:  int64Ptr(int64(el.Location.IDLocation)),
+				ToLocationID:    &effectiveToLocID,
 				TransferredBy:   empID,
-				InvoiceID:       inv.IDInvoice,
+				InvoiceID:       &inv.IDInvoice,
 				OldInvoiceID:    &oldInvoiceID,
 				TransactionType: "Internal Transfer",
 				StatusItems:     item.StatusItemsInventory,
@@ -197,10 +197,10 @@ func (s *Service) CreateInvoice(el *EmpLocation, req CreateInvoiceRequest) (*Cre
 				InvoiceID: inv.IDInvoice, InventoryID: item.IDInventory, DateTime: time.Now(),
 			})
 			s.db.Create(&invModel.InventoryTransaction{
-				InventoryID:     item.IDInventory,
-				ToLocationID:    int64(el.Location.IDLocation),
+				InventoryID:     &item.IDInventory,
+				ToLocationID:    int64Ptr(int64(el.Location.IDLocation)),
 				TransferredBy:   empID,
-				InvoiceID:       inv.IDInvoice,
+				InvoiceID:       &inv.IDInvoice,
 				TransactionType: "Vendor Shipment",
 				StatusItems:     item.StatusItemsInventory,
 			})
@@ -281,7 +281,9 @@ func (s *Service) UpdateInvoice(el *EmpLocation, invoiceID int64, dateCreate *st
 		s.db.Where("invoice_id = ?", invoiceID).Find(&txs)
 		seen := map[int64]bool{}
 		for _, tx := range txs {
-			seen[tx.InventoryID] = true
+			if tx.InventoryID != nil {
+				seen[*tx.InventoryID] = true
+			}
 		}
 		totalQuantity = len(seen)
 	} else {
@@ -368,11 +370,11 @@ func (s *Service) UpdateInvoice(el *EmpLocation, invoiceID int64, dateCreate *st
 		s.db.Save(&item)
 
 		s.db.Create(&invModel.InventoryTransaction{
-			InventoryID:     item.IDInventory,
-			FromLocationID:  inv.LocationID,
-			ToLocationID:    toLocID,
+			InventoryID:     &item.IDInventory,
+			FromLocationID:  &inv.LocationID,
+			ToLocationID:    &toLocID,
 			TransferredBy:   empID,
-			InvoiceID:       inv.IDInvoice,
+			InvoiceID:       &inv.IDInvoice,
 			OldInvoiceID:    &oldInvoiceID,
 			StatusItems:     item.StatusItemsInventory,
 			TransactionType: txType,
@@ -480,8 +482,11 @@ func (s *Service) ViewInvoice(el *EmpLocation, invoiceID int64) (map[string]inte
 
 	latest := map[int64]invModel.InventoryTransaction{}
 	for _, tx := range txs {
-		if existing, ok := latest[tx.InventoryID]; !ok || tx.DateTransaction.After(existing.DateTransaction) {
-			latest[tx.InventoryID] = tx
+		if tx.InventoryID == nil {
+			continue
+		}
+		if existing, ok := latest[*tx.InventoryID]; !ok || tx.DateTransaction.After(existing.DateTransaction) {
+			latest[*tx.InventoryID] = tx
 		}
 	}
 
@@ -728,8 +733,8 @@ func (s *Service) DeleteItem(invoiceID int64, sku string, inventoryID *int64) (m
 		if s.db.Where("inventory_id = ? AND invoice_id = ?", item.IDInventory, invoiceID).First(&invModel.InventoryTransfer{}).Error != nil {
 			return nil, fmt.Errorf("%w: item not associated with this transfer", ErrBadRequest)
 		}
-		if oldTx.TransactionType == "Local" {
-			item.LocationID = oldTx.FromLocationID
+		if oldTx.TransactionType == "Local" && oldTx.FromLocationID != nil {
+			item.LocationID = *oldTx.FromLocationID
 		}
 		item.StatusItemsInventory = types.StatusInventoryReadyForSale
 		if oldTx.OldInvoiceID != nil {
@@ -771,7 +776,9 @@ func (s *Service) DeleteItem(invoiceID int64, sku string, inventoryID *int64) (m
 		s.db.Where("invoice_id = ?", invoiceID).Find(&txs)
 		seen := map[int64]bool{}
 		for _, tx := range txs {
-			seen[tx.InventoryID] = true
+			if tx.InventoryID != nil {
+				seen[*tx.InventoryID] = true
+			}
 		}
 		newCount = len(seen)
 		for id := range seen {
@@ -938,4 +945,5 @@ func (s *Service) createVendorInvoiceAndShipment(inv *invoices.Invoice, vendorID
 	return vi.IDVendorInvoice, shipment.IDShipment, nil
 }
 
-func strPtr(s string) *string { return &s }
+func strPtr(s string) *string    { return &s }
+func int64Ptr(v int64) *int64    { return &v }
