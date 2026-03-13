@@ -11,6 +11,7 @@ import (
 	exameye "sighthub-backend/internal/routes/exam_eye"
 	"os"
 	"sighthub-backend/pkg/cache"
+	"sighthub-backend/pkg/scheduler"
 	"time"
 
 	"github.com/gorilla/mux"
@@ -79,6 +80,9 @@ func main() {
 	// 🧹 Blacklist очистка
 	blacklist.StartCleaner(1 * time.Minute)
 
+	// ⏱ Scheduler (replaces Celery)
+	sched := scheduler.New()
+
 	// 📡 Роутинг
 	router := mux.NewRouter()
 
@@ -114,6 +118,9 @@ func main() {
 	exameye.RegisterReferralRoutes(db, cache.RDB, cfg, router)
 	exameye.RegisterSuperRoutes(db, cache.RDB, cfg, router)
 	exameye.RegisterSLRPRoutes(db, cache.RDB, cfg, router)
+	routes.RegisterBillRoutes(db, cache.RDB, cfg, router)
+	routes.RegisterTicketRoutes(db, cache.RDB, cfg, sched, router)
+	routes.RegisterAccountingRoutes(db, cache.RDB, cfg, router)
 
 	addr := ":" + cfg.Port
 	log.Println("Server starting on", addr)
