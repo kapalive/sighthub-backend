@@ -95,6 +95,7 @@ func main() {
 	routes.RegisterInvoiceRoutes(db, cache.RDB, cfg, router)
 	routes.RegisterOrderedInventoryRoutes(db, cache.RDB, cfg, router)
 	routes.RegisterPosTerminalRoutes(db, cache.RDB, cfg, router)
+	routes.RegisterReportAccountingRoutes(db, cache.RDB, cfg, router)
 	routes.RegisterLicenseRoutes(db, router)
 	routes.RegisterQuestionnaireRoutes(db, cache.RDB, cfg, router)
 	routes.RegisterAppointmentBookRoutes(db, cache.RDB, cfg, router)
