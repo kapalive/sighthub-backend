@@ -121,6 +121,7 @@ func main() {
 	routes.RegisterBillRoutes(db, cache.RDB, cfg, router)
 	routes.RegisterTicketRoutes(db, cache.RDB, cfg, sched, router)
 	routes.RegisterAccountingRoutes(db, cache.RDB, cfg, router)
+	routes.RegisterClaimRoutes(db, cache.RDB, cfg, router)
 
 	addr := ":" + cfg.Port
 	log.Println("Server starting on", addr)
