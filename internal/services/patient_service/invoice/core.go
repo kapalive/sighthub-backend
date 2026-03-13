@@ -1133,7 +1133,12 @@ func (s *Service) AddItemsToInvoice(username string, invoiceID int64, input AddI
 				if rawLineID, ok := parseInt64(itemData.IDInvoiceSale); ok && rawLineID != 0 {
 					var existing invoices.InvoiceItemSale
 					if tx.Where("id_invoice_sale = ? AND invoice_id = ? AND item_type = ?", rawLineID, invoiceID, pbKey).First(&existing).Error == nil {
+						if existing.ItemID != nil && *existing.ItemID != *itemID {
+							return fmt.Errorf("contact Lens item_id mismatch")
+						}
 						existingItem = &existing
+					} else {
+						return fmt.Errorf("invoice item not found: id_invoice_sale=%d", rawLineID)
 					}
 				}
 
@@ -1242,8 +1247,7 @@ func (s *Service) AddItemsToInvoice(username string, invoiceID int64, input AddI
 				lineSaleKey = ptrStr(pbKey)
 			}
 
-			lineTotal := round2(total + taxAmount)
-			ptBal := lineTotal
+			ptBal := total
 			insBal := 0.0
 
 			if existingItem != nil {
@@ -1251,7 +1255,7 @@ func (s *Service) AddItemsToInvoice(username string, invoiceID int64, input AddI
 				existingItem.Quantity = int(quantity)
 				existingItem.Price = price
 				existingItem.Discount = discount
-				existingItem.Total = lineTotal
+				existingItem.Total = total
 				existingItem.TotalTax = taxAmount
 				existingItem.Cost = lineCost
 				existingItem.PtBalance = &ptBal
@@ -1279,7 +1283,7 @@ func (s *Service) AddItemsToInvoice(username string, invoiceID int64, input AddI
 					Quantity:    int(quantity),
 					Price:       price,
 					Discount:    discount,
-					Total:       lineTotal,
+					Total:       total,
 					Taxable:     taxPtr,
 					TotalTax:    taxAmount,
 					Cost:        lineCost,
@@ -1305,7 +1309,7 @@ func (s *Service) AddItemsToInvoice(username string, invoiceID int64, input AddI
 						Quantity:    -int(quantity),
 						Price:       price,
 						Discount:    negDiscount,
-						Total:       -lineTotal,
+						Total:       -total,
 						Taxable:     taxPtr,
 						TotalTax:    -taxAmount,
 						Cost:        -lineCost,
@@ -1349,10 +1353,16 @@ func (s *Service) AddItemsToInvoice(username string, invoiceID int64, input AddI
 								if missingInCount.BrandID != nil {
 									brandIntID = int(*missingInCount.BrandID)
 								}
-								tx.Create(&invModel.TempCountInventory{
+								var vendorIntID *int
+							if missingInCount.VendorID != nil {
+								v := int(*missingInCount.VendorID)
+								vendorIntID = &v
+							}
+							tx.Create(&invModel.TempCountInventory{
 									InventoryID:      frame.IDInventory,
 									LocationID:       locIntID,
 									BrandID:          brandIntID,
+									VendorID:         vendorIntID,
 									InStock:          true,
 									InventoryCountID: activeIC.IDInventoryCount,
 									CountDate:        time.Now(),

@@ -11,6 +11,7 @@ type TempCountInventory struct {
 	InventoryID      int64     `gorm:"column:inventory_id;not null"                   json:"inventory_id"`
 	LocationID       int       `gorm:"column:location_id;not null"                    json:"location_id"`
 	BrandID          int       `gorm:"column:brand_id;not null"                       json:"brand_id"`
+	VendorID         *int      `gorm:"column:vendor_id"                               json:"vendor_id,omitempty"`
 	InStock          bool      `gorm:"column:in_stock;not null;default:false"         json:"in_stock"`
 	InventoryCountID int64     `gorm:"column:inventory_count_id;not null"             json:"inventory_count_id"`
 }
@@ -24,6 +25,7 @@ func (t *TempCountInventory) ToMap() map[string]interface{} {
 		"inventory_id":       t.InventoryID,
 		"location_id":        t.LocationID,
 		"brand_id":           t.BrandID,
+		"vendor_id":          t.VendorID,
 		"in_stock":           t.InStock,
 		"inventory_count_id": t.InventoryCountID,
 	}
