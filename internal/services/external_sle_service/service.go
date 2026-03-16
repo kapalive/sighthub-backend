@@ -2,6 +2,7 @@ package external_sle_service
 
 import (
 	"errors"
+	"fmt"
 	"strconv"
 	"strings"
 	"time"
@@ -13,6 +14,7 @@ import (
 	sleModel "sighthub-backend/internal/models/medical/vision_exam/external_sle"
 	visionModel "sighthub-backend/internal/models/vision_exam"
 	"sighthub-backend/pkg/activitylog"
+	"sighthub-backend/pkg/defaults"
 )
 
 type Service struct{ db *gorm.DB }
@@ -116,8 +118,6 @@ type UpdateExternalSleInput struct {
 }
 
 // ---------- helpers ----------
-
-func boolPtr(b bool) *bool { return &b }
 
 func cleanDrawingPath(path string) string {
 	const prefix = "/mnt/tank/data/"
@@ -259,26 +259,6 @@ func (s *Service) SaveExternalSle(username string, examID int64, input SaveExter
 	if cleanPath != "" {
 		addDrawing = &cleanPath
 	}
-	odAngle := "n/a"
-	if input.OdAngleEstimation != nil {
-		odAngle = *input.OdAngleEstimation
-	}
-	osAngle := "n/a"
-	if input.OsAngleEstimation != nil {
-		osAngle = *input.OsAngleEstimation
-	}
-	iopFluress := boolPtr(false)
-	if input.IopDropsFluress != nil {
-		iopFluress = input.IopDropsFluress
-	}
-	iopPropara := boolPtr(false)
-	if input.IopDropsProparacaine != nil {
-		iopPropara = input.IopDropsProparacaine
-	}
-	iopFluoro := boolPtr(false)
-	if input.IopDropsFluoroStrip != nil {
-		iopFluoro = input.IopDropsFluoroStrip
-	}
 	vfID := vf.IDVisualFields
 	sle := sleModel.ExternalSleEye{
 		EyeExamID:               examID,
@@ -287,25 +267,40 @@ func (s *Service) SaveExternalSle(username string, examID int64, input SaveExter
 		PachExternalSleID:       pach.IDPachExternalSle,
 		VisualFieldsID:          &vfID,
 		AddDrawing:              addDrawing,
-		OdAngleEstimation:       odAngle,
-		OsAngleEstimation:       osAngle,
-		IopDropsFluress:         iopFluress,
-		IopDropsProparacaine:    iopPropara,
-		IopDropsFluoroStrip:     iopFluoro,
+		OdAngleEstimation:       defaults.StrVal(defaults.StrDefault(input.OdAngleEstimation, "n/a")),
+		OsAngleEstimation:       defaults.StrVal(defaults.StrDefault(input.OsAngleEstimation, "n/a")),
+		IopDropsFluress:         defaults.Bool(input.IopDropsFluress),
+		IopDropsProparacaine:    defaults.Bool(input.IopDropsProparacaine),
+		IopDropsFluoroStrip:     defaults.Bool(input.IopDropsFluoroStrip),
 		Note:                    input.Note,
 	}
 	if err := s.db.Create(&sle).Error; err != nil {
 		return nil, err
 	}
 
-	if input.TonometryEyes != nil {
-		t, valErrs := parseTonometry(sle.IDExternalSleEye, input.TonometryEyes)
+	if input.TonometryEyes == nil {
+		input.TonometryEyes = &TonometryInput{}
+	}
+
+	var tonometry *sleModel.TonometryEye
+	if input.TonometryEyes.MethodTonometry == "" &&
+		input.TonometryEyes.DateTonometryEye == nil &&
+		input.TonometryEyes.TimeTonometryEye == nil &&
+		input.TonometryEyes.OdTonometryEye == nil &&
+		input.TonometryEyes.OsTonometryEye == nil {
+		// All fields are empty/nil — create with defaults, skip validation.
+		tonometry = &sleModel.TonometryEye{
+			ExternalSleEyeID: sle.IDExternalSleEye,
+		}
+	} else {
+		var valErrs []string
+		tonometry, valErrs = parseTonometry(sle.IDExternalSleEye, input.TonometryEyes)
 		if len(valErrs) > 0 {
 			return nil, &ValidationError{Errors: valErrs}
 		}
-		if err := s.db.Create(t).Error; err != nil {
-			return nil, err
-		}
+	}
+	if err := s.db.Create(tonometry).Error; err != nil {
+		return nil, err
 	}
 
 	activitylog.Log(s.db, "exam_sle", "save", activitylog.WithEntity(examID))
@@ -420,7 +415,9 @@ func (s *Service) UpdateExternalSle(username string, examID int64, input UpdateE
 			if in.OsIris != nil              { f.OsIris = in.OsIris }
 			if in.OdLens != nil              { f.OdLens = in.OdLens }
 			if in.OsLens != nil              { f.OsLens = in.OsLens }
-			s.db.Save(&f)
+			if err := s.db.Save(&f).Error; err != nil {
+				return nil, fmt.Errorf("findings save failed: %w", err)
+			}
 		}
 	}
 
@@ -436,7 +433,9 @@ func (s *Service) UpdateExternalSle(username string, examID int64, input UpdateE
 			if in.OsNasal != nil { g.OsNasal = in.OsNasal }
 			if in.OdTemp != nil  { g.OdTemp = in.OdTemp }
 			if in.OsTemp != nil  { g.OsTemp = in.OsTemp }
-			s.db.Save(&g)
+			if err := s.db.Save(&g).Error; err != nil {
+				return nil, fmt.Errorf("gonioscopy save failed: %w", err)
+			}
 		}
 	}
 
@@ -446,7 +445,9 @@ func (s *Service) UpdateExternalSle(username string, examID int64, input UpdateE
 			in := input.PachExternalSle
 			if in.Od != nil { p.Od = in.Od }
 			if in.Os != nil { p.Os = in.Os }
-			s.db.Save(&p)
+			if err := s.db.Save(&p).Error; err != nil {
+				return nil, fmt.Errorf("pach save failed: %w", err)
+			}
 		}
 	}
 
@@ -468,7 +469,9 @@ func (s *Service) UpdateExternalSle(username string, examID int64, input UpdateE
 			if in.Result != nil           { vf.Result = in.Result }
 			if in.Recommendations != nil  { vf.Recommendations = in.Recommendations }
 			if in.Comments != nil         { vf.Comments = in.Comments }
-			s.db.Save(&vf)
+			if err := s.db.Save(&vf).Error; err != nil {
+				return nil, fmt.Errorf("visual_fields save failed: %w", err)
+			}
 		}
 	}
 
@@ -481,7 +484,9 @@ func (s *Service) UpdateExternalSle(username string, examID int64, input UpdateE
 	if input.IopDropsProparacaine != nil { sle.IopDropsProparacaine = input.IopDropsProparacaine }
 	if input.IopDropsFluoroStrip != nil { sle.IopDropsFluoroStrip = input.IopDropsFluoroStrip }
 	if input.Note != nil                { sle.Note = input.Note }
-	s.db.Save(&sle)
+	if err := s.db.Save(&sle).Error; err != nil {
+		return nil, fmt.Errorf("external_sle save failed: %w", err)
+	}
 
 	if input.TonometryEyes != nil {
 		t, valErrs := parseTonometry(sle.IDExternalSleEye, input.TonometryEyes)

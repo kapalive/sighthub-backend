@@ -21,7 +21,7 @@ func New(db *gorm.DB) *Service { return &Service{db: db} }
 
 func (s *Service) getEmployee(username string) (*empModel.Employee, error) {
 	var login authModel.EmployeeLogin
-	if err := s.db.Where("username = ?", username).First(&login).Error; err != nil {
+	if err := s.db.Where("employee_login = ?", username).First(&login).Error; err != nil {
 		return nil, errors.New("employee not found")
 	}
 	var emp empModel.Employee

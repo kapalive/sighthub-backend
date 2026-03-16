@@ -2,6 +2,7 @@ package cl_fitting_service
 
 import (
 	"errors"
+	"fmt"
 	"time"
 
 	"gorm.io/gorm"
@@ -12,6 +13,7 @@ import (
 	vendorModel "sighthub-backend/internal/models/vendors"
 	visionModel "sighthub-backend/internal/models/vision_exam"
 	"sighthub-backend/pkg/activitylog"
+	"sighthub-backend/pkg/defaults"
 )
 
 type Service struct{ db *gorm.DB }
@@ -196,23 +198,20 @@ func computeExpireDate(odBrand, osBrand *string, expireDateStr *string) *time.Ti
 }
 
 func fittingFromInput(in FittingInput) clModel.Fitting1 {
-	de := "n/a"
-	if in.DominantEye != nil {
-		de = *in.DominantEye
-	}
+	de := defaults.StrVal(in.DominantEye)
 	return clModel.Fitting1{
-		OdBrand: in.OdBrand, OsBrand: in.OsBrand,
-		OdBCur: in.OdBCur, OsBCur: in.OsBCur,
-		OdDia: in.OdDia, OsDia: in.OsDia,
-		OdPwr: in.OdPwr, OsPwr: in.OsPwr,
-		OdCyl: in.OdCyl, OsCyl: in.OsCyl,
-		OdAxis: in.OdAxis, OsAxis: in.OsAxis,
-		OdAdd: in.OdAdd, OsAdd: in.OsAdd,
-		OdDva20: in.OdDva20, OsDva20: in.OsDva20,
-		OdNva20: in.OdNva20, OsNva20: in.OsNva20,
-		OdOverRefraction: in.OdOverRefraction, OsOverRefraction: in.OsOverRefraction,
-		OdFinal: in.OdFinal, OsFinal: in.OsFinal,
-		Evaluation:  in.Evaluation,
+		OdBrand: defaults.Str(in.OdBrand), OsBrand: defaults.Str(in.OsBrand),
+		OdBCur: defaults.Str(in.OdBCur), OsBCur: defaults.Str(in.OsBCur),
+		OdDia: defaults.Str(in.OdDia), OsDia: defaults.Str(in.OsDia),
+		OdPwr: defaults.Str(in.OdPwr), OsPwr: defaults.Str(in.OsPwr),
+		OdCyl: defaults.Str(in.OdCyl), OsCyl: defaults.Str(in.OsCyl),
+		OdAxis: defaults.Str(in.OdAxis), OsAxis: defaults.Str(in.OsAxis),
+		OdAdd: defaults.Str(in.OdAdd), OsAdd: defaults.Str(in.OsAdd),
+		OdDva20: defaults.Str(in.OdDva20), OsDva20: defaults.Str(in.OsDva20),
+		OdNva20: defaults.Str(in.OdNva20), OsNva20: defaults.Str(in.OsNva20),
+		OdOverRefraction: defaults.Str(in.OdOverRefraction), OsOverRefraction: defaults.Str(in.OsOverRefraction),
+		OdFinal: defaults.Bool(in.OdFinal), OsFinal: defaults.Bool(in.OsFinal),
+		Evaluation:  defaults.Str(in.Evaluation),
 		DominantEye: de,
 	}
 }
@@ -287,20 +286,20 @@ func (s *Service) SaveClFitting(username string, examID int64, input SaveClFitti
 	// FirstTrial — expire_date logic
 	expireDate := computeExpireDate(input.FirstTrial.OdBrand, input.FirstTrial.OsBrand, input.FirstTrial.ExpireDate)
 	ft := clModel.FirstTrial{
-		OdBrand: input.FirstTrial.OdBrand, OsBrand: input.FirstTrial.OsBrand,
-		OdBCur: input.FirstTrial.OdBCur, OsBCur: input.FirstTrial.OsBCur,
-		OdDia: input.FirstTrial.OdDia, OsDia: input.FirstTrial.OsDia,
-		OdPwr: input.FirstTrial.OdPwr, OsPwr: input.FirstTrial.OsPwr,
-		OdCyl: input.FirstTrial.OdCyl, OsCyl: input.FirstTrial.OsCyl,
-		OdAxis: input.FirstTrial.OdAxis, OsAxis: input.FirstTrial.OsAxis,
-		OdAdd: input.FirstTrial.OdAdd, OsAdd: input.FirstTrial.OsAdd,
-		OdDva20: input.FirstTrial.OdDva20, OsDva20: input.FirstTrial.OsDva20,
-		OdNva20: input.FirstTrial.OdNva20, OsNva20: input.FirstTrial.OsNva20,
+		OdBrand: defaults.Str(input.FirstTrial.OdBrand), OsBrand: defaults.Str(input.FirstTrial.OsBrand),
+		OdBCur: defaults.Str(input.FirstTrial.OdBCur), OsBCur: defaults.Str(input.FirstTrial.OsBCur),
+		OdDia: defaults.Str(input.FirstTrial.OdDia), OsDia: defaults.Str(input.FirstTrial.OsDia),
+		OdPwr: defaults.Str(input.FirstTrial.OdPwr), OsPwr: defaults.Str(input.FirstTrial.OsPwr),
+		OdCyl: defaults.Str(input.FirstTrial.OdCyl), OsCyl: defaults.Str(input.FirstTrial.OsCyl),
+		OdAxis: defaults.Str(input.FirstTrial.OdAxis), OsAxis: defaults.Str(input.FirstTrial.OsAxis),
+		OdAdd: defaults.Str(input.FirstTrial.OdAdd), OsAdd: defaults.Str(input.FirstTrial.OsAdd),
+		OdDva20: defaults.Str(input.FirstTrial.OdDva20), OsDva20: defaults.Str(input.FirstTrial.OsDva20),
+		OdNva20: defaults.Str(input.FirstTrial.OdNva20), OsNva20: defaults.Str(input.FirstTrial.OsNva20),
 		Trial:             boolVal(input.FirstTrial.Trial),
 		Final:             boolVal(input.FirstTrial.Final),
 		NeedToOrder:       boolVal(input.FirstTrial.NeedToOrder),
 		DispenseFromStock: boolVal(input.FirstTrial.DispenseFromStock),
-		FrontDeskNote:     input.FirstTrial.FrontDeskNote,
+		FrontDeskNote:     defaults.Str(input.FirstTrial.FrontDeskNote),
 		ExpireDate:        expireDate,
 	}
 	if err := s.db.Create(&ft).Error; err != nil {
@@ -309,21 +308,21 @@ func (s *Service) SaveClFitting(username string, examID int64, input SaveClFitti
 
 	// SecondTrial
 	st := clModel.SecondTrial{
-		OdBrand: input.SecondTrial.OdBrand, OsBrand: input.SecondTrial.OsBrand,
-		OdBCur: input.SecondTrial.OdBCur, OsBCur: input.SecondTrial.OsBCur,
-		OdDia: input.SecondTrial.OdDia, OsDia: input.SecondTrial.OsDia,
-		OdPwr: input.SecondTrial.OdPwr, OsPwr: input.SecondTrial.OsPwr,
-		OdCyl: input.SecondTrial.OdCyl, OsCyl: input.SecondTrial.OsCyl,
-		OdAxis: input.SecondTrial.OdAxis, OsAxis: input.SecondTrial.OsAxis,
-		OdAdd: input.SecondTrial.OdAdd, OsAdd: input.SecondTrial.OsAdd,
-		OdDva20: input.SecondTrial.OdDva20, OsDva20: input.SecondTrial.OsDva20,
-		OdNva20: input.SecondTrial.OdNva20, OsNva20: input.SecondTrial.OsNva20,
+		OdBrand: defaults.Str(input.SecondTrial.OdBrand), OsBrand: defaults.Str(input.SecondTrial.OsBrand),
+		OdBCur: defaults.Str(input.SecondTrial.OdBCur), OsBCur: defaults.Str(input.SecondTrial.OsBCur),
+		OdDia: defaults.Str(input.SecondTrial.OdDia), OsDia: defaults.Str(input.SecondTrial.OsDia),
+		OdPwr: defaults.Str(input.SecondTrial.OdPwr), OsPwr: defaults.Str(input.SecondTrial.OsPwr),
+		OdCyl: defaults.Str(input.SecondTrial.OdCyl), OsCyl: defaults.Str(input.SecondTrial.OsCyl),
+		OdAxis: defaults.Str(input.SecondTrial.OdAxis), OsAxis: defaults.Str(input.SecondTrial.OsAxis),
+		OdAdd: defaults.Str(input.SecondTrial.OdAdd), OsAdd: defaults.Str(input.SecondTrial.OsAdd),
+		OdDva20: defaults.Str(input.SecondTrial.OdDva20), OsDva20: defaults.Str(input.SecondTrial.OsDva20),
+		OdNva20: defaults.Str(input.SecondTrial.OdNva20), OsNva20: defaults.Str(input.SecondTrial.OsNva20),
 		Trial:             boolVal(input.SecondTrial.Trial),
 		Final:             boolVal(input.SecondTrial.Final),
 		NeedToOrder:       boolVal(input.SecondTrial.NeedToOrder),
 		DispenseFromStock: boolVal(input.SecondTrial.DispenseFromStock),
-		FrontDeskNote:     input.SecondTrial.FrontDeskNote,
-		TypeAdd:           input.SecondTrial.TypeAdd,
+		FrontDeskNote:     defaults.Str(input.SecondTrial.FrontDeskNote),
+		TypeAdd:           defaults.Str(input.SecondTrial.TypeAdd),
 	}
 	if err := s.db.Create(&st).Error; err != nil {
 		return nil, err
@@ -331,21 +330,21 @@ func (s *Service) SaveClFitting(username string, examID int64, input SaveClFitti
 
 	// ThirdTrial
 	tt := clModel.ThirdTrial{
-		OdBrand: input.ThirdTrial.OdBrand, OsBrand: input.ThirdTrial.OsBrand,
-		OdBCur: input.ThirdTrial.OdBCur, OsBCur: input.ThirdTrial.OsBCur,
-		OdDia: input.ThirdTrial.OdDia, OsDia: input.ThirdTrial.OsDia,
-		OdPwr: input.ThirdTrial.OdPwr, OsPwr: input.ThirdTrial.OsPwr,
-		OdCyl: input.ThirdTrial.OdCyl, OsCyl: input.ThirdTrial.OsCyl,
-		OdAxis: input.ThirdTrial.OdAxis, OsAxis: input.ThirdTrial.OsAxis,
-		OdAdd: input.ThirdTrial.OdAdd, OsAdd: input.ThirdTrial.OsAdd,
-		OdDva20: input.ThirdTrial.OdDva20, OsDva20: input.ThirdTrial.OsDva20,
-		OdNva20: input.ThirdTrial.OdNva20, OsNva20: input.ThirdTrial.OsNva20,
+		OdBrand: defaults.Str(input.ThirdTrial.OdBrand), OsBrand: defaults.Str(input.ThirdTrial.OsBrand),
+		OdBCur: defaults.Str(input.ThirdTrial.OdBCur), OsBCur: defaults.Str(input.ThirdTrial.OsBCur),
+		OdDia: defaults.Str(input.ThirdTrial.OdDia), OsDia: defaults.Str(input.ThirdTrial.OsDia),
+		OdPwr: defaults.Str(input.ThirdTrial.OdPwr), OsPwr: defaults.Str(input.ThirdTrial.OsPwr),
+		OdCyl: defaults.Str(input.ThirdTrial.OdCyl), OsCyl: defaults.Str(input.ThirdTrial.OsCyl),
+		OdAxis: defaults.Str(input.ThirdTrial.OdAxis), OsAxis: defaults.Str(input.ThirdTrial.OsAxis),
+		OdAdd: defaults.Str(input.ThirdTrial.OdAdd), OsAdd: defaults.Str(input.ThirdTrial.OsAdd),
+		OdDva20: defaults.Str(input.ThirdTrial.OdDva20), OsDva20: defaults.Str(input.ThirdTrial.OsDva20),
+		OdNva20: defaults.Str(input.ThirdTrial.OdNva20), OsNva20: defaults.Str(input.ThirdTrial.OsNva20),
 		Trial:             boolVal(input.ThirdTrial.Trial),
 		Final:             boolVal(input.ThirdTrial.Final),
 		NeedToOrder:       boolVal(input.ThirdTrial.NeedToOrder),
 		DispenseFromStock: boolVal(input.ThirdTrial.DispenseFromStock),
-		FrontDeskNote:     input.ThirdTrial.FrontDeskNote,
-		TypeAdd:           input.ThirdTrial.TypeAdd,
+		FrontDeskNote:     defaults.Str(input.ThirdTrial.FrontDeskNote),
+		TypeAdd:           defaults.Str(input.ThirdTrial.TypeAdd),
 	}
 	if err := s.db.Create(&tt).Error; err != nil {
 		return nil, err
@@ -356,17 +355,17 @@ func (s *Service) SaveClFitting(username string, examID int64, input SaveClFitti
 	if input.GasPermeable.LabDesign != nil {
 		li := input.GasPermeable.LabDesign
 		ld = clModel.LabDesign{
-			ColorOd: li.OdColor, ColorOs: li.OsColor,
-			K1Od: li.OdK1, K1Os: li.OsK1,
-			K2Od: li.OdK2, K2Os: li.OsK2,
-			SphOd: li.OdSph, SphOs: li.OsSph,
-			CylOd: li.OdCyl, CylOs: li.OsCyl,
-			AxisOd: li.OdAxis, AxisOs: li.OsAxis,
-			AddOd: li.OdAdd, AddOs: li.OsAdd,
-			OverallDiaOd: li.OdOverallDia, OverallDiaOs: li.OsOverallDia,
-			DvaOd: li.OdDva, DvaOs: li.OsDva,
-			NvaOd: li.OdNva, NvaOs: li.OsNva,
-			FrontDeskNote: li.FrontDeskNote,
+			ColorOd: defaults.Str(li.OdColor), ColorOs: defaults.Str(li.OsColor),
+			K1Od: defaults.Str(li.OdK1), K1Os: defaults.Str(li.OsK1),
+			K2Od: defaults.Str(li.OdK2), K2Os: defaults.Str(li.OsK2),
+			SphOd: defaults.Str(li.OdSph), SphOs: defaults.Str(li.OsSph),
+			CylOd: defaults.Str(li.OdCyl), CylOs: defaults.Str(li.OsCyl),
+			AxisOd: defaults.Str(li.OdAxis), AxisOs: defaults.Str(li.OsAxis),
+			AddOd: defaults.Str(li.OdAdd), AddOs: defaults.Str(li.OsAdd),
+			OverallDiaOd: defaults.Str(li.OdOverallDia), OverallDiaOs: defaults.Str(li.OsOverallDia),
+			DvaOd: defaults.Str(li.OdDva), DvaOs: defaults.Str(li.OsDva),
+			NvaOd: defaults.Str(li.OdNva), NvaOs: defaults.Str(li.OsNva),
+			FrontDeskNote: defaults.Str(li.FrontDeskNote),
 		}
 	}
 	if err := s.db.Create(&ld).Error; err != nil {
@@ -378,21 +377,21 @@ func (s *Service) SaveClFitting(username string, examID int64, input SaveClFitti
 	if input.GasPermeable.DrDesign != nil {
 		di := input.GasPermeable.DrDesign
 		dd = clModel.DrDesign{
-			MaterialOd: di.OdMaterial, MaterialOs: di.OsMaterial,
-			ColorOd: di.OdColor, ColorOs: di.OsColor,
-			BaseCurveOd: di.OdBaseCurve, BaseCurveOs: di.OsBaseCurve,
-			DiaOd: di.OdDia, DiaOs: di.OsDia,
-			PowerOd: di.OdPower, PowerOs: di.OsPower,
-			CylOd: di.OdCyl, CylOs: di.OsCyl,
-			AxisOd: di.OdAxis, AxisOs: di.OsAxis,
-			AddOd: di.OdAdd, AddOs: di.OsAdd,
-			CtrThkOd: di.OdCtrThk, CtrThkOs: di.OsCtrThk,
-			PerfCurveOd: di.OdPerfCurve, PerfCurveOs: di.OsPerfCurve,
+			MaterialOd: defaults.Str(di.OdMaterial), MaterialOs: defaults.Str(di.OsMaterial),
+			ColorOd: defaults.Str(di.OdColor), ColorOs: defaults.Str(di.OsColor),
+			BaseCurveOd: defaults.Str(di.OdBaseCurve), BaseCurveOs: defaults.Str(di.OsBaseCurve),
+			DiaOd: defaults.Str(di.OdDia), DiaOs: defaults.Str(di.OsDia),
+			PowerOd: defaults.Str(di.OdPower), PowerOs: defaults.Str(di.OsPower),
+			CylOd: defaults.Str(di.OdCyl), CylOs: defaults.Str(di.OsCyl),
+			AxisOd: defaults.Str(di.OdAxis), AxisOs: defaults.Str(di.OsAxis),
+			AddOd: defaults.Str(di.OdAdd), AddOs: defaults.Str(di.OsAdd),
+			CtrThkOd: defaults.Str(di.OdCtrThk), CtrThkOs: defaults.Str(di.OsCtrThk),
+			PerfCurveOd: defaults.Str(di.OdPerfCurve), PerfCurveOs: defaults.Str(di.OsPerfCurve),
 			LenticOd: boolVal(di.OdLentic), LenticOs: boolVal(di.OsLentic),
 			DotOd: boolVal(di.OdDot), DotOs: boolVal(di.OsDot),
-			DvaOd: di.OdDva, DvaOs: di.OsDva,
-			NvaOd: di.OdNva, NvaOs: di.OsNva,
-			FrontDeskNote: di.FrontDeskNote,
+			DvaOd: defaults.Str(di.OdDva), DvaOs: defaults.Str(di.OsDva),
+			NvaOd: defaults.Str(di.OdNva), NvaOs: defaults.Str(di.OsNva),
+			FrontDeskNote: defaults.Str(di.FrontDeskNote),
 		}
 	}
 	if err := s.db.Create(&dd).Error; err != nil {
@@ -422,7 +421,7 @@ func (s *Service) SaveClFitting(username string, examID int64, input SaveClFitti
 		ThirdTrialID:   &ttid,
 		GasPermeableID: &gpid,
 		EyeExamID:      examID,
-		DrNote:         input.DrNote,
+		DrNote:         defaults.Str(input.DrNote),
 	}
 	if err := s.db.Create(&cf).Error; err != nil {
 		return nil, err
@@ -577,7 +576,9 @@ func (s *Service) UpdateClFitting(username string, examID int64, input UpdateClF
 			if in.OsFinal != nil { f1.OsFinal = in.OsFinal }
 			if in.Evaluation != nil { f1.Evaluation = in.Evaluation }
 			if in.DominantEye != nil { f1.DominantEye = *in.DominantEye }
-			s.db.Save(&f1)
+			if err := s.db.Save(&f1).Error; err != nil {
+				return nil, fmt.Errorf("fitting_1 save failed: %w", err)
+			}
 		}
 	}
 
@@ -610,7 +611,9 @@ func (s *Service) UpdateClFitting(username string, examID int64, input UpdateClF
 			if in.OsFinal != nil { f2.OsFinal = in.OsFinal }
 			if in.Evaluation != nil { f2.Evaluation = in.Evaluation }
 			if in.DominantEye != nil { f2.DominantEye = *in.DominantEye }
-			s.db.Save(&f2)
+			if err := s.db.Save(&f2).Error; err != nil {
+				return nil, fmt.Errorf("fitting_2 save failed: %w", err)
+			}
 		}
 	}
 
@@ -643,7 +646,9 @@ func (s *Service) UpdateClFitting(username string, examID int64, input UpdateClF
 			if in.OsFinal != nil { f3.OsFinal = in.OsFinal }
 			if in.Evaluation != nil { f3.Evaluation = in.Evaluation }
 			if in.DominantEye != nil { f3.DominantEye = *in.DominantEye }
-			s.db.Save(&f3)
+			if err := s.db.Save(&f3).Error; err != nil {
+				return nil, fmt.Errorf("fitting_3 save failed: %w", err)
+			}
 		}
 	}
 
@@ -682,7 +687,9 @@ func (s *Service) UpdateClFitting(username string, examID int64, input UpdateClF
 			if in.DispenseFromStock != nil { ft.DispenseFromStock = *in.DispenseFromStock }
 			if in.FrontDeskNote != nil { ft.FrontDeskNote = in.FrontDeskNote }
 			ft.ExpireDate = expireDate
-			s.db.Save(&ft)
+			if err := s.db.Save(&ft).Error; err != nil {
+				return nil, fmt.Errorf("first_trial save failed: %w", err)
+			}
 		}
 	}
 
@@ -715,7 +722,9 @@ func (s *Service) UpdateClFitting(username string, examID int64, input UpdateClF
 			if in.DispenseFromStock != nil { st.DispenseFromStock = *in.DispenseFromStock }
 			if in.FrontDeskNote != nil { st.FrontDeskNote = in.FrontDeskNote }
 			if in.TypeAdd != nil { st.TypeAdd = in.TypeAdd }
-			s.db.Save(&st)
+			if err := s.db.Save(&st).Error; err != nil {
+				return nil, fmt.Errorf("second_trial save failed: %w", err)
+			}
 		}
 	}
 
@@ -748,7 +757,9 @@ func (s *Service) UpdateClFitting(username string, examID int64, input UpdateClF
 			if in.DispenseFromStock != nil { tt.DispenseFromStock = *in.DispenseFromStock }
 			if in.FrontDeskNote != nil { tt.FrontDeskNote = in.FrontDeskNote }
 			if in.TypeAdd != nil { tt.TypeAdd = in.TypeAdd }
-			s.db.Save(&tt)
+			if err := s.db.Save(&tt).Error; err != nil {
+				return nil, fmt.Errorf("third_trial save failed: %w", err)
+			}
 		}
 	}
 
@@ -781,7 +792,9 @@ func (s *Service) UpdateClFitting(username string, examID int64, input UpdateClF
 					if li.OdNva != nil { ld.NvaOd = li.OdNva }
 					if li.OsNva != nil { ld.NvaOs = li.OsNva }
 					if li.FrontDeskNote != nil { ld.FrontDeskNote = li.FrontDeskNote }
-					s.db.Save(&ld)
+					if err := s.db.Save(&ld).Error; err != nil {
+						return nil, fmt.Errorf("lab_design save failed: %w", err)
+					}
 				}
 			}
 			if input.GasPermeable.DrDesign != nil && gp.DrDesignID != nil {
@@ -817,7 +830,9 @@ func (s *Service) UpdateClFitting(username string, examID int64, input UpdateClF
 					if di.OdNva != nil { dd.NvaOd = di.OdNva }
 					if di.OsNva != nil { dd.NvaOs = di.OsNva }
 					if di.FrontDeskNote != nil { dd.FrontDeskNote = di.FrontDeskNote }
-					s.db.Save(&dd)
+					if err := s.db.Save(&dd).Error; err != nil {
+						return nil, fmt.Errorf("dr_design save failed: %w", err)
+					}
 				}
 			}
 		}
@@ -826,7 +841,9 @@ func (s *Service) UpdateClFitting(username string, examID int64, input UpdateClF
 	// ClFitting dr_note
 	if input.DrNote != nil {
 		cf.DrNote = input.DrNote
-		s.db.Save(&cf)
+		if err := s.db.Save(&cf).Error; err != nil {
+			return nil, fmt.Errorf("cl_fitting save failed: %w", err)
+		}
 	}
 
 	activitylog.Log(s.db, "exam_cl_fitting", "update", activitylog.WithEntity(examID))

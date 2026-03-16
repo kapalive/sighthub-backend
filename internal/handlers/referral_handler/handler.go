@@ -264,3 +264,28 @@ func (h *Handler) BuildTests(w http.ResponseWriter, r *http.Request) {
 		"drawing":  drawing,
 	})
 }
+
+// EmailReferralLetter — POST /referral-letters/{letter_id}/email
+func (h *Handler) EmailReferralLetter(w http.ResponseWriter, r *http.Request) {
+	letterID, err := parsePathInt64(r, "letter_id")
+	if err != nil {
+		jsonResponse(w, http.StatusBadRequest, map[string]string{"error": "invalid letter_id"})
+		return
+	}
+
+	var body struct {
+		ToEmail string `json:"to_email"`
+		Subject string `json:"subject"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil || body.ToEmail == "" {
+		jsonResponse(w, http.StatusBadRequest, map[string]string{"error": "to_email is required"})
+		return
+	}
+
+	if err := h.svc.SendReferralEmail(letterID, body.ToEmail, body.Subject); err != nil {
+		jsonResponse(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		return
+	}
+
+	jsonResponse(w, http.StatusOK, map[string]string{"message": "email sent successfully", "to": body.ToEmail})
+}

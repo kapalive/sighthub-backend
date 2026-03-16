@@ -111,9 +111,9 @@ func (s *Service) GetReceipts(el *EmpLocation, f ReceiptFilter) (map[string][]Re
 		}
 
 		var statusInvoiceName *string
-		if inv.StatusInvoiceID != 0 {
+		if inv.StatusInvoiceID != nil && *inv.StatusInvoiceID != 0 {
 			var si invoices.StatusInvoice
-			if s.db.First(&si, inv.StatusInvoiceID).Error == nil {
+			if s.db.First(&si, *inv.StatusInvoiceID).Error == nil {
 				statusInvoiceName = &si.StatusInvoiceValue
 			}
 		}
@@ -128,7 +128,7 @@ func (s *Service) GetReceipts(el *EmpLocation, f ReceiptFilter) (map[string][]Re
 			Quantity:          inv.Quantity,
 			VendorName:        groupName,
 			VendorInvoiceID:   vendorInvoiceID,
-			StatusInvoiceID:   inv.StatusInvoiceID,
+			StatusInvoiceID:   func() int64 { if inv.StatusInvoiceID != nil { return *inv.StatusInvoiceID }; return 0 }(),
 			StatusInvoiceName: statusInvoiceName,
 		}
 		grouped[groupName] = append(grouped[groupName], row)
@@ -414,7 +414,7 @@ func (s *Service) PayTransfer(el *EmpLocation, invoiceID int64) (*PayTransferRes
 		inv.Due = paidAmount
 	}
 	inv.Due = 0
-	inv.StatusInvoiceID = 24 // Paid
+	statusID := int64(24); inv.StatusInvoiceID = &statusID // Paid
 
 	empID := int64(el.Employee.IDEmployee)
 	pmID := int64(1)

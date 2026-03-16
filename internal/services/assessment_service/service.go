@@ -12,6 +12,7 @@ import (
 	empModel "sighthub-backend/internal/models/employees"
 	visionModel "sighthub-backend/internal/models/vision_exam"
 	"sighthub-backend/pkg/activitylog"
+	"sighthub-backend/pkg/defaults"
 )
 
 type Service struct{ db *gorm.DB }
@@ -226,8 +227,8 @@ func (s *Service) SaveAssessment(username string, examID int64, input SaveAssess
 		for _, ai := range input.Assessments {
 			ae := assessmentModel.AssessmentEye{
 				EyeExamID:  examID,
-				Impression: ai.Impression,
-				Plan:       ai.Plan,
+				Impression: defaults.Str(ai.Impression),
+				Plan:       defaults.Str(ai.Plan),
 			}
 			if err := tx.Create(&ae).Error; err != nil {
 				return err

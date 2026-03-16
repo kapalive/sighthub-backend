@@ -509,6 +509,56 @@ func PathAllowed(allowed map[string]struct{}, requiredPath string) bool {
 	return false
 }
 
+// ─── RequireLocationPermission middleware ────────────────────────────────────
+//
+// Checks that the user has the given permission_id at their current location.
+// Equivalent to Python's @require_location_permission(permission_id).
+
+func RequireLocationPermission(db *gorm.DB, permissionIDs ...int) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			username := pkgAuth.UsernameFromContext(r.Context())
+			if username == "" {
+				jsonErr(w, "Unauthorized", http.StatusUnauthorized)
+				return
+			}
+
+			login, emp, _, err := loadLoginAndEmployee(db, username)
+			if err != nil || emp == nil || emp.LocationID == nil {
+				jsonErr(w, "Employee not assigned to a location", http.StatusForbidden)
+				return
+			}
+
+			var loc location.Location
+			if err := db.First(&loc, *emp.LocationID).Error; err != nil {
+				jsonErr(w, "Location not found", http.StatusNotFound)
+				return
+			}
+
+			var count int64
+			q := db.Table("employee_permission ep").
+				Joins("JOIN permissions_combination pc ON pc.id_permissions_combination = ep.permissions_combination_id").
+				Joins("LEFT JOIN permissions_sub_block_store pbs ON pbs.id_permissions_sub_block = pc.permissions_sub_block_store_id").
+				Joins("LEFT JOIN permissions_sub_block_warehouse pbw ON pbw.id_permissions_sub_block = pc.permissions_sub_block_warehouse_id").
+				Where("ep.employee_login_id = ? AND ep.is_active = true AND pc.permissions_id IN ?",
+					login.IDEmployeeLogin, permissionIDs).
+				Where(`(
+					(pc.permissions_sub_block_store_id IS NULL AND pc.permissions_sub_block_warehouse_id IS NULL)
+					OR pbs.store_id = ?
+					OR pbw.warehouse_id = ?
+				)`, loc.StoreID, loc.WarehouseID)
+
+			q.Count(&count)
+			if count == 0 {
+				jsonErr(w, "Permission denied", http.StatusForbidden)
+				return
+			}
+
+			next.ServeHTTP(w, r)
+		})
+	}
+}
+
 // ─── internal helpers ──────────────────────────────────────────────────────────
 
 func jsonErr(w http.ResponseWriter, msg string, code int) {

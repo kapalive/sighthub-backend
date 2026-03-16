@@ -7,9 +7,11 @@ import (
 	"crypto/tls"
 	"fmt"
 	"html/template"
+	"net"
 	"net/smtp"
 	"os"
 	"path/filepath"
+	"time"
 
 	"gorm.io/gorm"
 )
@@ -149,7 +151,7 @@ func Send(cfg *SMTPConfig, to, subject, htmlBody string) error {
 
 	if cfg.UseSSL {
 		tlsCfg := &tls.Config{ServerName: cfg.SmtpHost}
-		conn, err := tls.Dial("tcp", addr, tlsCfg)
+		conn, err := tls.DialWithDialer(&net.Dialer{Timeout: 15 * time.Second}, "tcp", addr, tlsCfg)
 		if err != nil {
 			return fmt.Errorf("tls dial: %w", err)
 		}

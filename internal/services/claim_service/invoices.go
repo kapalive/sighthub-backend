@@ -50,9 +50,10 @@ func (s *Service) GetInsuranceInvoices(username string, params map[string]string
 	}
 
 	db := s.db.Model(&invoiceModel.Invoice{}).
-		Joins("JOIN invoice_insurance_policy iip ON iip.invoice_id = invoice.id_invoice").
+		Joins("LEFT JOIN invoice_insurance_policy iip ON iip.invoice_id = invoice.id_invoice").
 		Joins("JOIN patient p ON p.id_patient = invoice.patient_id").
-		Where("invoice.location_id = ?", loc.IDLocation)
+		Where("invoice.location_id = ?", loc.IDLocation).
+		Where("(iip.invoice_id IS NOT NULL OR invoice.ins_bal > 0)")
 
 	if status := params["status"]; status != "" {
 		statuses := strings.Split(status, ",")
@@ -118,7 +119,10 @@ func (s *Service) GetInsuranceInvoices(username string, params map[string]string
 		var hasPayment bool
 		s.db.Raw("SELECT EXISTS(SELECT 1 FROM insurance_payment WHERE invoice_id = ?)", inv.IDInvoice).Scan(&hasPayment)
 
-		status := string(inv.PaidInsuranceStatus)
+		status := ""
+		if inv.PaidInsuranceStatus != nil {
+			status = string(*inv.PaidInsuranceStatus)
+		}
 		if status == "" {
 			status = "Prep"
 		}
@@ -327,9 +331,13 @@ func (s *Service) AddInsurancePayment(username string, invoiceID int64, input Ad
 			adjustPaymentID = ipAdj.IDInsurancePayment
 		}
 
-		status := string(inv.PaidInsuranceStatus)
+		status := ""
+		if inv.PaidInsuranceStatus != nil {
+			status = string(*inv.PaidInsuranceStatus)
+		}
 		if status == "Prep" || status == "Accept" || status == "" {
-			inv.PaidInsuranceStatus = modelTypes.PaidInsuranceStatusPaid
+			paid := modelTypes.PaidInsuranceStatusPaid
+			inv.PaidInsuranceStatus = &paid
 		}
 		s.recalcInvoice(&inv)
 
@@ -625,7 +633,8 @@ func (s *Service) UpdateInsuranceStatus(username string, invoiceID int64, status
 		return nil, err
 	}
 
-	inv.PaidInsuranceStatus = modelTypes.PaidInsuranceStatus(status)
+	newStatus := modelTypes.PaidInsuranceStatus(status)
+	inv.PaidInsuranceStatus = &newStatus
 	if err := s.db.Save(&inv).Error; err != nil {
 		return nil, err
 	}
@@ -736,7 +745,10 @@ func (s *Service) GetClaimInfo(invoiceID int64) (map[string]interface{}, error) 
 		return nil, err
 	}
 
-	status := string(inv.PaidInsuranceStatus)
+	status := ""
+	if inv.PaidInsuranceStatus != nil {
+		status = string(*inv.PaidInsuranceStatus)
+	}
 	if status == "" {
 		status = "Prep"
 	}

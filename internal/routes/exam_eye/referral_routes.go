@@ -36,5 +36,6 @@ func RegisterReferralRoutes(db *gorm.DB, rdb *redis.Client, cfg *config.Config, 
 	api.HandleFunc("/doctors/{doctor_id:[0-9]+}", h.DeleteReferralDoctor).Methods("DELETE")
 	api.HandleFunc("/referral-letters/{letter_id:[0-9]+}/html", h.PrintReferralLetter).Methods("GET")
 	api.HandleFunc("/referral-letters/{letter_id:[0-9]+}/fax", h.FaxReferralLetter).Methods("POST")
+	api.HandleFunc("/referral-letters/{letter_id:[0-9]+}/email", h.EmailReferralLetter).Methods("POST")
 	api.HandleFunc("/tests-build/{exam_id:[0-9]+}", h.BuildTests).Methods("GET")
 }

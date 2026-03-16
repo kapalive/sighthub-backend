@@ -23,6 +23,7 @@ import (
 	patModel       "sighthub-backend/internal/models/patients"
 	visionModel    "sighthub-backend/internal/models/vision_exam"
 	"sighthub-backend/pkg/activitylog"
+	"sighthub-backend/pkg/email"
 )
 
 type Service struct{ db *gorm.DB }
@@ -33,7 +34,7 @@ func New(db *gorm.DB) *Service { return &Service{db: db} }
 
 func (s *Service) getEmployee(username string) (*empModel.Employee, error) {
 	var login authModel.EmployeeLogin
-	if err := s.db.Where("username = ?", username).First(&login).Error; err != nil {
+	if err := s.db.Where("employee_login = ?", username).First(&login).Error; err != nil {
 		return nil, errors.New("employee not found")
 	}
 	var emp empModel.Employee
@@ -677,12 +678,18 @@ func (s *Service) GetReferralLetterHTML(letterID int64) (string, error) {
 		issue = *letter.IssueLetter
 	}
 
+	// Convert \n to <br> for HTML rendering
+	nl2br := func(s string) template.HTML {
+		escaped := template.HTMLEscapeString(s)
+		return template.HTML(strings.ReplaceAll(escaped, "\n", "<br>\n"))
+	}
+
 	ctx := map[string]interface{}{
 		"title":       title,
-		"intro":       intro,
-		"tests":       tests,
+		"intro":       nl2br(intro),
+		"tests":       nl2br(tests),
 		"drawing":     drawingPath,
-		"issue":       issue,
+		"issue":       nl2br(issue),
 		"to_doctor":   toDoc,
 		"cc_doctor":   ccDoc,
 		"from_doctor": doctor,
@@ -1027,4 +1034,37 @@ func strOrNo(p *string) string {
 		return "No data"
 	}
 	return *p
+}
+
+// ─── SendReferralEmail ───────────────────────────────────────────────────────
+
+func (s *Service) SendReferralEmail(letterID int64, toEmail, subject string) error {
+	// Get letter to find exam → location
+	var letter referralModel.ReferralLetter
+	if err := s.db.First(&letter, letterID).Error; err != nil {
+		return errors.New("letter not found")
+	}
+
+	var exam visionModel.EyeExam
+	if err := s.db.First(&exam, letter.EyeExamID).Error; err != nil {
+		return errors.New("exam not found")
+	}
+
+	htmlBody, err := s.GetReferralLetterHTML(letterID)
+	if err != nil {
+		return fmt.Errorf("failed to render letter: %w", err)
+	}
+
+	// Use location-specific SMTP config
+	locID := int64(exam.LocationID)
+	smtpCfg, err := email.GetSMTPForLocation(s.db, &locID)
+	if err != nil {
+		return fmt.Errorf("smtp not configured: %w", err)
+	}
+
+	if subject == "" {
+		subject = "Referral Letter"
+	}
+
+	return email.Send(smtpCfg, toEmail, subject, htmlBody)
 }

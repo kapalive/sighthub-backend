@@ -23,7 +23,7 @@ func (s *Service) UpdateInvoiceStatus(invoiceID int64, statusInvoiceID int) (map
 		return nil, fmt.Errorf("%w: status not found", ErrNotFound)
 	}
 
-	inv.StatusInvoiceID = int64(statusInvoiceID)
+	statusID := int64(statusInvoiceID); inv.StatusInvoiceID = &statusID
 	s.db.Save(&inv)
 
 	return map[string]interface{}{

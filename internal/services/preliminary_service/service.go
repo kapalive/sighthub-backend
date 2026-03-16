@@ -11,6 +11,7 @@ import (
 	preliminary   "sighthub-backend/internal/models/medical/vision_exam/preliminary"
 	visionModel   "sighthub-backend/internal/models/vision_exam"
 	"sighthub-backend/pkg/activitylog"
+	"sighthub-backend/pkg/defaults"
 )
 
 // ─── Service ─────────────────────────────────────────────────────────────────
@@ -353,90 +354,94 @@ func (s *Service) SavePreliminary(username string, examID int64, input SavePreli
 	}
 
 	// NearPointTesting sub-records
-	var distPhoria preliminary.DistPhoriaTest
-	if d := input.NearPointTesting; d != nil && d.DistPhoriaTesting != nil {
-		dp := d.DistPhoriaTesting
-		distPhoria = preliminary.DistPhoriaTest{
-			Horiz:      dp.Horiz,
-			Vert:       dp.Vert,
-			HorizExo:   boolDeref(dp.HorizExo, false),
-			HorizEso:   boolDeref(dp.HorizEso, false),
-			HorizOrtho: boolDeref(dp.HorizOrtho, false),
-			VertRh:     boolDeref(dp.VertRh, false),
-			VertLn:     boolDeref(dp.VertLn, false),
-			VertOrtho:  boolDeref(dp.VertOrtho, false),
-		}
+	if input.NearPointTesting == nil {
+		input.NearPointTesting = &NearPointTestingInput{}
+	}
+	if input.NearPointTesting.DistPhoriaTesting == nil {
+		input.NearPointTesting.DistPhoriaTesting = &DistPhoriaInput{}
+	}
+	if input.NearPointTesting.NearPhoriaTesting == nil {
+		input.NearPointTesting.NearPhoriaTesting = &NearPhoriaInput{}
+	}
+	if input.NearPointTesting.DistVergenceTesting == nil {
+		input.NearPointTesting.DistVergenceTesting = &DistVergenceInput{}
+	}
+	if input.NearPointTesting.NearVergenceTesting == nil {
+		input.NearPointTesting.NearVergenceTesting = &NearVergenceInput{}
+	}
+	if input.NearPointTesting.Accommodation == nil {
+		input.NearPointTesting.Accommodation = &AccommodationInput{}
+	}
+
+	dp := input.NearPointTesting.DistPhoriaTesting
+	distPhoria := preliminary.DistPhoriaTest{
+		Horiz:      defaults.Str(dp.Horiz),
+		Vert:       defaults.Str(dp.Vert),
+		HorizExo:   boolDeref(dp.HorizExo, false),
+		HorizEso:   boolDeref(dp.HorizEso, false),
+		HorizOrtho: boolDeref(dp.HorizOrtho, false),
+		VertRh:     boolDeref(dp.VertRh, false),
+		VertLn:     boolDeref(dp.VertLn, false),
+		VertOrtho:  boolDeref(dp.VertOrtho, false),
 	}
 	if err := s.db.Create(&distPhoria).Error; err != nil {
 		return nil, err
 	}
 
-	var nearPhoria preliminary.NearPhoriaTest
-	if d := input.NearPointTesting; d != nil && d.NearPhoriaTesting != nil {
-		np := d.NearPhoriaTesting
-		nearPhoria = preliminary.NearPhoriaTest{
-			Horiz:            np.Horiz,
-			Vert:             np.Vert,
-			GradientRatio1:   np.GradientRatio1,
-			CalculatedRatio1: np.CalculatedRatio1,
-			GradientRatio2:   np.GradientRatio2,
-			CalculatedRatio2: np.CalculatedRatio2,
-			HorizExo:         boolDeref(np.HorizExo, false),
-			HorizEso:         boolDeref(np.HorizEso, false),
-			HorizOrtho:       boolDeref(np.HorizOrtho, false),
-			VertRh:           boolDeref(np.VertRh, false),
-			VertLn:           boolDeref(np.VertLn, false),
-			VertOrtho:        boolDeref(np.VertOrtho, false),
-		}
+	np := input.NearPointTesting.NearPhoriaTesting
+	nearPhoria := preliminary.NearPhoriaTest{
+		Horiz:            defaults.Str(np.Horiz),
+		Vert:             defaults.Str(np.Vert),
+		GradientRatio1:   defaults.Str(np.GradientRatio1),
+		CalculatedRatio1: defaults.Str(np.CalculatedRatio1),
+		GradientRatio2:   defaults.Str(np.GradientRatio2),
+		CalculatedRatio2: defaults.Str(np.CalculatedRatio2),
+		HorizExo:         boolDeref(np.HorizExo, false),
+		HorizEso:         boolDeref(np.HorizEso, false),
+		HorizOrtho:       boolDeref(np.HorizOrtho, false),
+		VertRh:           boolDeref(np.VertRh, false),
+		VertLn:           boolDeref(np.VertLn, false),
+		VertOrtho:        boolDeref(np.VertOrtho, false),
 	}
 	if err := s.db.Create(&nearPhoria).Error; err != nil {
 		return nil, err
 	}
 
-	var distVergence preliminary.DistVergenceTest
-	if d := input.NearPointTesting; d != nil && d.DistVergenceTesting != nil {
-		dv := d.DistVergenceTesting
-		distVergence = preliminary.DistVergenceTest{
-			Bi1: dv.Bi1, Bo1: dv.Bo1,
-			Bi2: dv.Bi2, Bo2: dv.Bo2,
-			Bi3: dv.Bi3, Bo3: dv.Bo3,
-		}
+	dv := input.NearPointTesting.DistVergenceTesting
+	distVergence := preliminary.DistVergenceTest{
+		Bi1: defaults.Str(dv.Bi1), Bo1: defaults.Str(dv.Bo1),
+		Bi2: defaults.Str(dv.Bi2), Bo2: defaults.Str(dv.Bo2),
+		Bi3: defaults.Str(dv.Bi3), Bo3: defaults.Str(dv.Bo3),
 	}
 	if err := s.db.Create(&distVergence).Error; err != nil {
 		return nil, err
 	}
 
-	var nearVergence preliminary.NearVergenceTest
-	if d := input.NearPointTesting; d != nil && d.NearVergenceTesting != nil {
-		nv := d.NearVergenceTesting
-		nearVergence = preliminary.NearVergenceTest{
-			Bi1: nv.Bi1, Bo1: nv.Bo1,
-			Bi2: nv.Bi2, Bo2: nv.Bo2,
-			Bi3: nv.Bi3, Bo3: nv.Bo3,
-		}
+	nv := input.NearPointTesting.NearVergenceTesting
+	nearVergence := preliminary.NearVergenceTest{
+		Bi1: defaults.Str(nv.Bi1), Bo1: defaults.Str(nv.Bo1),
+		Bi2: defaults.Str(nv.Bi2), Bo2: defaults.Str(nv.Bo2),
+		Bi3: defaults.Str(nv.Bi3), Bo3: defaults.Str(nv.Bo3),
 	}
 	if err := s.db.Create(&nearVergence).Error; err != nil {
 		return nil, err
 	}
 
-	var accommodation preliminary.Accommodation
-	if d := input.NearPointTesting; d != nil && d.Accommodation != nil {
-		ac := d.Accommodation
-		accommodation = preliminary.Accommodation{
-			Pra1:                 ac.Pra1,
-			Nra1:                 ac.Nra1,
-			Pra2:                 ac.Pra2,
-			Nra2:                 ac.Nra2,
-			MemOd:                ac.MemOd,
-			MemOs:                ac.MemOs,
-			Baf:                  ac.Baf,
-			VergenceFacilityCpm:  ac.VergenceFacilityCpm,
-			VergenceFacilityWith: ac.VergenceFacilityWith,
-			PushUpOd:             ac.PushUpOd,
-			PushUpOs:             ac.PushUpOs,
-			PushUpOu:             ac.PushUpOu,
-			SlowWith:             ac.SlowWith,
-		}
+	ac := input.NearPointTesting.Accommodation
+	accommodation := preliminary.Accommodation{
+		Pra1:                 defaults.Str(ac.Pra1),
+		Nra1:                 defaults.Str(ac.Nra1),
+		Pra2:                 defaults.Str(ac.Pra2),
+		Nra2:                 defaults.Str(ac.Nra2),
+		MemOd:                defaults.Str(ac.MemOd),
+		MemOs:                defaults.Str(ac.MemOs),
+		Baf:                  defaults.Str(ac.Baf),
+		VergenceFacilityCpm:  defaults.Str(ac.VergenceFacilityCpm),
+		VergenceFacilityWith: defaults.Str(ac.VergenceFacilityWith),
+		PushUpOd:             defaults.Str(ac.PushUpOd),
+		PushUpOs:             defaults.Str(ac.PushUpOs),
+		PushUpOu:             defaults.Str(ac.PushUpOu),
+		SlowWith:             defaults.Bool(ac.SlowWith),
 	}
 	if err := s.db.Create(&accommodation).Error; err != nil {
 		return nil, err
@@ -461,190 +466,203 @@ func (s *Service) SavePreliminary(username string, examID int64, input SavePreli
 	nptID := npt.IDNearPointTesting
 
 	// Simple sub-records
-	var unaidedVADist preliminary.UnaidedVADistance
-	if d := input.UnaidedVADistance; d != nil {
-		unaidedVADist = preliminary.UnaidedVADistance{Od20: d.Od20, Os20: d.Os20, Ou20: d.Ou20}
+	if input.UnaidedVADistance == nil {
+		input.UnaidedVADistance = &UnaidedVADistanceInput{}
 	}
+	d1 := input.UnaidedVADistance
+	unaidedVADist := preliminary.UnaidedVADistance{Od20: defaults.Str(d1.Od20), Os20: defaults.Str(d1.Os20), Ou20: defaults.Str(d1.Ou20)}
 	if err := s.db.Create(&unaidedVADist).Error; err != nil {
 		return nil, err
 	}
 	unaidedVADistID := unaidedVADist.IDUnaidedVADistance
 
-	var unaidedPHDist preliminary.UnaidedPHDistance
-	if d := input.UnaidedPHDistance; d != nil {
-		unaidedPHDist = preliminary.UnaidedPHDistance{Od20: d.Od20, Os20: d.Os20}
+	if input.UnaidedPHDistance == nil {
+		input.UnaidedPHDistance = &UnaidedPHDistanceInput{}
 	}
+	d2 := input.UnaidedPHDistance
+	unaidedPHDist := preliminary.UnaidedPHDistance{Od20: defaults.Str(d2.Od20), Os20: defaults.Str(d2.Os20)}
 	if err := s.db.Create(&unaidedPHDist).Error; err != nil {
 		return nil, err
 	}
 	unaidedPHDistID := unaidedPHDist.IDUnaidedPHDistance
 
-	var unaidedVANear preliminary.UnaidedVANear
-	if d := input.UnaidedVANear; d != nil {
-		unaidedVANear = preliminary.UnaidedVANear{Od20: d.Od20, Os20: d.Os20, Ou20: d.Ou20}
+	if input.UnaidedVANear == nil {
+		input.UnaidedVANear = &UnaidedVANearInput{}
 	}
+	d3 := input.UnaidedVANear
+	unaidedVANear := preliminary.UnaidedVANear{Od20: defaults.Str(d3.Od20), Os20: defaults.Str(d3.Os20), Ou20: defaults.Str(d3.Ou20)}
 	if err := s.db.Create(&unaidedVANear).Error; err != nil {
 		return nil, err
 	}
 	unaidedVANearID := unaidedVANear.IDUnaidedVANear
 
-	var aidedVADist preliminary.AidedVADistance
-	if d := input.AidedVADistance; d != nil {
-		aidedVADist = preliminary.AidedVADistance{Od20: d.Od20, Os20: d.Os20, Ou20: d.Ou20}
+	if input.AidedVADistance == nil {
+		input.AidedVADistance = &AidedVADistanceInput{}
 	}
+	d4 := input.AidedVADistance
+	aidedVADist := preliminary.AidedVADistance{Od20: defaults.Str(d4.Od20), Os20: defaults.Str(d4.Os20), Ou20: defaults.Str(d4.Ou20)}
 	if err := s.db.Create(&aidedVADist).Error; err != nil {
 		return nil, err
 	}
 	aidedVADistID := aidedVADist.IDAidedVADistance
 
-	var aidedPHDist preliminary.AidedPHDistance
-	if d := input.AidedPHDistance; d != nil {
-		aidedPHDist = preliminary.AidedPHDistance{Od20: d.Od20, Os20: d.Os20}
+	if input.AidedPHDistance == nil {
+		input.AidedPHDistance = &AidedPHDistanceInput{}
 	}
+	d5 := input.AidedPHDistance
+	aidedPHDist := preliminary.AidedPHDistance{Od20: defaults.Str(d5.Od20), Os20: defaults.Str(d5.Os20)}
 	if err := s.db.Create(&aidedPHDist).Error; err != nil {
 		return nil, err
 	}
 	aidedPHDistID := aidedPHDist.IDAidedPHDistance
 
-	var aidedVANear preliminary.AidedVANear
-	if d := input.AidedVANear; d != nil {
-		aidedVANear = preliminary.AidedVANear{Od20: d.Od20, Os20: d.Os20, Ou20: d.Ou20}
+	if input.AidedVANear == nil {
+		input.AidedVANear = &AidedVANearInput{}
 	}
+	d6 := input.AidedVANear
+	aidedVANear := preliminary.AidedVANear{Od20: defaults.Str(d6.Od20), Os20: defaults.Str(d6.Os20), Ou20: defaults.Str(d6.Ou20)}
 	if err := s.db.Create(&aidedVANear).Error; err != nil {
 		return nil, err
 	}
 	aidedVANearID := aidedVANear.IDAidedVANear
 
-	var confrontation preliminary.Confrontation
-	if d := input.Confrontation; d != nil {
-		confrontation = preliminary.Confrontation{Od: d.Od, Os: d.Os}
+	if input.Confrontation == nil {
+		input.Confrontation = &ConfrontationInput{}
 	}
+	d7 := input.Confrontation
+	confrontation := preliminary.Confrontation{Od: defaults.Str(d7.Od), Os: defaults.Str(d7.Os)}
 	if err := s.db.Create(&confrontation).Error; err != nil {
 		return nil, err
 	}
 	confrontationID := confrontation.IDConfrontation
 
-	var automated preliminary.Automated
-	if d := input.Automated; d != nil {
-		automated = preliminary.Automated{Od: d.Od, Os: d.Os}
+	if input.Automated == nil {
+		input.Automated = &AutomatedInput{}
 	}
+	d8 := input.Automated
+	automated := preliminary.Automated{Od: defaults.Str(d8.Od), Os: defaults.Str(d8.Os)}
 	if err := s.db.Create(&automated).Error; err != nil {
 		return nil, err
 	}
 	automatedID := automated.IDAutomated
 
-	var motility preliminary.Motility
-	if d := input.Motility; d != nil {
-		motility = preliminary.Motility{Od: d.Od, Os: d.Os}
+	if input.Motility == nil {
+		input.Motility = &MotilityInput{}
 	}
+	d9 := input.Motility
+	motility := preliminary.Motility{Od: defaults.Str(d9.Od), Os: defaults.Str(d9.Os)}
 	if err := s.db.Create(&motility).Error; err != nil {
 		return nil, err
 	}
 	motilityID := motility.IDMotility
 
-	var pupils preliminary.Pupils
-	if d := input.Pupils; d != nil {
-		pupils = preliminary.Pupils{
-			OdMmDim:    d.OdMmDim,
-			OdMmBright: d.OdMmBright,
-			OsMmDim:    d.OsMmDim,
-			OsMmBright: d.OsMmBright,
-			Perrla:     boolDeref(d.Perrla, false),
-			PerrlaText: d.PerrlaText,
-			Apd:        boolDeref(d.Apd, false),
-			ApdText:    d.ApdText,
-		}
+	if input.Pupils == nil {
+		input.Pupils = &PupilsInput{}
+	}
+	d10 := input.Pupils
+	pupils := preliminary.Pupils{
+		OdMmDim:    defaults.Str(d10.OdMmDim),
+		OdMmBright: defaults.Str(d10.OdMmBright),
+		OsMmDim:    defaults.Str(d10.OsMmDim),
+		OsMmBright: defaults.Str(d10.OsMmBright),
+		Perrla:     boolDeref(d10.Perrla, false),
+		PerrlaText: defaults.Str(d10.PerrlaText),
+		Apd:        boolDeref(d10.Apd, false),
+		ApdText:    defaults.Str(d10.ApdText),
 	}
 	if err := s.db.Create(&pupils).Error; err != nil {
 		return nil, err
 	}
 	pupilsID := pupils.IDPupils
 
-	var colorVision preliminary.ColorVision
-	if d := input.ColorVision; d != nil {
-		colorVision = preliminary.ColorVision{Od1: d.Od1, Od2: d.Od2, Os1: d.Os1, Os2: d.Os2}
+	if input.ColorVision == nil {
+		input.ColorVision = &ColorVisionInput{}
 	}
+	d11 := input.ColorVision
+	colorVision := preliminary.ColorVision{Od1: defaults.Str(d11.Od1), Od2: defaults.Str(d11.Od2), Os1: defaults.Str(d11.Os1), Os2: defaults.Str(d11.Os2)}
 	if err := s.db.Create(&colorVision).Error; err != nil {
 		return nil, err
 	}
 	colorVisionID := colorVision.IDColorVision
 
-	var bruckner preliminary.Bruckner
-	if d := input.Bruckner; d != nil {
-		bruckner = preliminary.Bruckner{Od: d.Od, Os: d.Os, GoodReflex: d.GoodReflex}
+	if input.Bruckner == nil {
+		input.Bruckner = &BrucknerInput{}
 	}
+	d12 := input.Bruckner
+	bruckner := preliminary.Bruckner{Od: defaults.Str(d12.Od), Os: defaults.Str(d12.Os), GoodReflex: defaults.Bool(d12.GoodReflex)}
 	if err := s.db.Create(&bruckner).Error; err != nil {
 		return nil, err
 	}
 	brucknerID := bruckner.IDBruckner
 
-	var amslerGrid preliminary.AmslerGrid
-	if d := input.AmslerGrid; d != nil {
-		amslerGrid = preliminary.AmslerGrid{Od: d.Od, Os: d.Os}
+	if input.AmslerGrid == nil {
+		input.AmslerGrid = &AmslerGridInput{}
 	}
+	d13 := input.AmslerGrid
+	amslerGrid := preliminary.AmslerGrid{Od: defaults.Str(d13.Od), Os: defaults.Str(d13.Os)}
 	if err := s.db.Create(&amslerGrid).Error; err != nil {
 		return nil, err
 	}
 	amslerGridID := amslerGrid.IDAmslerGrid
 
-	var distVGP preliminary.DistanceVonGraefePhoria
-	if d := input.DistanceVonGraefePhoria; d != nil {
-		distVGP = preliminary.DistanceVonGraefePhoria{HDistVgp: d.HDistVgp, VDistVgp: d.VDistVgp}
+	if input.DistanceVonGraefePhoria == nil {
+		input.DistanceVonGraefePhoria = &DistanceVonGraefeInput{}
 	}
+	d14 := input.DistanceVonGraefePhoria
+	distVGP := preliminary.DistanceVonGraefePhoria{HDistVgp: defaults.Str(d14.HDistVgp), VDistVgp: defaults.Str(d14.VDistVgp)}
 	if err := s.db.Create(&distVGP).Error; err != nil {
 		return nil, err
 	}
 	distVGPID := distVGP.IDDistanceVonGraefePhoria
 
-	var nearVGP preliminary.NearVonGraefePhoria
-	if d := input.NearVonGraefePhoria; d != nil {
-		nearVGP = preliminary.NearVonGraefePhoria{HNearVgp: d.HNearVgp, VNearVgp: d.VNearVgp}
+	if input.NearVonGraefePhoria == nil {
+		input.NearVonGraefePhoria = &NearVonGraefeInput{}
 	}
+	d15 := input.NearVonGraefePhoria
+	nearVGP := preliminary.NearVonGraefePhoria{HNearVgp: defaults.Str(d15.HNearVgp), VNearVgp: defaults.Str(d15.VNearVgp)}
 	if err := s.db.Create(&nearVGP).Error; err != nil {
 		return nil, err
 	}
 	nearVGPID := nearVGP.IDNearVonGraefePhoria
 
-	var autoRef preliminary.AutorefractorPreliminary
-	if d := input.AutorefractorPreliminary; d != nil {
-		autoRef = preliminary.AutorefractorPreliminary{
-			OdSph: d.OdSph, OsSph: d.OsSph,
-			OdCyl: d.OdCyl, OsCyl: d.OsCyl,
-			OdAxis: d.OdAxis, OsAxis: d.OsAxis,
-			Pd: d.Pd,
-		}
+	if input.AutorefractorPreliminary == nil {
+		input.AutorefractorPreliminary = &AutorefractorInput{}
+	}
+	d16 := input.AutorefractorPreliminary
+	autoRef := preliminary.AutorefractorPreliminary{
+		OdSph: defaults.Str(d16.OdSph), OsSph: defaults.Str(d16.OsSph),
+		OdCyl: defaults.Str(d16.OdCyl), OsCyl: defaults.Str(d16.OsCyl),
+		OdAxis: defaults.Str(d16.OdAxis), OsAxis: defaults.Str(d16.OsAxis),
+		Pd: defaults.Str(d16.Pd),
 	}
 	if err := s.db.Create(&autoRef).Error; err != nil {
 		return nil, err
 	}
 	autoRefID := autoRef.IDAutorefractorPreliminary
 
-	var autoKera preliminary.AutoKeratometerPreliminary
-	if d := input.AutoKeratometerPreliminary; d != nil {
-		autoKera = preliminary.AutoKeratometerPreliminary{
-			OdPw1: d.OdPw1, OsPw1: d.OsPw1,
-			OdPw2: d.OdPw2, OsPw2: d.OsPw2,
-			OdAxis: d.OdAxis, OsAxis: d.OsAxis,
-		}
+	if input.AutoKeratometerPreliminary == nil {
+		input.AutoKeratometerPreliminary = &AutoKeratometerInput{}
+	}
+	d17 := input.AutoKeratometerPreliminary
+	autoKera := preliminary.AutoKeratometerPreliminary{
+		OdPw1: defaults.Str(d17.OdPw1), OsPw1: defaults.Str(d17.OsPw1),
+		OdPw2: defaults.Str(d17.OdPw2), OsPw2: defaults.Str(d17.OsPw2),
+		OdAxis: defaults.Str(d17.OdAxis), OsAxis: defaults.Str(d17.OsAxis),
 	}
 	if err := s.db.Create(&autoKera).Error; err != nil {
 		return nil, err
 	}
 	autoKeraID := autoKera.IDAutoKeratometerPreliminary
 
-	var bp preliminary.BloodPressure
-	if d := input.BloodPressure; d != nil {
-		bp = preliminary.BloodPressure{Sbp: d.Sbp, Dbp: d.Dbp}
+	if input.BloodPressure == nil {
+		input.BloodPressure = &BloodPressureInput{}
 	}
+	d18 := input.BloodPressure
+	bp := preliminary.BloodPressure{Sbp: defaults.Str(d18.Sbp), Dbp: defaults.Str(d18.Dbp)}
 	if err := s.db.Create(&bp).Error; err != nil {
 		return nil, err
 	}
 	bpIntID := int(bp.IDBloodPressure)
-
-	irisColor := "n/a"
-	if input.IrisColor != nil && *input.IrisColor != "" {
-		irisColor = *input.IrisColor
-	}
 
 	prelim := preliminary.PreliminaryEyeExam{
 		EyeExamID:                    examID,
@@ -661,22 +679,22 @@ func (s *Service) SavePreliminary(username string, examID int64, input SavePreli
 		MotilityID:                   &motilityID,
 		PupilsID:                     &pupilsID,
 		ColorVisionID:                &colorVisionID,
-		DistanceCoverTest:            input.DistanceCoverTest,
-		NearCoverTest:                input.NearCoverTest,
-		NpcTest:                      input.NpcTest,
+		DistanceCoverTest:            defaults.Str(input.DistanceCoverTest),
+		NearCoverTest:                defaults.Str(input.NearCoverTest),
+		NpcTest:                      defaults.Str(input.NpcTest),
 		BrucknerID:                   &brucknerID,
 		AmslerGridID:                 &amslerGridID,
-		Worth4Dot:                    input.Worth4Dot,
-		StereoVision:                 input.StereoVision,
-		FixationDisparity:            input.FixationDisparity,
+		Worth4Dot:                    defaults.Str(input.Worth4Dot),
+		StereoVision:                 defaults.Str(input.StereoVision),
+		FixationDisparity:            defaults.Str(input.FixationDisparity),
 		DistanceVonGraefePhorialID:   &distVGPID,
 		NearVonGraefePhorialID:       &nearVGPID,
 		NearPointTestingID:           &nptID,
 		AutorefractorPreliminaryID:   &autoRefID,
 		AutoKeratometerPreliminaryID: &autoKeraID,
 		BloodPressureID:              &bpIntID,
-		IrisColor:                    irisColor,
-		Note:                         input.Note,
+		IrisColor:                    *defaults.StrDefault(input.IrisColor, "n/a"),
+		Note:                         defaults.Str(input.Note),
 	}
 	if err := s.db.Create(&prelim).Error; err != nil {
 		return nil, err
@@ -1461,12 +1479,25 @@ func (s *Service) FillEntranceRx(examID int64, input FillEntranceRxInput) (map[s
 		return nil, errors.New("cannot modify entrance rx for a completed exam")
 	}
 
+	// Find or create preliminary record
+	var prelim preliminary.PreliminaryEyeExam
+	if err := s.db.Where("eye_exam_id = ?", examID).First(&prelim).Error; err != nil {
+		// No preliminary yet — create one
+		prelim = preliminary.PreliminaryEyeExam{
+			EyeExamID: examID,
+			IrisColor: "n/a",
+		}
+		if err := s.db.Create(&prelim).Error; err != nil {
+			return nil, err
+		}
+	}
+
 	var entranceGlassesID *int64
 	var entranceContLensID *int64
 
 	if input.RxData.Glasses != nil {
 		var gRx rxGlasses
-		if err := s.db.Where("id_glasses_prescription = ?", *input.RxData.Glasses).First(&gRx).Error; err != nil {
+		if err := s.db.Where("prescription_id = ?", *input.RxData.Glasses).First(&gRx).Error; err != nil {
 			return nil, errors.New("glasses prescription not found")
 		}
 		var presc rxPrescription
@@ -1488,19 +1519,20 @@ func (s *Service) FillEntranceRx(examID int64, input FillEntranceRxInput) (map[s
 			return nil, err
 		}
 		entranceGlassesID = &eg.IDEntranceGlasses
+		prelim.EntranceGlassesID = entranceGlassesID
 	}
 
 	if input.RxData.Contact != nil {
 		var cRx rxContactLens
-		if err := s.db.Where("id_contact_lens_prescription = ?", *input.RxData.Contact).First(&cRx).Error; err != nil {
+		if err := s.db.Where("prescription_id = ?", *input.RxData.Contact).First(&cRx).Error; err != nil {
 			return nil, errors.New("contact lens prescription not found")
 		}
 		var presc rxPrescription
 		s.db.First(&presc, cRx.PrescriptionID)
 		ecl := preliminary.EntranceContLens{
 			Data:    presc.PrescriptionDate,
-			OdBrand: nil,
-			OsBrand: nil,
+			OdBrand: cRx.OdContLens,
+			OsBrand: cRx.OsContLens,
 			OdBaseC: cRx.OdBc,
 			OsBaseC: cRx.OsBc,
 			OdDia:   cRx.OdDia,
@@ -1518,23 +1550,19 @@ func (s *Service) FillEntranceRx(examID int64, input FillEntranceRxInput) (map[s
 			return nil, err
 		}
 		entranceContLensID = &ecl.IDEntranceContLens
+		prelim.EntranceContLensID = entranceContLensID
 	}
 
-	prelim := preliminary.PreliminaryEyeExam{
-		EyeExamID:          examID,
-		EntranceGlassesID:  entranceGlassesID,
-		EntranceContLensID: entranceContLensID,
-		IrisColor:          "n/a",
-	}
-	if err := s.db.Create(&prelim).Error; err != nil {
+	// Update existing preliminary with entrance IDs
+	if err := s.db.Save(&prelim).Error; err != nil {
 		return nil, err
 	}
 
 	return map[string]interface{}{
-		"message":                "entrance rx saved successfully",
+		"message":                 "entrance rx saved successfully",
 		"id_preliminary_eye_exam": prelim.IDPreliminaryEyeExam,
-		"entrance_glasses_id":    entranceGlassesID,
-		"entrance_cont_lens_id":  entranceContLensID,
+		"entrance_glasses_id":     entranceGlassesID,
+		"entrance_cont_lens_id":   entranceContLensID,
 	}, nil
 }
 
@@ -1556,7 +1584,7 @@ func (s *Service) UpdateEntranceRx(examID int64, input FillEntranceRxInput) (map
 
 	if input.RxData.Glasses != nil {
 		var gRx rxGlasses
-		if err := s.db.Where("id_glasses_prescription = ?", *input.RxData.Glasses).First(&gRx).Error; err != nil {
+		if err := s.db.Where("prescription_id = ?", *input.RxData.Glasses).First(&gRx).Error; err != nil {
 			return nil, errors.New("glasses prescription not found")
 		}
 		var presc rxPrescription
@@ -1577,13 +1605,15 @@ func (s *Service) UpdateEntranceRx(examID int64, input FillEntranceRxInput) (map
 		eg.OsAdd = gRx.OsAdd
 		eg.OdHPrism = gRx.OdHPrism
 		eg.OsHPrism = gRx.OsHPrism
-		s.db.Save(&eg)
+		if err := s.db.Save(&eg).Error; err != nil {
+			return nil, err
+		}
 		prelim.EntranceGlassesID = &eg.IDEntranceGlasses
 	}
 
 	if input.RxData.Contact != nil {
 		var cRx rxContactLens
-		if err := s.db.Where("id_contact_lens_prescription = ?", *input.RxData.Contact).First(&cRx).Error; err != nil {
+		if err := s.db.Where("prescription_id = ?", *input.RxData.Contact).First(&cRx).Error; err != nil {
 			return nil, errors.New("contact lens prescription not found")
 		}
 		var presc rxPrescription
@@ -1594,6 +1624,8 @@ func (s *Service) UpdateEntranceRx(examID int64, input FillEntranceRxInput) (map
 			s.db.First(&ecl, *prelim.EntranceContLensID)
 		}
 		ecl.Data = presc.PrescriptionDate
+		ecl.OdBrand = cRx.OdContLens
+		ecl.OsBrand = cRx.OsContLens
 		ecl.OdBaseC = cRx.OdBc
 		ecl.OsBaseC = cRx.OsBc
 		ecl.OdDia = cRx.OdDia
@@ -1606,7 +1638,9 @@ func (s *Service) UpdateEntranceRx(examID int64, input FillEntranceRxInput) (map
 		ecl.OsAxis = cRx.OsAxis
 		ecl.OdAdd = cRx.OdAdd
 		ecl.OsAdd = cRx.OsAdd
-		s.db.Save(&ecl)
+		if err := s.db.Save(&ecl).Error; err != nil {
+			return nil, err
+		}
 		prelim.EntranceContLensID = &ecl.IDEntranceContLens
 	}
 
@@ -1716,8 +1750,8 @@ func (s *Service) CreateNearPointTesting(examID int64, input NearPointTestingInp
 	var distPhoria preliminary.DistPhoriaTest
 	if d := input.DistPhoriaTesting; d != nil {
 		distPhoria = preliminary.DistPhoriaTest{
-			Horiz:      d.Horiz,
-			Vert:       d.Vert,
+			Horiz:      defaults.Str(d.Horiz),
+			Vert:       defaults.Str(d.Vert),
 			HorizExo:   boolDeref(d.HorizExo, false),
 			HorizEso:   boolDeref(d.HorizEso, false),
 			HorizOrtho: boolDeref(d.HorizOrtho, false),
@@ -1733,12 +1767,12 @@ func (s *Service) CreateNearPointTesting(examID int64, input NearPointTestingInp
 	var nearPhoria preliminary.NearPhoriaTest
 	if d := input.NearPhoriaTesting; d != nil {
 		nearPhoria = preliminary.NearPhoriaTest{
-			Horiz:            d.Horiz,
-			Vert:             d.Vert,
-			GradientRatio1:   d.GradientRatio1,
-			CalculatedRatio1: d.CalculatedRatio1,
-			GradientRatio2:   d.GradientRatio2,
-			CalculatedRatio2: d.CalculatedRatio2,
+			Horiz:            defaults.Str(d.Horiz),
+			Vert:             defaults.Str(d.Vert),
+			GradientRatio1:   defaults.Str(d.GradientRatio1),
+			CalculatedRatio1: defaults.Str(d.CalculatedRatio1),
+			GradientRatio2:   defaults.Str(d.GradientRatio2),
+			CalculatedRatio2: defaults.Str(d.CalculatedRatio2),
 			HorizExo:         boolDeref(d.HorizExo, false),
 			HorizEso:         boolDeref(d.HorizEso, false),
 			HorizOrtho:       boolDeref(d.HorizOrtho, false),
@@ -1754,9 +1788,9 @@ func (s *Service) CreateNearPointTesting(examID int64, input NearPointTestingInp
 	var distVergence preliminary.DistVergenceTest
 	if d := input.DistVergenceTesting; d != nil {
 		distVergence = preliminary.DistVergenceTest{
-			Bi1: d.Bi1, Bo1: d.Bo1,
-			Bi2: d.Bi2, Bo2: d.Bo2,
-			Bi3: d.Bi3, Bo3: d.Bo3,
+			Bi1: defaults.Str(d.Bi1), Bo1: defaults.Str(d.Bo1),
+			Bi2: defaults.Str(d.Bi2), Bo2: defaults.Str(d.Bo2),
+			Bi3: defaults.Str(d.Bi3), Bo3: defaults.Str(d.Bo3),
 		}
 	}
 	if err := s.db.Create(&distVergence).Error; err != nil {
@@ -1766,9 +1800,9 @@ func (s *Service) CreateNearPointTesting(examID int64, input NearPointTestingInp
 	var nearVergence preliminary.NearVergenceTest
 	if d := input.NearVergenceTesting; d != nil {
 		nearVergence = preliminary.NearVergenceTest{
-			Bi1: d.Bi1, Bo1: d.Bo1,
-			Bi2: d.Bi2, Bo2: d.Bo2,
-			Bi3: d.Bi3, Bo3: d.Bo3,
+			Bi1: defaults.Str(d.Bi1), Bo1: defaults.Str(d.Bo1),
+			Bi2: defaults.Str(d.Bi2), Bo2: defaults.Str(d.Bo2),
+			Bi3: defaults.Str(d.Bi3), Bo3: defaults.Str(d.Bo3),
 		}
 	}
 	if err := s.db.Create(&nearVergence).Error; err != nil {
@@ -1778,19 +1812,19 @@ func (s *Service) CreateNearPointTesting(examID int64, input NearPointTestingInp
 	var accommodation preliminary.Accommodation
 	if d := input.Accommodation; d != nil {
 		accommodation = preliminary.Accommodation{
-			Pra1:                 d.Pra1,
-			Nra1:                 d.Nra1,
-			Pra2:                 d.Pra2,
-			Nra2:                 d.Nra2,
-			MemOd:                d.MemOd,
-			MemOs:                d.MemOs,
-			Baf:                  d.Baf,
-			VergenceFacilityCpm:  d.VergenceFacilityCpm,
-			VergenceFacilityWith: d.VergenceFacilityWith,
-			PushUpOd:             d.PushUpOd,
-			PushUpOs:             d.PushUpOs,
-			PushUpOu:             d.PushUpOu,
-			SlowWith:             d.SlowWith,
+			Pra1:                 defaults.Str(d.Pra1),
+			Nra1:                 defaults.Str(d.Nra1),
+			Pra2:                 defaults.Str(d.Pra2),
+			Nra2:                 defaults.Str(d.Nra2),
+			MemOd:                defaults.Str(d.MemOd),
+			MemOs:                defaults.Str(d.MemOs),
+			Baf:                  defaults.Str(d.Baf),
+			VergenceFacilityCpm:  defaults.Str(d.VergenceFacilityCpm),
+			VergenceFacilityWith: defaults.Str(d.VergenceFacilityWith),
+			PushUpOd:             defaults.Str(d.PushUpOd),
+			PushUpOs:             defaults.Str(d.PushUpOs),
+			PushUpOu:             defaults.Str(d.PushUpOu),
+			SlowWith:             defaults.Bool(d.SlowWith),
 		}
 	}
 	if err := s.db.Create(&accommodation).Error; err != nil {

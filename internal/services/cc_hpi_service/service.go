@@ -6,6 +6,7 @@ import (
 	"gorm.io/gorm"
 
 	"sighthub-backend/pkg/activitylog"
+	"sighthub-backend/pkg/defaults"
 
 	empLoginModel "sighthub-backend/internal/models/auth"
 	empModel "sighthub-backend/internal/models/employees"
@@ -105,15 +106,15 @@ func (s *Service) SaveCcHpi(username string, examID int64, input SaveCcHpiInput)
 	// Create ChiefComplaintHPIEye
 	d := input.ChiefComplaintHpiEye
 	chief := visionModel.ChiefComplaintHPIEye{
-		NoteChiefComplaint: d.NoteChiefComplaint,
-		Location:           d.Location,
-		Quality:            d.Quality,
-		Severity:           d.Severity,
-		Duration:           d.Duration,
-		Timing:             d.Timing,
-		Context:            d.Context,
-		Factors:            d.Factors,
-		Symptoms:           d.Symptoms,
+		NoteChiefComplaint: defaults.Str(d.NoteChiefComplaint),
+		Location:           defaults.Str(d.Location),
+		Quality:            defaults.Str(d.Quality),
+		Severity:           defaults.Str(d.Severity),
+		Duration:           defaults.Str(d.Duration),
+		Timing:             defaults.Str(d.Timing),
+		Context:            defaults.Str(d.Context),
+		Factors:            defaults.Str(d.Factors),
+		Symptoms:           defaults.Str(d.Symptoms),
 	}
 	if err := s.db.Create(&chief).Error; err != nil {
 		return nil, err
@@ -122,15 +123,15 @@ func (s *Service) SaveCcHpi(username string, examID int64, input SaveCcHpiInput)
 	// Create SecondaryComplaintHPIEye
 	sd := input.SecondaryComplaintHpiEye
 	secondary := visionModel.SecondaryComplaintHPIEye{
-		NoteSecondaryComplaint: sd.NoteSecondaryComplaint,
-		Location:               sd.Location,
-		Quality:                sd.Quality,
-		Severity:               sd.Severity,
-		Duration:               sd.Duration,
-		Timing:                 sd.Timing,
-		Context:                sd.Context,
-		Factors:                sd.Factors,
-		Symptoms:               sd.Symptoms,
+		NoteSecondaryComplaint: defaults.Str(sd.NoteSecondaryComplaint),
+		Location:               defaults.Str(sd.Location),
+		Quality:                defaults.Str(sd.Quality),
+		Severity:               defaults.Str(sd.Severity),
+		Duration:               defaults.Str(sd.Duration),
+		Timing:                 defaults.Str(sd.Timing),
+		Context:                defaults.Str(sd.Context),
+		Factors:                defaults.Str(sd.Factors),
+		Symptoms:               defaults.Str(sd.Symptoms),
 	}
 	if err := s.db.Create(&secondary).Error; err != nil {
 		return nil, err
@@ -141,7 +142,7 @@ func (s *Service) SaveCcHpi(username string, examID int64, input SaveCcHpiInput)
 		EyeExamID:                  examID,
 		ChiefComplaintHPIEyeID:     &chief.IDChiefComplaintHPIEye,
 		SecondaryComplaintHPIEyeID: &secondary.IDSecondaryComplaintHPIEye,
-		ChiefComplaintNote:         input.ChiefComplaintNote,
+		ChiefComplaintNote:         defaults.Str(input.ChiefComplaintNote),
 	}
 	if err := s.db.Create(&ccHpi).Error; err != nil {
 		return nil, err

@@ -121,8 +121,8 @@ func (s *Service) CreateInvoice(el *EmpLocation, req CreateInvoiceRequest) (*Cre
 		EmployeeID:      &empID,
 		LocationID:      int64(el.Location.IDLocation),
 		ToLocationID:    toLocID,
-		VendorID:        vendorID,
-		StatusInvoiceID: statusInvID,
+		VendorID:        &vendorID,
+		StatusInvoiceID: &statusInvID,
 	}
 	if err := s.db.Create(&inv).Error; err != nil {
 		return nil, err
@@ -274,7 +274,7 @@ func (s *Service) UpdateInvoice(el *EmpLocation, invoiceID int64, dateCreate *st
 	}
 	// For transfer invoices, only allow adding items if status = 25 (Sent to Store)
 	if strings.HasPrefix(inv.NumberInvoice, "I") && inv.ToLocationID != nil {
-		if inv.StatusInvoiceID != 25 {
+		if inv.StatusInvoiceID != nil && *inv.StatusInvoiceID != 25 {
 			return nil, fmt.Errorf("%w: cannot add items: invoice status must be 'Sent to Store'", ErrForbidden)
 		}
 	}
@@ -547,9 +547,9 @@ func (s *Service) ViewInvoice(el *EmpLocation, invoiceID int64) (map[string]inte
 	}
 
 	var statusInvoiceName *string
-	if inv.StatusInvoiceID != 0 {
+	if inv.StatusInvoiceID != nil && *inv.StatusInvoiceID != 0 {
 		var si invoices.StatusInvoice
-		if s.db.First(&si, inv.StatusInvoiceID).Error == nil {
+		if s.db.First(&si, *inv.StatusInvoiceID).Error == nil {
 			statusInvoiceName = &si.StatusInvoiceValue
 		}
 	}

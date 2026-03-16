@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"strconv"
+	"time"
 
 	"gorm.io/gorm"
 
@@ -26,7 +27,7 @@ func New(db *gorm.DB) *Service { return &Service{db: db} }
 
 func (s *Service) getEmployeeAndLocation(username string) (*empModel.Employee, *locModel.Location, error) {
 	var login authModel.EmployeeLogin
-	if err := s.db.Where("username = ?", username).First(&login).Error; err != nil {
+	if err := s.db.Where("employee_login = ?", username).First(&login).Error; err != nil {
 		return nil, nil, errors.New("employee or location not found")
 	}
 	var emp empModel.Employee
@@ -219,8 +220,11 @@ func (s *Service) CreateSuperInvoice(username string, examID int64, input Invoic
 
 	discount := 0.0
 	empID := int64(emp.IDEmployee)
+	now := time.Now()
 	newInvoice := invoiceModel.Invoice{
 		NumberInvoice: invoiceNumber,
+		DateCreate:    now,
+		CreatedAt:     now,
 		EmployeeID:    &empID,
 		LocationID:    int64(exam.LocationID),
 		PatientID:     exam.PatientID,
@@ -269,7 +273,7 @@ func (s *Service) CreateSuperInvoice(username string, examID int64, input Invoic
 			desc = *svc.InvoiceDesc
 		}
 		totalTax := 0.0
-		insBal0 := 0.0
+		ptBal0 := 0.0
 		taxable := false
 		invItem := invoiceModel.InvoiceItemSale{
 			InvoiceID:   newInvoice.IDInvoice,
@@ -281,8 +285,8 @@ func (s *Service) CreateSuperInvoice(username string, examID int64, input Invoic
 			Total:       total,
 			Taxable:     &taxable,
 			TotalTax:    totalTax,
-			PtBalance:   &total,
-			InsBalance:  &insBal0,
+			PtBalance:   &ptBal0,
+			InsBalance:  &total,
 		}
 		if err := tx.Create(&invItem).Error; err != nil {
 			tx.Rollback()
@@ -290,7 +294,7 @@ func (s *Service) CreateSuperInvoice(username string, examID int64, input Invoic
 		}
 
 		totalAmount += total
-		ptBal += total
+		insBal += total
 		due += total
 	}
 

@@ -134,6 +134,7 @@ func main() {
 	routes.RegisterReportSalesRoutes(db, cache.RDB, cfg, router)
 	routes.RegisterSaleRoutes(db, cache.RDB, cfg, router)
 	routes.RegisterSettingsRoutes(db, cache.RDB, cfg, router)
+	routes.RegisterVendorRoutes(db, cache.RDB, cfg, router)
 
 	addr := ":" + cfg.Port
 	log.Println("Server starting on", addr)
