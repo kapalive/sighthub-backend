@@ -35,7 +35,7 @@ func RegisterPriceBookRoutes(db *gorm.DB, rdb *redis.Client, cfg *config.Config,
 	api.Use(readMW)
 
 	// ─── Frames ───────────────────────────────────────────────────────────────
-	api.HandleFunc("/vendor-brand", hFrame.GetVendorBrandCombinations).Methods("GET")
+	api.HandleFunc("/vendor_brand", hFrame.GetVendorBrandCombinations).Methods("GET")
 	api.HandleFunc("/products", hFrame.GetProducts).Methods("GET")
 	api.HandleFunc("/models", hFrame.GetModels).Methods("GET")
 
