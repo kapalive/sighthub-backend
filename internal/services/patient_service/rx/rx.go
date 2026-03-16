@@ -1,6 +1,7 @@
 package rx
 
 import (
+	"encoding/json"
 	"errors"
 	"strings"
 	"time"
@@ -25,49 +26,49 @@ func New(db *gorm.DB) *Service { return &Service{db: db} }
 // ─── Input DTOs ───────────────────────────────────────────────────────────────
 
 type GlassesInput struct {
-	OdSph             *string  `json:"od_sph"`
-	OsSph             *string  `json:"os_sph"`
-	OdCyl             *string  `json:"od_cyl"`
-	OsCyl             *string  `json:"os_cyl"`
-	OdAxis            *string  `json:"od_axis"`
-	OsAxis            *string  `json:"os_axis"`
-	OdAdd             *float64 `json:"od_add"`
-	OsAdd             *float64 `json:"os_add"`
-	OdHPrism          *float64 `json:"od_h_prism"`
-	OsHPrism          *float64 `json:"os_h_prism"`
-	OdHPrismDirection *string  `json:"od_h_prism_direction"`
-	OsHPrismDirection *string  `json:"os_h_prism_direction"`
-	OdVPrism          *float64 `json:"od_v_prism"`
-	OsVPrism          *float64 `json:"os_v_prism"`
-	OdVPrismDirection *string  `json:"od_v_prism_direction"`
-	OsVPrismDirection *string  `json:"os_v_prism_direction"`
-	OdDpd             *float64 `json:"od_dpd"`
-	OsDpd             *float64 `json:"os_dpd"`
-	Date              *string  `json:"date"`            // expiration_date alias from frontend
-	ExpirationDate    *string  `json:"expiration_date"` // direct
+	OdSph             *string      `json:"od_sph"`
+	OsSph             *string      `json:"os_sph"`
+	OdCyl             *string      `json:"od_cyl"`
+	OsCyl             *string      `json:"os_cyl"`
+	OdAxis            *string      `json:"od_axis"`
+	OsAxis            *string      `json:"os_axis"`
+	OdAdd             *FlexFloat `json:"od_add"`
+	OsAdd             *FlexFloat `json:"os_add"`
+	OdHPrism          *FlexFloat `json:"od_h_prism"`
+	OsHPrism          *FlexFloat `json:"os_h_prism"`
+	OdHPrismDirection *string      `json:"od_h_prism_direction"`
+	OsHPrismDirection *string      `json:"os_h_prism_direction"`
+	OdVPrism          *FlexFloat `json:"od_v_prism"`
+	OsVPrism          *FlexFloat `json:"os_v_prism"`
+	OdVPrismDirection *string      `json:"od_v_prism_direction"`
+	OsVPrismDirection *string      `json:"os_v_prism_direction"`
+	OdDpd             *FlexFloat `json:"od_dpd"`
+	OsDpd             *FlexFloat `json:"os_dpd"`
+	Date              *string      `json:"date"`            // expiration_date alias from frontend
+	ExpirationDate    *string      `json:"expiration_date"` // direct
 }
 
 type ContactsInput struct {
-	OdContLens *string  `json:"od_cont_lens"`
-	OsContLens *string  `json:"os_cont_lens"`
-	OdBc       *string  `json:"od_bc"`
-	OsBc       *string  `json:"os_bc"`
-	OdDia      *float64 `json:"od_dia"`
-	OsDia      *float64 `json:"os_dia"`
-	OdPwr      *string  `json:"od_pwr"`
-	OsPwr      *string  `json:"os_pwr"`
-	OdCyl      *string  `json:"od_cyl"`
-	OsCyl      *string  `json:"os_cyl"`
-	OdAxis     *string  `json:"od_axis"`
-	OsAxis     *string  `json:"os_axis"`
-	OdAdd      *string  `json:"od_add"`
-	OsAdd      *string  `json:"os_add"`
-	OdColor    *string  `json:"od_color"`
-	OsColor    *string  `json:"os_color"`
-	OdType     *string  `json:"od_type"`
-	OsType     *string  `json:"os_type"`
-	Date       *string  `json:"date"`            // expiration_date alias from frontend
-	ExpirationDate *string `json:"expiration_date"` // direct
+	OdContLens     *string      `json:"od_cont_lens"`
+	OsContLens     *string      `json:"os_cont_lens"`
+	OdBc           *string      `json:"od_bc"`
+	OsBc           *string      `json:"os_bc"`
+	OdDia          *FlexFloat `json:"od_dia"`
+	OsDia          *FlexFloat `json:"os_dia"`
+	OdPwr          *string      `json:"od_pwr"`
+	OsPwr          *string      `json:"os_pwr"`
+	OdCyl          *string      `json:"od_cyl"`
+	OsCyl          *string      `json:"os_cyl"`
+	OdAxis         *string      `json:"od_axis"`
+	OsAxis         *string      `json:"os_axis"`
+	OdAdd          *string      `json:"od_add"`
+	OsAdd          *string      `json:"os_add"`
+	OdColor        *string      `json:"od_color"`
+	OsColor        *string      `json:"os_color"`
+	OdType         *string      `json:"od_type"`
+	OsType         *string      `json:"os_type"`
+	Date           *string      `json:"date"`            // expiration_date alias from frontend
+	ExpirationDate *string      `json:"expiration_date"` // direct
 }
 
 type PrescriptionPayload struct {
@@ -185,6 +186,36 @@ func parseExpDate(dateStr *string, altStr *string) (*time.Time, error) {
 		return nil, errors.New("invalid date, expected YYYY-MM-DD")
 	}
 	return &t, nil
+}
+
+// FlexFloat accepts both JSON number (1.50) and JSON string ("1.50")
+type FlexFloat struct {
+	Value *float64
+}
+
+func (f *FlexFloat) UnmarshalJSON(b []byte) error {
+	if string(b) == "null" {
+		f.Value = nil
+		return nil
+	}
+	s := strings.Trim(string(b), `"`)
+	if s == "" {
+		f.Value = nil
+		return nil
+	}
+	var v float64
+	if err := json.Unmarshal([]byte(s), &v); err != nil {
+		return err
+	}
+	f.Value = &v
+	return nil
+}
+
+func ffVal(f *FlexFloat) *float64 {
+	if f == nil {
+		return nil
+	}
+	return f.Value
 }
 
 func normalizeEnumStr(s *string) *string {
@@ -480,19 +511,19 @@ func (s *Service) CreateRx(username string, input CreateRxInput) (map[string]int
 		OdSph: gInput.OdSph, OsSph: gInput.OsSph,
 		OdCyl: gInput.OdCyl, OsCyl: gInput.OsCyl,
 		OdAxis: gInput.OdAxis, OsAxis: gInput.OsAxis,
-		OdAdd: gInput.OdAdd, OsAdd: gInput.OsAdd,
-		OdHPrism: gInput.OdHPrism, OsHPrism: gInput.OsHPrism,
+		OdAdd: ffVal(gInput.OdAdd), OsAdd: ffVal(gInput.OsAdd),
+		OdHPrism: ffVal(gInput.OdHPrism), OsHPrism: ffVal(gInput.OsHPrism),
 		OdHPrismDirection: gInput.OdHPrismDirection, OsHPrismDirection: gInput.OsHPrismDirection,
-		OdVPrism: gInput.OdVPrism, OsVPrism: gInput.OsVPrism,
+		OdVPrism: ffVal(gInput.OdVPrism), OsVPrism: ffVal(gInput.OsVPrism),
 		OdVPrismDirection: gInput.OdVPrismDirection, OsVPrismDirection: gInput.OsVPrismDirection,
-		OdDpd: gInput.OdDpd, OsDpd: gInput.OsDpd,
+		OdDpd: ffVal(gInput.OdDpd), OsDpd: ffVal(gInput.OsDpd),
 		ExpirationDate: gExp,
 	}
 
 	contactsRec := presModel.ContactLensPrescription{
 		OdContLens: cInput.OdContLens, OsContLens: cInput.OsContLens,
 		OdBc: cInput.OdBc, OsBc: cInput.OsBc,
-		OdDia: cInput.OdDia, OsDia: cInput.OsDia,
+		OdDia: ffVal(cInput.OdDia), OsDia: ffVal(cInput.OsDia),
 		OdPwr: cInput.OdPwr, OsPwr: cInput.OsPwr,
 		OdCyl: cInput.OdCyl, OsCyl: cInput.OsCyl,
 		OdAxis: cInput.OdAxis, OsAxis: cInput.OsAxis,
@@ -613,18 +644,18 @@ func (s *Service) UpdateRx(username string, input UpdateRxInput) error {
 					"os_cyl":              gd.OsCyl,
 					"od_axis":             gd.OdAxis,
 					"os_axis":             gd.OsAxis,
-					"od_add":              gd.OdAdd,
-					"os_add":              gd.OsAdd,
-					"od_h_prism":          gd.OdHPrism,
-					"os_h_prism":          gd.OsHPrism,
+					"od_add":              ffVal(gd.OdAdd),
+					"os_add":              ffVal(gd.OsAdd),
+					"od_h_prism":          ffVal(gd.OdHPrism),
+					"os_h_prism":          ffVal(gd.OsHPrism),
 					"od_h_prism_direction": normalizeEnumStr(gd.OdHPrismDirection),
 					"os_h_prism_direction": normalizeEnumStr(gd.OsHPrismDirection),
-					"od_v_prism":          gd.OdVPrism,
-					"os_v_prism":          gd.OsVPrism,
+					"od_v_prism":          ffVal(gd.OdVPrism),
+					"os_v_prism":          ffVal(gd.OsVPrism),
 					"od_v_prism_direction": normalizeEnumStr(gd.OdVPrismDirection),
 					"os_v_prism_direction": normalizeEnumStr(gd.OsVPrismDirection),
-					"od_dpd":              gd.OdDpd,
-					"os_dpd":              gd.OsDpd,
+					"od_dpd":              ffVal(gd.OdDpd),
+					"os_dpd":              ffVal(gd.OsDpd),
 					"expiration_date":      gExp,
 				}
 				if err := tx.Model(&g).Updates(gUpdates).Error; err != nil {
@@ -645,8 +676,8 @@ func (s *Service) UpdateRx(username string, input UpdateRxInput) error {
 					"os_cont_lens":   cd.OsContLens,
 					"od_bc":          cd.OdBc,
 					"os_bc":          cd.OsBc,
-					"od_dia":         cd.OdDia,
-					"os_dia":         cd.OsDia,
+					"od_dia":         ffVal(cd.OdDia),
+					"os_dia":         ffVal(cd.OsDia),
 					"od_pwr":         cd.OdPwr,
 					"os_pwr":         cd.OsPwr,
 					"od_cyl":         cd.OdCyl,

@@ -1,9 +1,5 @@
 package employees
 
-import (
-	"time"
-)
-
 // WorkShift ⇄ work_shift
 type WorkShift struct {
 	IDWorkShift int64   `gorm:"column:id_work_shift;primaryKey"                      json:"id_work_shift"`
@@ -17,20 +13,20 @@ type WorkShift struct {
 	Saturday  bool `gorm:"column:saturday;not null;default:false"                    json:"saturday"`
 	Sunday    bool `gorm:"column:sunday;not null;default:false"                      json:"sunday"`
 
-	MondayTimeStart    time.Time  `gorm:"column:monday_time_start;type:time;not null;default:'10:00:00'"  json:"-"`
-	MondayTimeEnd      time.Time  `gorm:"column:monday_time_end;type:time;not null;default:'19:00:00'"    json:"-"`
-	TuesdayTimeStart   time.Time  `gorm:"column:tuesday_time_start;type:time;not null;default:'10:00:00'" json:"-"`
-	TuesdayTimeEnd     time.Time  `gorm:"column:tuesday_time_end;type:time;not null;default:'19:00:00'"   json:"-"`
-	WednesdayTimeStart time.Time  `gorm:"column:wednesday_time_start;type:time;not null;default:'10:00:00'" json:"-"`
-	WednesdayTimeEnd   time.Time  `gorm:"column:wednesday_time_end;type:time;not null;default:'19:00:00'"  json:"-"`
-	ThursdayTimeStart  time.Time  `gorm:"column:thursday_time_start;type:time;not null;default:'10:00:00'" json:"-"`
-	ThursdayTimeEnd    time.Time  `gorm:"column:thursday_time_end;type:time;not null;default:'19:00:00'"   json:"-"`
-	FridayTimeStart    time.Time  `gorm:"column:friday_time_start;type:time;not null;default:'10:00:00'"   json:"-"`
-	FridayTimeEnd      time.Time  `gorm:"column:friday_time_end;type:time;not null;default:'19:00:00'"     json:"-"`
-	SaturdayTimeStart  *time.Time `gorm:"column:saturday_time_start;type:time"                             json:"-"`
-	SaturdayTimeEnd    *time.Time `gorm:"column:saturday_time_end;type:time"                               json:"-"`
-	SundayTimeStart    *time.Time `gorm:"column:sunday_time_start;type:time"                               json:"-"`
-	SundayTimeEnd      *time.Time `gorm:"column:sunday_time_end;type:time"                                 json:"-"`
+	MondayTimeStart    string  `gorm:"column:monday_time_start;type:time;not null;default:'10:00:00'"  json:"-"`
+	MondayTimeEnd      string  `gorm:"column:monday_time_end;type:time;not null;default:'19:00:00'"    json:"-"`
+	TuesdayTimeStart   string  `gorm:"column:tuesday_time_start;type:time;not null;default:'10:00:00'" json:"-"`
+	TuesdayTimeEnd     string  `gorm:"column:tuesday_time_end;type:time;not null;default:'19:00:00'"   json:"-"`
+	WednesdayTimeStart string  `gorm:"column:wednesday_time_start;type:time;not null;default:'10:00:00'" json:"-"`
+	WednesdayTimeEnd   string  `gorm:"column:wednesday_time_end;type:time;not null;default:'19:00:00'"  json:"-"`
+	ThursdayTimeStart  string  `gorm:"column:thursday_time_start;type:time;not null;default:'10:00:00'" json:"-"`
+	ThursdayTimeEnd    string  `gorm:"column:thursday_time_end;type:time;not null;default:'19:00:00'"   json:"-"`
+	FridayTimeStart    string  `gorm:"column:friday_time_start;type:time;not null;default:'10:00:00'"   json:"-"`
+	FridayTimeEnd      string  `gorm:"column:friday_time_end;type:time;not null;default:'19:00:00'"     json:"-"`
+	SaturdayTimeStart  *string `gorm:"column:saturday_time_start;type:time"                             json:"-"`
+	SaturdayTimeEnd    *string `gorm:"column:saturday_time_end;type:time"                               json:"-"`
+	SundayTimeStart    *string `gorm:"column:sunday_time_start;type:time"                               json:"-"`
+	SundayTimeEnd      *string `gorm:"column:sunday_time_end;type:time"                                 json:"-"`
 
 	// Interval в PG. Проще всего держать как текст "HH:MM:SS" (или "00:30:00")
 	LunchDuration *string `gorm:"column:lunch_duration;type:interval;default:'00:30:00'"                   json:"-"`
@@ -51,35 +47,35 @@ func (w *WorkShift) ToMap() map[string]interface{} {
 		"saturday":      w.Saturday,
 		"sunday":        w.Sunday,
 
-		"monday_time_start":    w.MondayTimeStart.Format("15:04:05"),
-		"monday_time_end":      w.MondayTimeEnd.Format("15:04:05"),
-		"tuesday_time_start":   w.TuesdayTimeStart.Format("15:04:05"),
-		"tuesday_time_end":     w.TuesdayTimeEnd.Format("15:04:05"),
-		"wednesday_time_start": w.WednesdayTimeStart.Format("15:04:05"),
-		"wednesday_time_end":   w.WednesdayTimeEnd.Format("15:04:05"),
-		"thursday_time_start":  w.ThursdayTimeStart.Format("15:04:05"),
-		"thursday_time_end":    w.ThursdayTimeEnd.Format("15:04:05"),
-		"friday_time_start":    w.FridayTimeStart.Format("15:04:05"),
-		"friday_time_end":      w.FridayTimeEnd.Format("15:04:05"),
+		"monday_time_start":    w.MondayTimeStart,
+		"monday_time_end":      w.MondayTimeEnd,
+		"tuesday_time_start":   w.TuesdayTimeStart,
+		"tuesday_time_end":     w.TuesdayTimeEnd,
+		"wednesday_time_start": w.WednesdayTimeStart,
+		"wednesday_time_end":   w.WednesdayTimeEnd,
+		"thursday_time_start":  w.ThursdayTimeStart,
+		"thursday_time_end":    w.ThursdayTimeEnd,
+		"friday_time_start":    w.FridayTimeStart,
+		"friday_time_end":      w.FridayTimeEnd,
 	}
 
-	if w.SaturdayTimeStart != nil && !w.SaturdayTimeStart.IsZero() {
-		m["saturday_time_start"] = w.SaturdayTimeStart.Format("15:04:05")
+	if w.SaturdayTimeStart != nil && *w.SaturdayTimeStart != "" {
+		m["saturday_time_start"] = *w.SaturdayTimeStart
 	} else {
 		m["saturday_time_start"] = nil
 	}
-	if w.SaturdayTimeEnd != nil && !w.SaturdayTimeEnd.IsZero() {
-		m["saturday_time_end"] = w.SaturdayTimeEnd.Format("15:04:05")
+	if w.SaturdayTimeEnd != nil && *w.SaturdayTimeEnd != "" {
+		m["saturday_time_end"] = *w.SaturdayTimeEnd
 	} else {
 		m["saturday_time_end"] = nil
 	}
-	if w.SundayTimeStart != nil && !w.SundayTimeStart.IsZero() {
-		m["sunday_time_start"] = w.SundayTimeStart.Format("15:04:05")
+	if w.SundayTimeStart != nil && *w.SundayTimeStart != "" {
+		m["sunday_time_start"] = *w.SundayTimeStart
 	} else {
 		m["sunday_time_start"] = nil
 	}
-	if w.SundayTimeEnd != nil && !w.SundayTimeEnd.IsZero() {
-		m["sunday_time_end"] = w.SundayTimeEnd.Format("15:04:05")
+	if w.SundayTimeEnd != nil && *w.SundayTimeEnd != "" {
+		m["sunday_time_end"] = *w.SundayTimeEnd
 	} else {
 		m["sunday_time_end"] = nil
 	}

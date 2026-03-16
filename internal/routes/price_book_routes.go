@@ -30,7 +30,7 @@ func RegisterPriceBookRoutes(db *gorm.DB, rdb *redis.Client, cfg *config.Config,
 	updateMW := middleware.ActivePermission(db, 29)
 	deleteMW := middleware.ActivePermission(db, 30)
 
-	api := r.PathPrefix("/api/price-book").Subrouter()
+	api := r.PathPrefix("/api/price_book").Subrouter()
 	api.Use(jwtMW)
 	api.Use(readMW)
 

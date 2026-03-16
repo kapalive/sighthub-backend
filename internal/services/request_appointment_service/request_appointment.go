@@ -355,8 +355,8 @@ func (s *Service) GetDoctorSlotAvailability(hash string, doctorID int64, startDa
 		hasCalendar := s.db.Where("employee_id = ? AND date = ?", doctorID, current.Format("2006-01-02")).
 			First(&calEntry).Error == nil
 
-		var startTime, endTime *time.Time
-		var lunchStart, lunchEnd *time.Time
+		var startTime, endTime *string
+		var lunchStart, lunchEnd *string
 
 		if hasCalendar && !calEntry.IsWorkingDay {
 			result = append(result, DaySlotResult{
@@ -376,6 +376,7 @@ func (s *Service) GetDoctorSlotAvailability(hash string, doctorID int64, startDa
 			lunchStart = schedEntry.LunchStart
 			lunchEnd = schedEntry.LunchEnd
 		}
+
 		if hasCalendar {
 			if calEntry.TimeStart != nil {
 				startTime = calEntry.TimeStart
@@ -404,8 +405,13 @@ func (s *Service) GetDoctorSlotAvailability(hash string, doctorID int64, startDa
 
 		busySlots := map[string]bool{}
 		for _, a := range appts {
-			st := combineDatetime(current, a.StartTime)
-			et := combineDatetime(current, a.EndTime)
+			ast := parseTime(a.StartTime)
+			aet := parseTime(a.EndTime)
+			if ast == nil || aet == nil {
+				continue
+			}
+			st := combineDatetime(current, *ast)
+			et := combineDatetime(current, *aet)
 			for st.Before(et) {
 				busySlots[st.Format("15:04")] = true
 				st = st.Add(15 * time.Minute)
@@ -413,13 +419,30 @@ func (s *Service) GetDoctorSlotAvailability(hash string, doctorID int64, startDa
 		}
 
 		hours := []SlotItem{}
-		cur := combineDatetime(current, *startTime)
-		end := combineDatetime(current, *endTime)
+		parsedStart := parseTime(*startTime)
+		parsedEnd := parseTime(*endTime)
+		if parsedStart == nil || parsedEnd == nil {
+			result = append(result, DaySlotResult{
+				Date:         current.Format("2006-01-02"),
+				IsWorkingDay: false,
+				Hours:        []SlotItem{},
+			})
+			current = current.AddDate(0, 0, 1)
+			continue
+		}
+		cur := combineDatetime(current, *parsedStart)
+		end := combineDatetime(current, *parsedEnd)
 		var lunchStartDt, lunchEndDt time.Time
 		hasLunch := lunchStart != nil && lunchEnd != nil
 		if hasLunch {
-			lunchStartDt = combineDatetime(current, *lunchStart)
-			lunchEndDt = combineDatetime(current, *lunchEnd)
+			pls := parseTime(*lunchStart)
+			ple := parseTime(*lunchEnd)
+			if pls != nil && ple != nil {
+				lunchStartDt = combineDatetime(current, *pls)
+				lunchEndDt = combineDatetime(current, *ple)
+			} else {
+				hasLunch = false
+			}
 		}
 
 		for cur.Before(end) {
@@ -548,7 +571,7 @@ func (s *Service) CreateRequestAppointment(input CreateRequestAppointmentInput) 
 		Dob:                       dob,
 		Phone:                     phone,
 		RequestingDate:            *reqDate,
-		RequestingTime:            *reqTime,
+		RequestingTime:            reqTime.Format("15:04:05"),
 		ProfessionalServiceTypeID: input.ProfessionalServiceTypeID,
 		InsurancePolicyID:         insPolicyID,
 		InsuranceCompanyID:        insCompanyID,
@@ -594,7 +617,7 @@ func (s *Service) CreateRequestAppointment(input CreateRequestAppointmentInput) 
 		dobStr = &s
 	}
 	reqDateStr := ra.RequestingDate.Format("2006-01-02")
-	reqTimeStr := ra.RequestingTime.Format("15:04:05")
+	reqTimeStr := ra.RequestingTime
 
 	return &RequestAppointmentResult{
 		IDRequestAppointment:    ra.IDRequestAppointment,
@@ -913,7 +936,11 @@ func (s *Service) CheckAppointment(appointmentID int64) error {
 	if appt.StatusAppointmentID != 3 && appt.StatusAppointmentID != 5 {
 		return errors.New("appointment has invalid status")
 	}
-	apptDatetime := combineDatetime(appt.AppointmentDate, appt.EndTime)
+	parsedEndTime := parseTime(appt.EndTime)
+	if parsedEndTime == nil {
+		return errors.New("invalid appointment end time")
+	}
+	apptDatetime := combineDatetime(appt.AppointmentDate, *parsedEndTime)
 	if apptDatetime.Before(time.Now()) {
 		return errors.New("appointment time has already passed")
 	}

@@ -11,8 +11,8 @@ type Calendar struct {
 	IsHoliday    bool       `gorm:"column:is_holiday;not null;default:false"    json:"is_holiday"`
 	WorkShiftID  *int64     `gorm:"column:work_shift_id"                        json:"work_shift_id,omitempty"`
 	EmployeeID   *int64     `gorm:"column:employee_id"                          json:"employee_id,omitempty"`
-	TimeStart    *time.Time `gorm:"column:time_start;type:time"                 json:"-"`
-	TimeEnd      *time.Time `gorm:"column:time_end;type:time"                   json:"-"`
+	TimeStart    *string `gorm:"column:time_start;type:time"                 json:"-"`
+	TimeEnd      *string `gorm:"column:time_end;type:time"                   json:"-"`
 	IsWorkingDay bool       `gorm:"column:is_working_day;not null;default:true" json:"is_working_day"`
 }
 
@@ -27,13 +27,13 @@ func (c *Calendar) ToMap() map[string]interface{} {
 		"employee_id":    c.EmployeeID,
 		"is_working_day": c.IsWorkingDay,
 	}
-	if c.TimeStart != nil && !c.TimeStart.IsZero() {
-		m["time_start"] = c.TimeStart.Format("15:04:05")
+	if c.TimeStart != nil && *c.TimeStart != "" {
+		m["time_start"] = *c.TimeStart
 	} else {
 		m["time_start"] = nil
 	}
-	if c.TimeEnd != nil && !c.TimeEnd.IsZero() {
-		m["time_end"] = c.TimeEnd.Format("15:04:05")
+	if c.TimeEnd != nil && *c.TimeEnd != "" {
+		m["time_end"] = *c.TimeEnd
 	} else {
 		m["time_end"] = nil
 	}

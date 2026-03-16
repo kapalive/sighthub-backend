@@ -328,11 +328,11 @@ func (s *Service) GetAppointments(input GetAppointmentsInput) ([]DaySchedule, er
 			if a.Patient != nil {
 				item.Title = fmt.Sprintf("%s %s", a.Patient.LastName, a.Patient.FirstName)
 			}
-			if !a.StartTime.IsZero() {
-				item.Start = a.StartTime.Format("15:04")
+			if a.StartTime != "" {
+				item.Start = truncTime(a.StartTime, 5) // "HH:MM"
 			}
-			if !a.EndTime.IsZero() {
-				item.End = a.EndTime.Format("15:04")
+			if a.EndTime != "" {
+				item.End = truncTime(a.EndTime, 5) // "HH:MM"
 			}
 			if a.Schedule != nil && a.Schedule.Employee != nil {
 				emp := a.Schedule.Employee
@@ -413,8 +413,8 @@ func (s *Service) GetRequestAppointments(locationID int) ([]RequestAppointmentIt
 		if !r.RequestingDate.IsZero() {
 			item.RequestingDate = r.RequestingDate.Format("2006-01-02")
 		}
-		if !r.RequestingTime.IsZero() {
-			item.RequestingTime = r.RequestingTime.Format("15:04:05")
+		if r.RequestingTime != "" {
+			item.RequestingTime = r.RequestingTime
 		}
 		if r.PatientID != nil {
 			if p, ok := patMap[*r.PatientID]; ok {
@@ -565,7 +565,15 @@ func (s *Service) CreateAppointment(input CreateAppointmentInput) (*AppointmentD
 		return nil, err
 	}
 
-	if !withinWorkHours(schedEntry.StartTime, startTime, schedEntry.EndTime) {
+	schedStart, err := parseTimeStr(schedEntry.StartTime)
+	if err != nil {
+		return nil, fmt.Errorf("invalid schedule start_time: %w", err)
+	}
+	schedEnd, err := parseTimeStr(schedEntry.EndTime)
+	if err != nil {
+		return nil, fmt.Errorf("invalid schedule end_time: %w", err)
+	}
+	if !withinWorkHours(schedStart, startTime, schedEnd) {
 		return nil, fmt.Errorf("requested time is outside the doctor's working hours")
 	}
 
@@ -616,8 +624,8 @@ func (s *Service) CreateAppointment(input CreateAppointmentInput) (*AppointmentD
 		PatientID:           *input.PatientID,
 		LocationID:          *input.LocationID,
 		AppointmentDate:     desiredDate,
-		StartTime:           startTime,
-		EndTime:             endTime,
+		StartTime:           startTime.Format("15:04:05"),
+		EndTime:             endTime.Format("15:04:05"),
 		StatusAppointmentID: statusAppointment.IDStatusAppointment,
 		Notes:               input.Notes,
 		InsurancePolicyID:   input.InsuranceID,
@@ -726,11 +734,11 @@ func (s *Service) UpdateAppointment(id int64, input UpdateAppointmentInput) erro
 		return fmt.Errorf("invalid appointment_date format")
 	}
 
-	startTimeStr := appointment.StartTime.Format("15:04")
+	startTimeStr := truncTime(appointment.StartTime, 5) // "HH:MM"
 	if input.StartTime != nil {
 		startTimeStr = *input.StartTime
 	}
-	endTimeStr := appointment.EndTime.Format("15:04")
+	endTimeStr := truncTime(appointment.EndTime, 5) // "HH:MM"
 	if input.EndTime != nil {
 		endTimeStr = *input.EndTime
 	}
@@ -755,15 +763,23 @@ func (s *Service) UpdateAppointment(id int64, input UpdateAppointmentInput) erro
 	if err != nil {
 		return err
 	}
-	if !withinWorkHours(schedEntry.StartTime, startTime, schedEntry.EndTime) {
+	uSchedStart, err := parseTimeStr(schedEntry.StartTime)
+	if err != nil {
+		return fmt.Errorf("invalid schedule start_time: %w", err)
+	}
+	uSchedEnd, err := parseTimeStr(schedEntry.EndTime)
+	if err != nil {
+		return fmt.Errorf("invalid schedule end_time: %w", err)
+	}
+	if !withinWorkHours(uSchedStart, startTime, uSchedEnd) {
 		return fmt.Errorf("requested time is outside the doctor's working hours")
 	}
 
 	schedID := int64(schedEntry.IDSchedule)
 	appointment.ScheduleID = &schedID
 	appointment.AppointmentDate = desiredDate
-	appointment.StartTime = startTime
-	appointment.EndTime = endTime
+	appointment.StartTime = startTime.Format("15:04:05")
+	appointment.EndTime = endTime.Format("15:04:05")
 
 	note := input.Note
 	if note == nil {
@@ -884,13 +900,22 @@ func (s *Service) SetDoctorLunch(doctorID int64, targetDate time.Time, lunchStar
 		}
 		return nil, err
 	}
-	if schedEntry.StartTime.IsZero() || schedEntry.EndTime.IsZero() {
+	if schedEntry.StartTime == "" || schedEntry.EndTime == "" {
 		return nil, fmt.Errorf("doctor is not scheduled to work on this day")
 	}
 
+	lSchedStart, err := parseTimeStr(schedEntry.StartTime)
+	if err != nil {
+		return nil, fmt.Errorf("invalid schedule start_time: %w", err)
+	}
+	lSchedEnd, err := parseTimeStr(schedEntry.EndTime)
+	if err != nil {
+		return nil, fmt.Errorf("invalid schedule end_time: %w", err)
+	}
+
 	lunchEnd := lunchStart.Add(time.Duration(durationMin) * time.Minute)
-	if !withinWorkHours(schedEntry.StartTime, lunchStart, schedEntry.EndTime) ||
-		timeMinutes(lunchEnd) > timeMinutes(schedEntry.EndTime) {
+	if !withinWorkHours(lSchedStart, lunchStart, lSchedEnd) ||
+		timeMinutes(lunchEnd) > timeMinutes(lSchedEnd) {
 		return nil, fmt.Errorf("lunch time is outside of working hours")
 	}
 
@@ -940,12 +965,10 @@ func (s *Service) getWorkHoursForDate(workShiftID int64, date time.Time, apptDur
 			day.IsWorkingDay = cal.IsWorkingDay
 			if cal.IsWorkingDay {
 				if cal.TimeStart != nil {
-					ts := cal.TimeStart.Format("15:04:05")
-					day.TimeStart = &ts
+					day.TimeStart = cal.TimeStart
 				}
 				if cal.TimeEnd != nil {
-					te := cal.TimeEnd.Format("15:04:05")
-					day.TimeEnd = &te
+					day.TimeEnd = cal.TimeEnd
 				}
 			} else {
 				msg := "location is closed on this day"
@@ -966,8 +989,8 @@ func (s *Service) getWorkHoursForDate(workShiftID int64, date time.Time, apptDur
 
 	type dayData struct {
 		working bool
-		start   time.Time
-		end     time.Time
+		start   string
+		end     string
 	}
 	wsMap := map[time.Weekday]dayData{
 		time.Monday:    {ws.Monday, ws.MondayTimeStart, ws.MondayTimeEnd},
@@ -979,21 +1002,19 @@ func (s *Service) getWorkHoursForDate(workShiftID int64, date time.Time, apptDur
 	if ws.SaturdayTimeStart != nil && ws.SaturdayTimeEnd != nil {
 		wsMap[time.Saturday] = dayData{ws.Saturday, *ws.SaturdayTimeStart, *ws.SaturdayTimeEnd}
 	} else {
-		wsMap[time.Saturday] = dayData{ws.Saturday, time.Time{}, time.Time{}}
+		wsMap[time.Saturday] = dayData{ws.Saturday, "", ""}
 	}
 	if ws.SundayTimeStart != nil && ws.SundayTimeEnd != nil {
 		wsMap[time.Sunday] = dayData{ws.Sunday, *ws.SundayTimeStart, *ws.SundayTimeEnd}
 	} else {
-		wsMap[time.Sunday] = dayData{ws.Sunday, time.Time{}, time.Time{}}
+		wsMap[time.Sunday] = dayData{ws.Sunday, "", ""}
 	}
 
 	di := wsMap[date.Weekday()]
 	day.IsWorkingDay = di.working
-	if di.working && !di.start.IsZero() {
-		ts := di.start.Format("15:04:05")
-		te := di.end.Format("15:04:05")
-		day.TimeStart = &ts
-		day.TimeEnd = &te
+	if di.working && di.start != "" {
+		day.TimeStart = &di.start
+		day.TimeEnd = &di.end
 	} else if !di.working {
 		msg := "location is closed on this day"
 		day.Message = &msg
@@ -1005,13 +1026,11 @@ func (s *Service) findOrCreateSchedule(doctorID int64, dayOfWeek string) (*sched
 	var schedEntry schedModel.Schedule
 	err := s.db.Where("employee_id = ? AND day_of_week = ?", doctorID, dayOfWeek).First(&schedEntry).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
-		defaultStart, _ := time.Parse("15:04", "09:00")
-		defaultEnd, _ := time.Parse("15:04", "17:00")
 		schedEntry = schedModel.Schedule{
 			EmployeeID:          doctorID,
 			DayOfWeek:           dayOfWeek,
-			StartTime:           defaultStart,
-			EndTime:             defaultEnd,
+			StartTime:           "09:00:00",
+			EndTime:             "17:00:00",
 			AppointmentDuration: 15,
 		}
 		if err := s.db.Create(&schedEntry).Error; err != nil {
@@ -1165,4 +1184,24 @@ func withinWorkHours(workStart, apptStart, workEnd time.Time) bool {
 
 func timeMinutes(t time.Time) int {
 	return t.Hour()*60 + t.Minute()
+}
+
+// truncTime safely truncates a time string (e.g. "10:00:00") to n characters.
+// If the string is shorter than n, it is returned as-is.
+func truncTime(s string, n int) string {
+	if len(s) > n {
+		return s[:n]
+	}
+	return s
+}
+
+// parseTimeStr parses a time string like "10:00:00" or "10:00" into time.Time.
+func parseTimeStr(s string) (time.Time, error) {
+	if t, err := time.Parse("15:04:05", s); err == nil {
+		return t, nil
+	}
+	if t, err := time.Parse("15:04", s); err == nil {
+		return t, nil
+	}
+	return time.Time{}, fmt.Errorf("cannot parse time %q", s)
 }

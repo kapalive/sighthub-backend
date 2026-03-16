@@ -5,7 +5,6 @@ import (
 	"strconv"
 
 	"github.com/gorilla/mux"
-	pkgAuth "sighthub-backend/pkg/auth"
 )
 
 // GET /vendors
@@ -30,11 +29,12 @@ func (h *Handler) GetBrands(w http.ResponseWriter, r *http.Request) {
 
 // GET /stores
 func (h *Handler) GetStores(w http.ResponseWriter, r *http.Request) {
-	// permitted_location_ids should be set by middleware — for now use context
-	_ = pkgAuth.UsernameFromContext(r.Context())
-	// TODO: extract permitted location IDs from middleware context
-	// For now, return all — permission middleware handles filtering
-	result, err := h.svc.GetStores([]int64{})
+	locIDs, err := resolveLocationIDs(h.db, r, nil)
+	if err != nil || len(locIDs) == 0 {
+		jsonResponse(w, 200, []map[string]interface{}{})
+		return
+	}
+	result, err := h.svc.GetStores(locIDs)
 	if err != nil {
 		jsonResponse(w, 500, map[string]string{"error": err.Error()})
 		return

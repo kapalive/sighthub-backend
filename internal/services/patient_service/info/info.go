@@ -15,6 +15,7 @@ import (
 	locModel "sighthub-backend/internal/models/location"
 	patModel "sighthub-backend/internal/models/patients"
 	presModel "sighthub-backend/internal/models/prescriptions"
+	schedModel "sighthub-backend/internal/models/schedule"
 	pkgActivity "sighthub-backend/pkg/activitylog"
 )
 
@@ -107,6 +108,21 @@ func derefBool(b *bool) bool {
 
 func ptrInt64(v int64) *int64 { return &v }
 
+func derefGender(g *patModel.Gender) string {
+	if g == nil {
+		return ""
+	}
+	return string(*g)
+}
+
+func toGenderPtr(s *string) *patModel.Gender {
+	if s == nil || *s == "" {
+		return nil
+	}
+	g := patModel.Gender(*s)
+	return &g
+}
+
 // ─── Languages ────────────────────────────────────────────────────────────────
 
 func (s *Service) GetLanguages() ([]map[string]interface{}, error) {
@@ -152,7 +168,7 @@ type CreatePatientInput struct {
 	MiddleName          *string `json:"middle_name"`
 	LastName            string  `json:"last_name"`
 	DOB                 *string `json:"dob"`
-	Gender              string  `json:"gender"`
+	Gender              *string `json:"gender"`
 	Phone               *string `json:"phone"`
 	PhoneHome           *string `json:"phone_home"`
 	CellWork            *string `json:"cell_work"`
@@ -193,7 +209,7 @@ func (s *Service) CreatePatient(username string, input CreatePatientInput) (map[
 		FirstName:           input.FirstName,
 		MiddleName:          input.MiddleName,
 		LastName:            input.LastName,
-		Gender:              patModel.Gender(input.Gender),
+		Gender:              toGenderPtr(input.Gender),
 		Phone:               input.Phone,
 		PhoneHome:           input.PhoneHome,
 		CellWork:            input.CellWork,
@@ -296,7 +312,7 @@ func (s *Service) GetPatient(username string, patientID int64) (*PatientDetail, 
 		MiddleName:        derefStr(patient.MiddleName),
 		LastName:          patient.LastName,
 		DOB:               dob,
-		Gender:            string(patient.Gender),
+		Gender:            derefGender(patient.Gender),
 		Phone:             derefStr(patient.Phone),
 		PhoneHome:         derefStr(patient.PhoneHome),
 		CellWork:          derefStr(patient.CellWork),
@@ -568,31 +584,38 @@ func (s *Service) GetPatientPrescriptions(patientID int64) ([]map[string]interfa
 func (s *Service) GetPatientAppointments(patientID int64) ([]map[string]interface{}, error) {
 	var appts []apptModel.Appointment
 	if err := s.db.
-		Preload("Schedule.Employee").
-		Preload("Reason").
 		Where("patient_id = ?", patientID).
 		Order("appointment_date DESC").
 		Find(&appts).Error; err != nil {
 		return nil, err
 	}
 
-	result := make([]map[string]interface{}, len(appts))
-	for i, a := range appts {
+	result := make([]map[string]interface{}, 0, len(appts))
+	for _, a := range appts {
 		doctorName := "Unknown Doctor"
-		if a.Schedule != nil && a.Schedule.Employee != nil {
-			doctorName = fmt.Sprintf("Dr. %s %s", a.Schedule.Employee.FirstName, a.Schedule.Employee.LastName)
+		if a.ScheduleID != nil {
+			var sched schedModel.Schedule
+			if err := s.db.First(&sched, "id_schedule = ?", *a.ScheduleID).Error; err == nil {
+				var emp empModel.Employee
+				if err := s.db.First(&emp, "id_employee = ?", sched.EmployeeID).Error; err == nil {
+					doctorName = fmt.Sprintf("Dr. %s %s", emp.FirstName, emp.LastName)
+				}
+			}
 		}
 
 		title := "No reason provided"
-		if a.Reason != nil {
-			title = a.Reason.Reason
+		if a.ReasonsVisionProviderAppointmentID != nil {
+			var reason apptModel.ReasonsVisionProviderAppointment
+			if err := s.db.First(&reason, "id_reasons_vision_provider_appointment = ?", *a.ReasonsVisionProviderAppointmentID).Error; err == nil {
+				title = reason.Reason
+			}
 		}
 
-		result[i] = map[string]interface{}{
+		result = append(result, map[string]interface{}{
 			"date":   a.AppointmentDate.Format("02/01/2006"),
 			"title":  title,
 			"doctor": doctorName,
-		}
+		})
 	}
 	return result, nil
 }

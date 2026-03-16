@@ -19,7 +19,7 @@ func RegisterReportDailyRoutes(db *gorm.DB, rdb *redis.Client, cfg *config.Confi
 	jwtMW := pkgAuth.JWTMiddleware(cfg.JWTSecretKey, rdb)
 	storeMW := middleware.StorePermission(db, 12, 81)
 
-	api := r.PathPrefix("/api/report-daily").Subrouter()
+	api := r.PathPrefix("/api/report_daily").Subrouter()
 	api.Use(jwtMW, storeMW)
 
 	api.HandleFunc("/sales", h.DailySalesSummary).Methods("GET")

@@ -896,7 +896,7 @@ func (s *Service) GetEmployeeLocationID(username string) (int, error) {
 		SELECT e.location_id
 		FROM employee e
 		JOIN employee_login el ON el.id_employee_login = e.employee_login_id
-		WHERE el.username = ?`, username).Row().Scan(&locID)
+		WHERE el.employee_login = ?`, username).Row().Scan(&locID)
 	if err != nil {
 		return 0, fmt.Errorf("employee or location not found")
 	}

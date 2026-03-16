@@ -14,7 +14,7 @@ type RequestAppointment struct {
 	Phone                      string     `gorm:"column:phone;size:18;not null"                          json:"phone"`
 	Email                      *string    `gorm:"column:email;size:50"                                   json:"email,omitempty"`
 	RequestingDate             time.Time  `gorm:"column:requesting_date;type:date;not null"              json:"-"`
-	RequestingTime             time.Time  `gorm:"column:requesting_time;type:time;not null"              json:"-"`
+	RequestingTime             string     `gorm:"column:requesting_time;type:time;not null"              json:"-"`
 	ProfessionalServiceTypeID  *int64     `gorm:"column:professional_service_type_id"                    json:"professional_service_type_id,omitempty"`
 	InsuranceCompanyID         *int64     `gorm:"column:insurance_company_id"                            json:"insurance_company_id,omitempty"`
 	InsurancePolicyID          *int64     `gorm:"column:insurance_policy_id"                             json:"insurance_policy_id,omitempty"`

@@ -19,7 +19,7 @@ func RegisterReportAccountingRoutes(db *gorm.DB, rdb *redis.Client, cfg *config.
 	jwtMW := pkgAuth.JWTMiddleware(cfg.JWTSecretKey, rdb)
 	storeMW := middleware.StorePermission(db, 12, 81)
 
-	api := r.PathPrefix("/api/report-accounting").Subrouter()
+	api := r.PathPrefix("/api/report_accounting").Subrouter()
 	api.Use(jwtMW)
 	api.Use(storeMW)
 

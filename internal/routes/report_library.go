@@ -17,7 +17,7 @@ func RegisterReportLibraryRoutes(db *gorm.DB, rdb *redis.Client, cfg *config.Con
 
 	jwtMW := pkgAuth.JWTMiddleware(cfg.JWTSecretKey, rdb)
 
-	api := r.PathPrefix("/api/report-library").Subrouter()
+	api := r.PathPrefix("/api/report_library").Subrouter()
 	api.Use(jwtMW)
 
 	api.HandleFunc("/all_reports", h.AllReports).Methods("GET")

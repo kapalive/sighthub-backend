@@ -9,6 +9,7 @@ import (
 
 	"sighthub-backend/internal/routes"
 	exameye "sighthub-backend/internal/routes/exam_eye"
+	integrations "sighthub-backend/internal/routes/integrations"
 	"os"
 	"sighthub-backend/pkg/cache"
 	"sighthub-backend/pkg/scheduler"
@@ -29,7 +30,7 @@ func corsMiddleware(next http.Handler) http.Handler {
 		}
 
 		w.Header().Set("Access-Control-Allow-Credentials", "true")
-		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Recaptcha-Token")
 		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
 
 		if r.Method == http.MethodOptions {
@@ -47,6 +48,13 @@ func main() {
 	cfg, err := config.LoadConfig()
 	if err != nil {
 		log.Fatal("Failed to load config:", err)
+	}
+
+	// Expose config values as env vars for packages that read os.Getenv
+	if cfg.TwilioAccountSID != "" {
+		os.Setenv("TWILIO_ACCOUNT_SID", cfg.TwilioAccountSID)
+		os.Setenv("TWILIO_AUTH_TOKEN", cfg.TwilioAuthToken)
+		os.Setenv("TWILIO_PHONE_NUMBER", cfg.TwilioPhoneNumber)
 	}
 
 	log.Println("Connecting to database...")
@@ -135,6 +143,14 @@ func main() {
 	routes.RegisterSaleRoutes(db, cache.RDB, cfg, router)
 	routes.RegisterSettingsRoutes(db, cache.RDB, cfg, router)
 	routes.RegisterVendorRoutes(db, cache.RDB, cfg, router)
+
+	// Integrations (domain routes)
+	integrations.RegisterZeissRoutes(db, cache.RDB, cfg, router)
+
+	// favicon
+	router.HandleFunc("/favicon.ico", func(w http.ResponseWriter, r *http.Request) {
+		http.ServeFile(w, r, "static/favicon.ico")
+	})
 
 	addr := ":" + cfg.Port
 	log.Println("Server starting on", addr)

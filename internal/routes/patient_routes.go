@@ -8,8 +8,13 @@ import (
 	"gorm.io/gorm"
 
 	"sighthub-backend/config"
+	commHandler "sighthub-backend/internal/handlers/patient_handler/communication"
+	fileHandler "sighthub-backend/internal/handlers/patient_handler/file"
 	infoHandler "sighthub-backend/internal/handlers/patient_handler/info"
+	insHandler "sighthub-backend/internal/handlers/patient_handler/insurance"
 	invHandler "sighthub-backend/internal/handlers/patient_handler/invoice"
+	recallHandler "sighthub-backend/internal/handlers/patient_handler/recall"
+	reportHandler "sighthub-backend/internal/handlers/patient_handler/report"
 	rxHandler "sighthub-backend/internal/handlers/patient_handler/rx"
 	"sighthub-backend/internal/middleware"
 	infoSvc "sighthub-backend/internal/services/patient_service/info"
@@ -25,9 +30,14 @@ func RegisterPatientRoutes(db *gorm.DB, rdb *redis.Client, cfg *config.Config, r
 	invoiceService := invSvc.New(db)
 
 	// ─── Handlers ──────────────────────────────────────────────────────────────
-	ih := infoHandler.New(infoService)
-	rh := rxHandler.New(rxService)
+	ih  := infoHandler.New(infoService)
+	rh  := rxHandler.New(rxService)
 	ivh := invHandler.New(invoiceService)
+	fh  := fileHandler.New(db)
+	ish := insHandler.New(db)
+	ch  := commHandler.New(db)
+	rch := recallHandler.New(db)
+	rpt := reportHandler.New(db)
 
 	// ─── Middleware ────────────────────────────────────────────────────────────
 	jwtMW  := pkgAuth.JWTMiddleware(cfg.JWTSecretKey, rdb)
@@ -36,6 +46,8 @@ func RegisterPatientRoutes(db *gorm.DB, rdb *redis.Client, cfg *config.Config, r
 	perm53 := middleware.ActivePermission(db, 53)
 	perm54 := middleware.ActivePermission(db, 54)
 	perm55 := middleware.ActivePermission(db, 55)
+	perm56 := middleware.ActivePermission(db, 56)
+	perm57 := middleware.ActivePermission(db, 57)
 	perm62 := middleware.ActivePermission(db, 62)
 	perm63 := middleware.ActivePermission(db, 63)
 	perm64 := middleware.ActivePermission(db, 64)
@@ -77,6 +89,62 @@ func RegisterPatientRoutes(db *gorm.DB, rdb *redis.Client, cfg *config.Config, r
 
 	api.HandleFunc("/{patient_id:[0-9]+}/prescriptions", ih.GetPatientPrescriptions).Methods("GET")
 	api.HandleFunc("/appointments", ih.GetPatientAppointments).Methods("GET")
+
+	// ─── Communication history + send ──────────────────────────────────────────
+
+	api.HandleFunc("/{patient_id:[0-9]+}/sms-history", ch.GetSMSHistory).Methods("GET")
+	api.HandleFunc("/{patient_id:[0-9]+}/send-sms", ch.SendSMS).Methods("POST")
+	api.HandleFunc("/{patient_id:[0-9]+}/email-history", ch.GetEmailHistory).Methods("GET")
+	api.HandleFunc("/{patient_id:[0-9]+}/send-email", ch.SendEmail).Methods("POST")
+	api.HandleFunc("/{patient_id:[0-9]+}/call-history", ch.GetCallHistory).Methods("GET")
+	api.HandleFunc("/{patient_id:[0-9]+}/log-call", ch.LogCall).Methods("POST")
+
+	// ─── Recall routes ─────────────────────────────────────────────────────────
+
+	api.HandleFunc("/{patient_id:[0-9]+}/recall", rch.GetRecalls).Methods("GET")
+	api.HandleFunc("/{patient_id:[0-9]+}/recall", rch.CreateRecall).Methods("POST")
+	api.HandleFunc("/{patient_id:[0-9]+}/recall/{recall_id:[0-9]+}", rch.DeleteRecall).Methods("DELETE")
+
+	// ─── File routes ───────────────────────────────────────────────────────────
+
+	api.HandleFunc("/file", fh.GetPatientFiles).Methods("GET")
+	api.Handle("/file",
+		perm56(http.HandlerFunc(fh.UploadFile)),
+	).Methods("POST")
+	api.HandleFunc("/file/{id_file:[0-9]+}", fh.GetFile).Methods("GET")
+	api.Handle("/file/{id_file:[0-9]+}",
+		perm56(http.HandlerFunc(fh.UpdateFile)),
+	).Methods("PUT")
+	api.Handle("/file/{id_file:[0-9]+}",
+		perm57(http.HandlerFunc(fh.DeleteFile)),
+	).Methods("DELETE")
+
+	// ─── Insurance routes ──────────────────────────────────────────────────────
+
+	api.HandleFunc("/insurance", ish.GetInsurancePolicies).Methods("GET")
+	api.HandleFunc("/insurance", ish.CreateInsurancePolicy).Methods("POST")
+	api.HandleFunc("/insurance/coverage_types", ish.GetCoverageTypes).Methods("GET")
+	api.HandleFunc("/insurance/companies", ish.GetCompanies).Methods("GET")
+	api.HandleFunc("/insurance/{id_insurance:[0-9]+}/patient/{id_patient:[0-9]+}", ish.GetInsurancePolicyByID).Methods("GET")
+	api.Handle("/insurance/{id_insurance:[0-9]+}",
+		perm52(http.HandlerFunc(ish.UpdateInsurancePolicy)),
+	).Methods("PUT")
+	api.Handle("/insurance/{id_insurance:[0-9]+}/holders",
+		perm52(http.HandlerFunc(ish.AddHolder)),
+	).Methods("POST")
+	api.Handle("/insurance/{id_insurance:[0-9]+}/holders/{patient_id:[0-9]+}",
+		perm52(http.HandlerFunc(ish.UpdateHolder)),
+	).Methods("PUT")
+	api.Handle("/insurance/{id_insurance:[0-9]+}/holders/{patient_id:[0-9]+}",
+		perm52(http.HandlerFunc(ish.DeleteHolder)),
+	).Methods("DELETE")
+	api.Handle("/insurance/{id_insurance:[0-9]+}/{id_patient:[0-9]+}",
+		perm52(http.HandlerFunc(ish.DeleteInsurancePolicy)),
+	).Methods("DELETE")
+
+	// ─── Report routes ─────────────────────────────────────────────────────────
+
+	api.HandleFunc("/report/all_patients/csv", rpt.AllPatientsCSV).Methods("GET")
 
 	// ─── Rx routes ─────────────────────────────────────────────────────────────
 

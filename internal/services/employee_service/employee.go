@@ -963,8 +963,8 @@ func buildWeeklySchedule(db *gorm.DB, employeeID int) map[string]interface{} {
 		if db.Where("employee_id = ? AND day_of_week = ?", employeeID, day).First(&sched).Error == nil {
 			result[day] = map[string]interface{}{
 				"is_working":           true,
-				"start_time":           sched.StartTime.Format("15:04"),
-				"end_time":             sched.EndTime.Format("15:04"),
+				"start_time":           sched.StartTime,
+				"end_time":             sched.EndTime,
 				"appointment_duration": sched.AppointmentDuration,
 			}
 		} else {
@@ -995,8 +995,8 @@ func buildScheduleRange(db *gorm.DB, employeeID int, start, end time.Time) []map
 		if db.Where("employee_id = ? AND day_of_week = ?", employeeID, dayOfWeek).First(&sched).Error == nil {
 			result = append(result, map[string]interface{}{
 				"date": dateStr, "is_working_day": true,
-				"time_start":           sched.StartTime.Format("15:04:05"),
-				"time_end":             sched.EndTime.Format("15:04:05"),
+				"time_start":           sched.StartTime,
+				"time_end":             sched.EndTime,
 				"appointment_duration": sched.AppointmentDuration,
 			})
 		} else {
@@ -1037,16 +1037,16 @@ func saveWeeklySchedule(db *gorm.DB, employeeID int, data map[string]interface{}
 			dur = int(d)
 		}
 		if exists {
-			sched.StartTime = startT
-			sched.EndTime = endT
+			sched.StartTime = startT.Format("15:04:05")
+			sched.EndTime = endT.Format("15:04:05")
 			sched.AppointmentDuration = dur
 			db.Save(&sched)
 		} else {
 			db.Create(&schedModel.Schedule{
 				EmployeeID:          int64(employeeID),
 				DayOfWeek:           day,
-				StartTime:           startT,
-				EndTime:             endT,
+				StartTime:           startT.Format("15:04:05"),
+				EndTime:             endT.Format("15:04:05"),
 				AppointmentDuration: dur,
 			})
 		}

@@ -18,7 +18,7 @@ func RegisterEmailTemplateRoutes(db *gorm.DB, rdb *redis.Client, cfg *config.Con
 
 	jwtMW := pkgAuth.JWTMiddleware(cfg.JWTSecretKey, rdb)
 
-	api := r.PathPrefix("/api/email-template").Subrouter()
+	api := r.PathPrefix("/api/email-templates").Subrouter()
 	api.Use(jwtMW, middleware.ActivePermission(db, 80))
 
 	api.HandleFunc("", h.GetAllTemplates).Methods("GET")

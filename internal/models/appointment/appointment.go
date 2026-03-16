@@ -17,8 +17,8 @@ type Appointment struct {
 
 	// Отдельные date/time колонки
 	AppointmentDate time.Time `gorm:"column:appointment_date;type:date;not null" json:"-"`
-	StartTime       time.Time `gorm:"column:start_time;type:time;not null"       json:"-"`
-	EndTime         time.Time `gorm:"column:end_time;type:time;not null"         json:"-"`
+	StartTime       string `gorm:"column:start_time;type:time;not null"       json:"-"`
+	EndTime         string `gorm:"column:end_time;type:time;not null"         json:"-"`
 
 	StatusAppointmentID int     `gorm:"column:status_appointment_id;not null" json:"status_appointment_id"`
 	Notes               *string `gorm:"column:notes;type:text"             json:"notes,omitempty"`
@@ -27,12 +27,12 @@ type Appointment struct {
 	ReasonsVisionProviderAppointmentID *int   `gorm:"column:reasons_vision_provider_appointment_id" json:"reasons_id,omitempty"`
 
 	// ---------- Relations (preload по желанию) ----------
-	Schedule          *schedule.Schedule                `gorm:"foreignKey:ScheduleID"             json:"schedule,omitempty"`
-	Patient           *patients.Patient                 `gorm:"foreignKey:PatientID"              json:"patient,omitempty"`
-	Location          *location.Location                `gorm:"foreignKey:LocationID"             json:"location,omitempty"`
-	StatusAppointment *StatusAppointment                `gorm:"foreignKey:StatusAppointmentID"    json:"status_appointment,omitempty"`
-	InsurancePolicy   *insurance.InsurancePolicy        `gorm:"foreignKey:InsurancePolicyID"      json:"insurance_policy,omitempty"`
-	Reason            *ReasonsVisionProviderAppointment `gorm:"foreignKey:ReasonsVisionProviderAppointmentID" json:"reason_obj,omitempty"`
+	Schedule          *schedule.Schedule                `gorm:"foreignKey:ScheduleID;references:IDSchedule"             json:"schedule,omitempty"`
+	Patient           *patients.Patient                 `gorm:"foreignKey:PatientID;references:IDPatient"              json:"patient,omitempty"`
+	Location          *location.Location                `gorm:"foreignKey:LocationID;references:IDLocation"             json:"location,omitempty"`
+	StatusAppointment *StatusAppointment                `gorm:"foreignKey:StatusAppointmentID;references:IDStatusAppointment"    json:"status_appointment,omitempty"`
+	InsurancePolicy   *insurance.InsurancePolicy        `gorm:"foreignKey:InsurancePolicyID;references:IDInsurancePolicy"      json:"insurance_policy,omitempty"`
+	Reason            *ReasonsVisionProviderAppointment `gorm:"foreignKey:ReasonsVisionProviderAppointmentID;references:IDReasonsVisionProviderAppointment" json:"reason_obj,omitempty"`
 }
 
 func (Appointment) TableName() string { return "appointment" }
@@ -56,13 +56,13 @@ func (a *Appointment) ToMap() map[string]interface{} {
 	} else {
 		m["appointment_date"] = nil
 	}
-	if !a.StartTime.IsZero() {
-		m["start_time"] = a.StartTime.Format("15:04:05")
+	if a.StartTime != "" {
+		m["start_time"] = a.StartTime
 	} else {
 		m["start_time"] = nil
 	}
-	if !a.EndTime.IsZero() {
-		m["end_time"] = a.EndTime.Format("15:04:05")
+	if a.EndTime != "" {
+		m["end_time"] = a.EndTime
 	} else {
 		m["end_time"] = nil
 	}

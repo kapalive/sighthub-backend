@@ -20,7 +20,7 @@ func RegisterFrameLibraryRoutes(db *gorm.DB, rdb *redis.Client, cfg *config.Conf
 	// permission 28 = frame library write access
 	writeMW := middleware.ActivePermission(db, 28)
 
-	api := r.PathPrefix("/api/frame-library").Subrouter()
+	api := r.PathPrefix("/api/frame_library").Subrouter()
 	api.Use(jwtMW)
 
 	// Read-only routes (JWT only)

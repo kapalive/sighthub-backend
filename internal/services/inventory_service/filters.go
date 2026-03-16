@@ -99,11 +99,11 @@ func (s *Service) buildFilterQuery(params FilterParams, effectiveLocationIDs []i
 // GetInventoryCSV returns all matching rows for CSV export.
 func (s *Service) GetInventoryCSV(params FilterParams, effectiveLocationIDs []int64) ([]CSVRow, error) {
 	fromWhere, args := s.buildFilterQuery(params, effectiveLocationIDs)
-	q := `SELECT i.id_inventory, i.sku, i.created_date::text AS created_date, i.status_items_inventory,
+	q := `SELECT i.id_inventory, i.sku, TO_CHAR(i.created_date, 'YYYY-MM-DD') AS created_date, i.status_items_inventory,
 	       l.id_location, l.full_name AS location_name,
 	       v.id_vendor, v.vendor_name, b.id_brand, b.brand_name,
 	       p.id_product, p.title_product, m.id_model, m.title_variant,
-	       el.username, CONCAT(e.first_name, ' ', e.last_name) AS employee_name,
+	       el.employee_login, CONCAT(e.first_name, ' ', e.last_name) AS employee_name,
 	       pb.pb_selling_price::text AS pb_selling_price ` + fromWhere
 
 	var rows []CSVRow
@@ -133,11 +133,11 @@ func (s *Service) GetInventoryByFilter(params FilterParams, effectiveLocationIDs
 		perPage = 25
 	}
 
-	selectQ := `SELECT i.id_inventory, i.sku, i.created_date::text AS created_date, i.status_items_inventory,
+	selectQ := `SELECT i.id_inventory, i.sku, TO_CHAR(i.created_date, 'YYYY-MM-DD') AS created_date, i.status_items_inventory,
 	       l.id_location, l.full_name AS location_name,
 	       v.id_vendor, v.vendor_name, b.id_brand, b.brand_name,
 	       p.id_product, p.title_product, m.id_model, m.title_variant,
-	       e.id_employee, el.username, pb.pb_selling_price::text AS pb_selling_price ` +
+	       e.id_employee, el.employee_login, pb.pb_selling_price::text AS pb_selling_price ` +
 		fromWhere + fmt.Sprintf(` LIMIT %d OFFSET %d`, perPage, (page-1)*perPage)
 
 	var rows []CSVRow

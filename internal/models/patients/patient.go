@@ -26,8 +26,8 @@ type Patient struct {
 
 	DOB *time.Time `gorm:"column:dob;type:date" json:"-"`
 
-	// ENUM gender (postgres type 'gender'); not null
-	Gender Gender `gorm:"column:gender;type:gender;not null" json:"gender"`
+	// ENUM gender (postgres type 'gender')
+	Gender *Gender `gorm:"column:gender;type:gender" json:"gender,omitempty"`
 
 	Phone     *string `gorm:"column:phone;type:varchar(15)"       json:"phone,omitempty"`
 	PhoneHome *string `gorm:"column:phone_home;type:varchar(15)"  json:"phone_home,omitempty"`
@@ -70,7 +70,7 @@ func (p *Patient) ToMap() map[string]interface{} {
 		"first_name":            p.FirstName,
 		"middle_name":           p.MiddleName,
 		"last_name":             p.LastName,
-		"gender":                p.Gender,
+		"gender":                func() interface{} { if p.Gender != nil { return string(*p.Gender) }; return nil }(),
 		"phone":                 p.Phone,
 		"phone_home":            p.PhoneHome,
 		"cell_work":             p.CellWork,

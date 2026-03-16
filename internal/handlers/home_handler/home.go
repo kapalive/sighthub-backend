@@ -443,7 +443,7 @@ func (h *Handler) SearchPatients(w http.ResponseWriter, r *http.Request) {
 			"address":    addr,
 			"phone":      strVal(p.Phone),
 			"email":      strVal(p.Email),
-			"gender":     string(p.Gender),
+			"gender":     func() string { if p.Gender != nil { return string(*p.Gender) }; return "" }(),
 		})
 	}
 

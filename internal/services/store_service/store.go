@@ -724,20 +724,20 @@ func parseWorkShift(data map[string]interface{}) (*empModel.WorkShift, error) {
 		Friday:             boolFromMap(data, "friday", true),
 		Saturday:           boolFromMap(data, "saturday", false),
 		Sunday:             boolFromMap(data, "sunday", false),
-		MondayTimeStart:    parseTimeStr(strFromMap(data, "monday_time_start"), "10:00:00"),
-		MondayTimeEnd:      parseTimeStr(strFromMap(data, "monday_time_end"), "19:00:00"),
-		TuesdayTimeStart:   parseTimeStr(strFromMap(data, "tuesday_time_start"), "10:00:00"),
-		TuesdayTimeEnd:     parseTimeStr(strFromMap(data, "tuesday_time_end"), "19:00:00"),
-		WednesdayTimeStart: parseTimeStr(strFromMap(data, "wednesday_time_start"), "10:00:00"),
-		WednesdayTimeEnd:   parseTimeStr(strFromMap(data, "wednesday_time_end"), "19:00:00"),
-		ThursdayTimeStart:  parseTimeStr(strFromMap(data, "thursday_time_start"), "10:00:00"),
-		ThursdayTimeEnd:    parseTimeStr(strFromMap(data, "thursday_time_end"), "19:00:00"),
-		FridayTimeStart:    parseTimeStr(strFromMap(data, "friday_time_start"), "10:00:00"),
-		FridayTimeEnd:      parseTimeStr(strFromMap(data, "friday_time_end"), "19:00:00"),
-		SaturdayTimeStart:  parseTimeStrPtr(strFromMap(data, "saturday_time_start")),
-		SaturdayTimeEnd:    parseTimeStrPtr(strFromMap(data, "saturday_time_end")),
-		SundayTimeStart:    parseTimeStrPtr(strFromMap(data, "sunday_time_start")),
-		SundayTimeEnd:      parseTimeStrPtr(strFromMap(data, "sunday_time_end")),
+		MondayTimeStart:    strOrDefault(strFromMap(data, "monday_time_start"), "10:00:00"),
+		MondayTimeEnd:      strOrDefault(strFromMap(data, "monday_time_end"), "19:00:00"),
+		TuesdayTimeStart:   strOrDefault(strFromMap(data, "tuesday_time_start"), "10:00:00"),
+		TuesdayTimeEnd:     strOrDefault(strFromMap(data, "tuesday_time_end"), "19:00:00"),
+		WednesdayTimeStart: strOrDefault(strFromMap(data, "wednesday_time_start"), "10:00:00"),
+		WednesdayTimeEnd:   strOrDefault(strFromMap(data, "wednesday_time_end"), "19:00:00"),
+		ThursdayTimeStart:  strOrDefault(strFromMap(data, "thursday_time_start"), "10:00:00"),
+		ThursdayTimeEnd:    strOrDefault(strFromMap(data, "thursday_time_end"), "19:00:00"),
+		FridayTimeStart:    strOrDefault(strFromMap(data, "friday_time_start"), "10:00:00"),
+		FridayTimeEnd:      strOrDefault(strFromMap(data, "friday_time_end"), "19:00:00"),
+		SaturdayTimeStart:  strPtr(strFromMap(data, "saturday_time_start")),
+		SaturdayTimeEnd:    strPtr(strFromMap(data, "saturday_time_end")),
+		SundayTimeStart:    strPtr(strFromMap(data, "sunday_time_start")),
+		SundayTimeEnd:      strPtr(strFromMap(data, "sunday_time_end")),
 		LunchDuration:      &ld,
 	}
 	if title := strFromMap(data, "title"); title != "" {
@@ -755,8 +755,8 @@ func updateWorkShift(ws *empModel.WorkShift, data map[string]interface{}) {
 	if v, ok := data["saturday"].(bool);  ok { ws.Saturday = v }
 	if v, ok := data["sunday"].(bool);    ok { ws.Sunday = v }
 
-	setTime := func(key string, dst *time.Time) {
-		if v, ok := data[key].(string); ok { *dst = parseTimeStr(v, "") }
+	setTime := func(key string, dst *string) {
+		if v, ok := data[key].(string); ok && v != "" { *dst = v }
 	}
 	setTime("monday_time_start",    &ws.MondayTimeStart)
 	setTime("monday_time_end",      &ws.MondayTimeEnd)
@@ -769,8 +769,8 @@ func updateWorkShift(ws *empModel.WorkShift, data map[string]interface{}) {
 	setTime("friday_time_start",    &ws.FridayTimeStart)
 	setTime("friday_time_end",      &ws.FridayTimeEnd)
 
-	setTimePtr := func(key string, dst **time.Time) {
-		if v, ok := data[key].(string); ok { *dst = parseTimeStrPtr(v) }
+	setTimePtr := func(key string, dst **string) {
+		if v, ok := data[key].(string); ok { *dst = strPtr(v) }
 	}
 	setTimePtr("saturday_time_start", &ws.SaturdayTimeStart)
 	setTimePtr("saturday_time_end",   &ws.SaturdayTimeEnd)
@@ -833,23 +833,11 @@ func addrParts(parts ...*string) []string {
 	return result
 }
 
-func parseTimeStr(s, def string) time.Time {
+func strOrDefault(s, def string) string {
 	if s == "" {
-		s = def
+		return def
 	}
-	t, _ := time.Parse("15:04:05", s)
-	return t
-}
-
-func parseTimeStrPtr(s string) *time.Time {
-	if s == "" {
-		return nil
-	}
-	t, err := time.Parse("15:04:05", s)
-	if err != nil {
-		return nil
-	}
-	return &t
+	return s
 }
 
 func strFromMap(m map[string]interface{}, key string) string {

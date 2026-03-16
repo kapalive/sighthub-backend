@@ -51,17 +51,17 @@ func (r *ScheduleRepo) GetWeeklySchedule(employeeID int) (map[string]interface{}
 	for _, s := range schedules {
 		entry := map[string]interface{}{
 			"id_schedule":          s.IDSchedule,
-			"start_time":           s.StartTime.Format("15:04:05"),
-			"end_time":             s.EndTime.Format("15:04:05"),
+			"start_time":           s.StartTime,
+			"end_time":             s.EndTime,
 			"appointment_duration": s.AppointmentDuration,
 		}
-		if s.LunchStart != nil && !s.LunchStart.IsZero() {
-			entry["lunch_start"] = s.LunchStart.Format("15:04:05")
+		if s.LunchStart != nil && *s.LunchStart != "" {
+			entry["lunch_start"] = *s.LunchStart
 		} else {
 			entry["lunch_start"] = nil
 		}
-		if s.LunchEnd != nil && !s.LunchEnd.IsZero() {
-			entry["lunch_end"] = s.LunchEnd.Format("15:04:05")
+		if s.LunchEnd != nil && *s.LunchEnd != "" {
+			entry["lunch_end"] = *s.LunchEnd
 		} else {
 			entry["lunch_end"] = nil
 		}
@@ -84,17 +84,16 @@ func (r *ScheduleRepo) SaveWeeklySchedule(employeeID int, data map[string]interf
 			var existing schedulemodels.Schedule
 			err := tx.Where("employee_id = ? AND day_of_week = ?", employeeID, dayName).First(&existing).Error
 
-			parseTime := func(key string) (time.Time, bool) {
+			parseTime := func(key string) (string, bool) {
 				v, ok := dayData[key]
 				if !ok || v == nil {
-					return time.Time{}, false
+					return "", false
 				}
 				s, ok := v.(string)
-				if !ok {
-					return time.Time{}, false
+				if !ok || s == "" {
+					return "", false
 				}
-				t, err := time.Parse("15:04:05", s)
-				return t, err == nil
+				return s, true
 			}
 
 			startTime, hasStart := parseTime("start_time")
@@ -113,7 +112,7 @@ func (r *ScheduleRepo) SaveWeeklySchedule(employeeID int, data map[string]interf
 				}
 			}
 
-			var lunchStart, lunchEnd *time.Time
+			var lunchStart, lunchEnd *string
 			if t, ok := parseTime("lunch_start"); ok {
 				lunchStart = &t
 			}
@@ -186,11 +185,9 @@ func (r *ScheduleRepo) GetScheduleWithDates(employeeID int, from, to time.Time) 
 					day.Message = &msg
 				}
 			} else if cal.TimeStart != nil {
-				ts := cal.TimeStart.Format("15:04:05")
-				day.TimeStart = &ts
+				day.TimeStart = cal.TimeStart
 				if cal.TimeEnd != nil {
-					te := cal.TimeEnd.Format("15:04:05")
-					day.TimeEnd = &te
+					day.TimeEnd = cal.TimeEnd
 				}
 			}
 		} else if !errors.Is(calErr, gorm.ErrRecordNotFound) {
@@ -198,8 +195,8 @@ func (r *ScheduleRepo) GetScheduleWithDates(employeeID int, from, to time.Time) 
 		} else {
 			// No calendar override — use weekly template
 			if s, ok := weeklyMap[dayName]; ok {
-				ts := s.StartTime.Format("15:04:05")
-				te := s.EndTime.Format("15:04:05")
+				ts := s.StartTime
+				te := s.EndTime
 				day.TimeStart = &ts
 				day.TimeEnd = &te
 				day.AppointmentDuration = &s.AppointmentDuration

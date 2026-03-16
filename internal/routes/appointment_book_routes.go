@@ -22,7 +22,7 @@ func RegisterAppointmentBookRoutes(db *gorm.DB, rdb *redis.Client, cfg *config.C
 
 	// ── StorePermission(12, 81): /location + /set_location ──────────────────
 	storeR := api.PathPrefix("").Subrouter()
-	storeR.Use(middleware.StorePermission(db, 12, 81))
+	storeR.Use(jwtMW, middleware.StorePermission(db, 12, 81))
 	storeR.HandleFunc("/location", h.GetLocations).Methods("GET")
 	storeR.HandleFunc("/set_location", h.SetLocation).Methods("PUT")
 

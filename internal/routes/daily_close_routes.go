@@ -17,7 +17,7 @@ func RegisterDailyCloseRoutes(db *gorm.DB, rdb *redis.Client, cfg *config.Config
 
 	jwtMW := pkgAuth.JWTMiddleware(cfg.JWTSecretKey, rdb)
 
-	api := r.PathPrefix("/api/daily-close").Subrouter()
+	api := r.PathPrefix("/api/daily_close").Subrouter()
 	api.Use(jwtMW)
 
 	// Count sheet CRUD

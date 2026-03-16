@@ -5,12 +5,17 @@ import (
 	"net/http"
 	"strings"
 
+	"gorm.io/gorm"
+
 	invSvc "sighthub-backend/internal/services/inventory_service"
 )
 
-type Handler struct{ svc *invSvc.Service }
+type Handler struct {
+	svc *invSvc.Service
+	db  *gorm.DB
+}
 
-func New(svc *invSvc.Service) *Handler { return &Handler{svc: svc} }
+func New(svc *invSvc.Service, db *gorm.DB) *Handler { return &Handler{svc: svc, db: db} }
 
 func jsonResponse(w http.ResponseWriter, status int, v interface{}) {
 	w.Header().Set("Content-Type", "application/json")

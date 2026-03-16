@@ -29,7 +29,7 @@ func RegisterDoctorDeskRoutes(db *gorm.DB, rdb *redis.Client, cfg *config.Config
 	perm60 := middleware.ActivePermission(db, 60)
 	perm61 := middleware.ActivePermission(db, 61)
 
-	api := r.PathPrefix("/api/doctor-desk").Subrouter()
+	api := r.PathPrefix("/api/doctor_desk").Subrouter()
 	api.Use(jwtMW, perm1)
 
 	// ─── Appointments ──────────────────────────────────────────────────────────

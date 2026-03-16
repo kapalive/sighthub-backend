@@ -75,16 +75,7 @@ func (s *Service) getScheduleForDay(workShiftID int64, date time.Time) (isWorkin
 		if !cal.IsWorkingDay {
 			return false, nil, nil
 		}
-		var ts, te *string
-		if cal.TimeStart != nil {
-			v := cal.TimeStart.Format("15:04:05")
-			ts = &v
-		}
-		if cal.TimeEnd != nil {
-			v := cal.TimeEnd.Format("15:04:05")
-			te = &v
-		}
-		return true, ts, te
+		return true, cal.TimeStart, cal.TimeEnd
 	}
 
 	// Fallback: WorkShift standard schedule
@@ -97,10 +88,10 @@ func (s *Service) getScheduleForDay(workShiftID int64, date time.Time) (isWorkin
 
 	type dayDef struct {
 		working bool
-		start   time.Time
-		end     time.Time
-		pStart  *time.Time
-		pEnd    *time.Time
+		start   string
+		end     string
+		pStart  *string
+		pEnd    *string
 	}
 
 	var dd dayDef
@@ -127,14 +118,14 @@ func (s *Service) getScheduleForDay(workShiftID int64, date time.Time) (isWorkin
 
 	var tsStr, teStr string
 	if dd.pStart != nil {
-		tsStr = dd.pStart.Format("15:04:05")
+		tsStr = *dd.pStart
 	} else {
-		tsStr = dd.start.Format("15:04:05")
+		tsStr = dd.start
 	}
 	if dd.pEnd != nil {
-		teStr = dd.pEnd.Format("15:04:05")
+		teStr = *dd.pEnd
 	} else {
-		teStr = dd.end.Format("15:04:05")
+		teStr = dd.end
 	}
 	return true, &tsStr, &teStr
 }
@@ -324,8 +315,8 @@ func (s *Service) GetAppointments(locationID int, date time.Time, employeeID *in
 		items = append(items, AppointmentItem{
 			AppointmentID: a.IDAppointment,
 			Title:         title,
-			Start:         a.StartTime.Format("15:04"),
-			End:           a.EndTime.Format("15:04"),
+			Start:         a.StartTime,
+			End:           a.EndTime,
 			DoctorID:      docID,
 			Doctor:        docName,
 			Notes:         a.Notes,

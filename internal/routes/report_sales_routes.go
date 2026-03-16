@@ -19,7 +19,7 @@ func RegisterReportSalesRoutes(db *gorm.DB, rdb *redis.Client, cfg *config.Confi
 	jwtMW := pkgAuth.JWTMiddleware(cfg.JWTSecretKey, rdb)
 	permMW := middleware.ActivePermission(db, 11)
 
-	api := r.PathPrefix("/api/report-sales").Subrouter()
+	api := r.PathPrefix("/api/report_sales").Subrouter()
 	api.Use(jwtMW, permMW)
 
 	api.HandleFunc("/breakdown", h.Breakdown).Methods("GET")

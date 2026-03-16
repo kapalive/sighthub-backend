@@ -299,7 +299,7 @@ func (s *Service) SaveHistory(username string, examID int64, input SaveHistoryIn
 	if input.MedicalRecord.EthnicityID != nil && (patient.EthnicityID == nil || *input.MedicalRecord.EthnicityID != *patient.EthnicityID) {
 		updates["ethnicity_id"] = *input.MedicalRecord.EthnicityID
 	}
-	if input.MedicalRecord.Gender != nil && string(patient.Gender) != *input.MedicalRecord.Gender {
+	if input.MedicalRecord.Gender != nil && (patient.Gender == nil || string(*patient.Gender) != *input.MedicalRecord.Gender) {
 		updates["gender"] = *input.MedicalRecord.Gender
 	}
 	if len(updates) > 0 {

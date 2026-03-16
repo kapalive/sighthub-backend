@@ -19,7 +19,7 @@ func RegisterReportInventoryRoutes(db *gorm.DB, rdb *redis.Client, cfg *config.C
 	jwtMW := pkgAuth.JWTMiddleware(cfg.JWTSecretKey, rdb)
 	permMW := middleware.ActivePermission(db, 11)
 
-	api := r.PathPrefix("/api/report-inventory").Subrouter()
+	api := r.PathPrefix("/api/report_inventory").Subrouter()
 	api.Use(jwtMW, permMW)
 
 	api.HandleFunc("/frame-interaction", h.FrameInteraction).Methods("GET")

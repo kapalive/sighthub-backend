@@ -1,0 +1,30 @@
+[Unit]
+Description=SightHub Backend — PROD (Go, HTTP)
+After=network-online.target postgresql.service redis-server.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=sighthub-backend
+Group=sighthub-backend
+WorkingDirectory=/home/aleks/sighthub-backend
+
+Environment=APP_ENV=production
+Environment=CONFIG_FILE=/home/aleks/sighthub-backend/config/config.json
+
+ExecStart=/home/aleks/sighthub-backend/sighthub-backend
+ExecReload=/bin/kill -HUP $MAINPID
+
+Restart=always
+RestartSec=2s
+KillSignal=SIGTERM
+TimeoutStopSec=30
+KillMode=mixed
+
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=false
+
+[Install]
+WantedBy=multi-user.target

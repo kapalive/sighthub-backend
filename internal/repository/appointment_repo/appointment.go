@@ -81,8 +81,8 @@ type CreateAppointmentInput struct {
 	PatientID                          int64
 	LocationID                         int
 	AppointmentDate                    time.Time
-	StartTime                          time.Time
-	EndTime                            time.Time
+	StartTime                          string
+	EndTime                            string
 	StatusAppointmentID                int
 	Notes                              *string
 	InsurancePolicyID                  *int64

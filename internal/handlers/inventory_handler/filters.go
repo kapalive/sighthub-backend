@@ -72,9 +72,12 @@ func (h *Handler) GetInventoryByFilter(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// TODO: extract effectiveLocationIDs from permission middleware context
-	// For now, use provided location_ids
-	effectiveLocationIDs := params.LocationIDs
+	// Resolve effective location IDs via permissions → fallback
+	effectiveLocationIDs, err := resolveLocationIDs(h.db, r, params.LocationIDs)
+	if err != nil || len(effectiveLocationIDs) == 0 {
+		jsonResponse(w, 200, &invSvc.FilterResult{Items: []map[string]interface{}{}})
+		return
+	}
 
 	if params.Output == "csv" || params.Output == "csv_detail" {
 		rows, err := h.svc.GetInventoryCSV(params, effectiveLocationIDs)

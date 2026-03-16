@@ -14,7 +14,7 @@ import (
 
 func RegisterInventoryRoutes(db *gorm.DB, rdb *redis.Client, cfg *config.Config, r *mux.Router) {
 	svc := inventory_service.New(db)
-	h := inventory_handler.New(svc)
+	h := inventory_handler.New(svc, db)
 
 	jwtMW := pkgAuth.JWTMiddleware(cfg.JWTSecretKey, rdb)
 	// permission 11 = inventory access
