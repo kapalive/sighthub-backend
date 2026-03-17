@@ -198,8 +198,22 @@ func (s *Service) CreateSuperInvoice(username string, examID int64, input Invoic
 	if superExam.InvoiceID != nil {
 		return nil, errors.New("invoice already exists for this super bill")
 	}
+
+	// If no cpt_hcpcs_code provided, auto-populate from existing super bill diagnoses
 	if len(input.CptHcpcsCode) == 0 {
-		return nil, errors.New("'cpt_hcpcs_code' object is required")
+		type row struct{ ProfessionalServiceID int64 }
+		var rows []row
+		s.db.Table("super_bill_diagnosis").
+			Select("DISTINCT professional_service_id").
+			Where("super_eye_exam_id = ?", superExam.IDSuperEyeExam).
+			Scan(&rows)
+		if len(rows) == 0 {
+			return nil, errors.New("no services found in super bill")
+		}
+		input.CptHcpcsCode = make(map[string]ServiceItem, len(rows))
+		for _, r := range rows {
+			input.CptHcpcsCode[strconv.FormatInt(r.ProfessionalServiceID, 10)] = ServiceItem{Quantity: 1}
+		}
 	}
 
 	shortName := ""

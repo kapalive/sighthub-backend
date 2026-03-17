@@ -8,6 +8,7 @@ import (
 
 	empModel      "sighthub-backend/internal/models/employees"
 	empLoginModel "sighthub-backend/internal/models/auth"
+	prelimModel   "sighthub-backend/internal/models/medical/vision_exam/preliminary"
 	refrModel     "sighthub-backend/internal/models/medical/vision_exam/refraction"
 	visionModel   "sighthub-backend/internal/models/vision_exam"
 	"sighthub-backend/pkg/activitylog"
@@ -498,6 +499,35 @@ func (s *Service) SaveRefraction(username string, examID int64, input SaveRefrac
 	return nil
 }
 
+// loadPreliminaryAutoData fetches autorefractor and auto_keratometer data
+// from the preliminary exam linked to this eye exam.
+func (s *Service) loadPreliminaryAutoData(examID int64) (interface{}, interface{}) {
+	var prelim prelimModel.PreliminaryEyeExam
+	if err := s.db.Where("eye_exam_id = ?", examID).First(&prelim).Error; err != nil {
+		return nil, nil
+	}
+
+	var autorefractor interface{}
+	if prelim.AutorefractorPreliminaryID != nil {
+		var ar prelimModel.AutorefractorPreliminary
+		if err := s.db.First(&ar, *prelim.AutorefractorPreliminaryID).Error; err == nil {
+			m := ar.ToMap()
+			delete(m, "pd") // pd not needed in refraction
+			autorefractor = m
+		}
+	}
+
+	var autoKeratometer interface{}
+	if prelim.AutoKeratometerPreliminaryID != nil {
+		var ak prelimModel.AutoKeratometerPreliminary
+		if err := s.db.First(&ak, *prelim.AutoKeratometerPreliminaryID).Error; err == nil {
+			autoKeratometer = ak.ToMap()
+		}
+	}
+
+	return autorefractor, autoKeratometer
+}
+
 // ─── GetRefraction ────────────────────────────────────────────────────────────
 
 func (s *Service) GetRefraction(examID int64) (map[string]interface{}, error) {
@@ -505,19 +535,24 @@ func (s *Service) GetRefraction(examID int64) (map[string]interface{}, error) {
 		return nil, err
 	}
 
+	// Load autorefractor & auto_keratometer from preliminary
+	autorefractor, autoKeratometer := s.loadPreliminaryAutoData(examID)
+
 	var re refrModel.RefractionEye
 	if err := s.db.Where("eye_exam_id = ?", examID).First(&re).Error; err != nil {
 		return map[string]interface{}{
-			"exam_id":        examID,
-			"exists":         false,
-			"refraction_eye": nil,
-			"retinoscopy":    nil,
-			"cyclo":          nil,
-			"manifest":       nil,
-			"final":          nil,
-			"final2":         nil,
-			"final3":         nil,
-			"dr_note":        nil,
+			"exam_id":           examID,
+			"exists":            false,
+			"refraction_eye":    nil,
+			"retinoscopy":       nil,
+			"cyclo":             nil,
+			"manifest":          nil,
+			"final":             nil,
+			"final2":            nil,
+			"final3":            nil,
+			"dr_note":           nil,
+			"autorefractor":     autorefractor,
+			"auto_keratometer":  autoKeratometer,
 		}, nil
 	}
 
@@ -534,16 +569,18 @@ func (s *Service) GetRefraction(examID int64) (map[string]interface{}, error) {
 	s.db.First(&final, re.FinalID)
 
 	result := map[string]interface{}{
-		"exam_id":        examID,
-		"exists":         true,
-		"refraction_eye": re.ToMap(),
-		"retinoscopy":    retin.ToMap(),
-		"cyclo":          cyclo.ToMap(),
-		"manifest":       mani.ToMap(),
-		"final":          final.ToMap(),
-		"final2":         nil,
-		"final3":         nil,
-		"dr_note":        re.DrNote,
+		"exam_id":           examID,
+		"exists":            true,
+		"refraction_eye":    re.ToMap(),
+		"retinoscopy":       retin.ToMap(),
+		"cyclo":             cyclo.ToMap(),
+		"manifest":          mani.ToMap(),
+		"final":             final.ToMap(),
+		"final2":            nil,
+		"final3":            nil,
+		"dr_note":           re.DrNote,
+		"autorefractor":     autorefractor,
+		"auto_keratometer":  autoKeratometer,
 	}
 
 	if re.Final2ID != nil {

@@ -184,28 +184,37 @@ func (s *Service) buildAssessmentResult(db *gorm.DB, ae assessmentModel.Assessme
 	}
 }
 
-func (s *Service) insertDiagnoses(tx *gorm.DB, assessmentEyeID int64, items []DiagnosisInput) {
+func (s *Service) insertDiagnoses(tx *gorm.DB, assessmentEyeID int64, items []DiagnosisInput) error {
 	for _, d := range items {
 		if d.Code == nil || d.LevelID == nil || d.Type == nil {
 			continue
 		}
-		tx.Create(&assessmentModel.AssessmentDiagnosis{
+		if err := tx.Create(&assessmentModel.AssessmentDiagnosis{
 			AssessmentEyeID: assessmentEyeID,
 			Code:            d.Code,
 			LevelID:         d.LevelID,
 			Type:            d.Type,
 			Title:           d.Title,
-		})
+		}).Error; err != nil {
+			return err
+		}
 	}
+	return nil
 }
 
-func (s *Service) insertPQRS(tx *gorm.DB, assessmentEyeID int64, items []PQRSInput) {
+func (s *Service) insertPQRS(tx *gorm.DB, assessmentEyeID int64, items []PQRSInput) error {
 	for _, p := range items {
-		tx.Create(&assessmentModel.AssessmentPQRS{
+		if p.IDPqrs == 0 {
+			continue
+		}
+		if err := tx.Create(&assessmentModel.AssessmentPQRS{
 			AssessmentEyeID: assessmentEyeID,
 			PqrsID:          p.IDPqrs,
-		})
+		}).Error; err != nil {
+			return err
+		}
 	}
+	return nil
 }
 
 // ---------- SaveAssessment ----------
@@ -222,7 +231,7 @@ func (s *Service) SaveAssessment(username string, examID int64, input SaveAssess
 		return nil, errors.New("assessments required")
 	}
 
-	var created []assessmentModel.AssessmentEye
+	var results []AssessmentResult
 	err = s.db.Transaction(func(tx *gorm.DB) error {
 		for _, ai := range input.Assessments {
 			ae := assessmentModel.AssessmentEye{
@@ -233,20 +242,21 @@ func (s *Service) SaveAssessment(username string, examID int64, input SaveAssess
 			if err := tx.Create(&ae).Error; err != nil {
 				return err
 			}
-			s.insertDiagnoses(tx, ae.IDAssessmentEye, ai.Diagnosis)
-			s.insertPQRS(tx, ae.IDAssessmentEye, ai.PQRS)
-			created = append(created, ae)
+			if err := s.insertDiagnoses(tx, ae.IDAssessmentEye, ai.Diagnosis); err != nil {
+				return err
+			}
+			if err := s.insertPQRS(tx, ae.IDAssessmentEye, ai.PQRS); err != nil {
+				return err
+			}
+			results = append(results, s.buildAssessmentResult(tx, ae))
 		}
-		activitylog.Log(tx, "exam_assessment", "save", activitylog.WithEntity(examID))
+		if err := activitylog.Log(tx, "exam_assessment", "save", activitylog.WithEntity(examID)); err != nil {
+			return err
+		}
 		return nil
 	})
 	if err != nil {
 		return nil, err
-	}
-
-	results := make([]AssessmentResult, 0, len(created))
-	for _, ae := range created {
-		results = append(results, s.buildAssessmentResult(s.db, ae))
 	}
 	return results, nil
 }
@@ -283,7 +293,7 @@ func (s *Service) UpdateAssessment(username string, examID int64, input UpdateAs
 		return nil, errors.New("assessments required")
 	}
 
-	var updated []assessmentModel.AssessmentEye
+	var results []AssessmentResult
 	err = s.db.Transaction(func(tx *gorm.DB) error {
 		for _, ai := range input.Assessments {
 			var ae assessmentModel.AssessmentEye
@@ -311,22 +321,27 @@ func (s *Service) UpdateAssessment(username string, examID int64, input UpdateAs
 				return err
 			}
 
-			tx.Where("assessment_eye_id = ?", ae.IDAssessmentEye).Delete(&assessmentModel.AssessmentDiagnosis{})
-			tx.Where("assessment_eye_id = ?", ae.IDAssessmentEye).Delete(&assessmentModel.AssessmentPQRS{})
-			s.insertDiagnoses(tx, ae.IDAssessmentEye, ai.Diagnosis)
-			s.insertPQRS(tx, ae.IDAssessmentEye, ai.PQRS)
-			updated = append(updated, ae)
+			if err := tx.Where("assessment_eye_id = ?", ae.IDAssessmentEye).Delete(&assessmentModel.AssessmentDiagnosis{}).Error; err != nil {
+				return err
+			}
+			if err := tx.Where("assessment_eye_id = ?", ae.IDAssessmentEye).Delete(&assessmentModel.AssessmentPQRS{}).Error; err != nil {
+				return err
+			}
+			if err := s.insertDiagnoses(tx, ae.IDAssessmentEye, ai.Diagnosis); err != nil {
+				return err
+			}
+			if err := s.insertPQRS(tx, ae.IDAssessmentEye, ai.PQRS); err != nil {
+				return err
+			}
+			results = append(results, s.buildAssessmentResult(tx, ae))
 		}
-		activitylog.Log(tx, "exam_assessment", "update", activitylog.WithEntity(examID))
+		if err := activitylog.Log(tx, "exam_assessment", "update", activitylog.WithEntity(examID)); err != nil {
+			return err
+		}
 		return nil
 	})
 	if err != nil {
 		return nil, err
-	}
-
-	results := make([]AssessmentResult, 0, len(updated))
-	for _, ae := range updated {
-		results = append(results, s.buildAssessmentResult(s.db, ae))
 	}
 	return results, nil
 }

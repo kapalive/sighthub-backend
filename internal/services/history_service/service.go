@@ -670,7 +670,9 @@ func (s *Service) SaveMedication(username string, examID int64, title string) er
 		return errors.New("cannot modify a completed exam")
 	}
 
-	parts := strings.Split(title, "|")
+	// Strip {, }, [, ] from the title before processing
+	cleaned := strings.NewReplacer("{", "", "}", "", "[", "", "]", "").Replace(title)
+	parts := strings.Split(cleaned, "|")
 	name := strings.TrimSpace(parts[0])
 	var formulationType, strength *string
 	if len(parts) > 1 {

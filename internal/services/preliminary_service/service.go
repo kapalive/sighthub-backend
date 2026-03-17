@@ -20,6 +20,13 @@ type Service struct{ db *gorm.DB }
 
 func New(db *gorm.DB) *Service { return &Service{db: db} }
 
+func irisColorOrDefault(s *string) string {
+	if s == nil || *s == "" {
+		return "n/a"
+	}
+	return *s
+}
+
 // ─── Local prescription stubs ─────────────────────────────────────────────────
 
 type rxPrescription struct {
@@ -693,7 +700,7 @@ func (s *Service) SavePreliminary(username string, examID int64, input SavePreli
 		AutorefractorPreliminaryID:   &autoRefID,
 		AutoKeratometerPreliminaryID: &autoKeraID,
 		BloodPressureID:              &bpIntID,
-		IrisColor:                    *defaults.StrDefault(input.IrisColor, "n/a"),
+		IrisColor:                    irisColorOrDefault(input.IrisColor),
 		Note:                         defaults.Str(input.Note),
 	}
 	if err := s.db.Create(&prelim).Error; err != nil {
@@ -987,7 +994,7 @@ func (s *Service) UpdatePreliminary(username string, examID int64, input UpdateP
 	if input.FixationDisparity != nil {
 		prelim.FixationDisparity = input.FixationDisparity
 	}
-	if input.IrisColor != nil {
+	if input.IrisColor != nil && *input.IrisColor != "" {
 		prelim.IrisColor = *input.IrisColor
 	}
 	if input.Note != nil {

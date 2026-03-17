@@ -23,7 +23,9 @@ func RegisterHelpdeskRoutes(db *gorm.DB, rdb *redis.Client, cfg *config.Config, 
 	jwtR := api.PathPrefix("").Subrouter()
 	jwtR.Use(jwtMW)
 	jwtR.HandleFunc("", h.ListTickets).Methods("GET")
+	jwtR.HandleFunc("/", h.ListTickets).Methods("GET")
 	jwtR.HandleFunc("", h.CreateTicket).Methods("POST")
+	jwtR.HandleFunc("/", h.CreateTicket).Methods("POST")
 	jwtR.HandleFunc("/{ticket_id:[0-9]+}", h.GetTicket).Methods("GET")
 
 	// Webhook from external helpdesk — HMAC only, no JWT

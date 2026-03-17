@@ -84,14 +84,7 @@ func (h *Handler) CreateSuperInvoice(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var input superSvc.InvoiceInput
-	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
-		jsonResponse(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
-		return
-	}
-	if len(input.CptHcpcsCode) == 0 {
-		jsonResponse(w, http.StatusBadRequest, map[string]string{"error": "'cpt_hcpcs_code' object is required"})
-		return
-	}
+	json.NewDecoder(r.Body).Decode(&input) // empty body is OK
 	username := pkgAuth.UsernameFromContext(r.Context())
 	result, err := h.svc.CreateSuperInvoice(username, examID, input)
 	if err != nil {

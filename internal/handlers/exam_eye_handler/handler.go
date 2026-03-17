@@ -2,6 +2,7 @@ package exam_eye_handler
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"strconv"
 
@@ -10,6 +11,27 @@ import (
 	eeSvc "sighthub-backend/internal/services/exam_eye_service"
 	pkgAuth "sighthub-backend/pkg/auth"
 )
+
+// flexInt64 unmarshals from both JSON number (42) and JSON string ("42").
+type flexInt64 int64
+
+func (f *flexInt64) UnmarshalJSON(b []byte) error {
+	var n int64
+	if err := json.Unmarshal(b, &n); err == nil {
+		*f = flexInt64(n)
+		return nil
+	}
+	var s string
+	if err := json.Unmarshal(b, &s); err == nil {
+		n, err := strconv.ParseInt(s, 10, 64)
+		if err != nil {
+			return fmt.Errorf("cannot parse %q as int64", s)
+		}
+		*f = flexInt64(n)
+		return nil
+	}
+	return fmt.Errorf("cannot unmarshal %s into int64", string(b))
+}
 
 type Handler struct{ svc *eeSvc.Service }
 
@@ -45,15 +67,15 @@ func (h *Handler) StartNewExam(w http.ResponseWriter, r *http.Request) {
 	username := pkgAuth.UsernameFromContext(r.Context())
 
 	var body struct {
-		PatientID     int64 `json:"patient_id"`
-		EyeExamTypeID int64 `json:"eye_exam_type_id"`
+		PatientID     flexInt64 `json:"patient_id"`
+		EyeExamTypeID flexInt64 `json:"eye_exam_type_id"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil || body.PatientID == 0 {
 		jsonResponse(w, http.StatusBadRequest, map[string]string{"error": "patient_id is required"})
 		return
 	}
 
-	result, err := h.svc.StartNewExam(username, body.PatientID, body.EyeExamTypeID)
+	result, err := h.svc.StartNewExam(username, int64(body.PatientID), int64(body.EyeExamTypeID))
 	if err != nil {
 		switch err.Error() {
 		case "employee or location not found":

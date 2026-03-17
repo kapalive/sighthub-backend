@@ -60,7 +60,17 @@
       "Bash(systemctl --user restart sighthub-backend-dev)",
       "Bash(kill -HUP 2585518)",
       "Bash(kill 2585518)",
-      "Bash(git rm:*)"
+      "Bash(git rm:*)",
+      "Bash(PGPASSWORD=Ri250Ca100w psql -h 172.16.6.4 -U icore -d eyesync_db -c \"\\\\d activity_log\")",
+      "Bash(PGPASSWORD=Ri250Ca100w psql -h 172.16.6.4 -U icore -d eyesync_db -c \"\\\\d assessment_eye\")",
+      "Bash(PGPASSWORD=Ri250Ca100w psql -h 172.16.6.4 -U icore -d eyesync_db -c \"\\\\d assessment_diagnosis_eye\")",
+      "Bash(PGPASSWORD=Ri250Ca100w psql -h 172.16.6.4 -U icore -d eyesync_db -c \"INSERT INTO activity_log \\(entity_type, action, entity_id\\) VALUES \\(''test'', ''test'', 999\\) RETURNING id\")",
+      "Bash(PGPASSWORD=Ri250Ca100w psql -h 172.16.6.4 -U icore -d eyesync_db -c \"DELETE FROM activity_log WHERE id = 353\")",
+      "Bash(PGPASSWORD=Ri250Ca100w psql -h 172.16.6.4 -U icore -d eyesync_db -c \"SELECT id_eye_exam, employee_id, passed FROM eye_exam WHERE id_eye_exam = 111\")",
+      "Bash(PGPASSWORD=Ri250Ca100w psql -h 172.16.6.4 -U icore -d eyesync_db -c \"SELECT * FROM assessment_eye WHERE eye_exam_id = 111\")",
+      "Bash(PGPASSWORD=Ri250Ca100w psql -h 172.16.6.4 -U icore -d eyesync_db -c \"SELECT tgname, tgtype FROM pg_trigger WHERE tgrelid = ''assessment_eye''::regclass OR tgrelid = ''assessment_diagnosis_eye''::regclass OR tgrelid = ''assessment_pqrs''::regclass OR tgrelid = ''activity_log''::regclass\")",
+      "Bash(find /home/aleks/eyesync/app -name *refraction* -o -name *preliminary*)",
+      "Bash(find /home/aleks/sighthub-backend/internal/models -name *refraction* -o -name *preliminary*)"
     ],
     "additionalDirectories": [
       "/tmp"
