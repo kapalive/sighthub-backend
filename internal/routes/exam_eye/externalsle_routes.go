@@ -22,7 +22,7 @@ func RegisterExternalSleRoutes(db *gorm.DB, rdb *redis.Client, cfg *config.Confi
 	perm1 := middleware.ActivePermission(db, 1)
 	perm3 := middleware.ActivePermission(db, 3)
 
-	api := r.PathPrefix("/api/exam_eye/external_sle").Subrouter()
+	api := r.PathPrefix("/api/exam_eye/externalsle").Subrouter()
 	api.Use(jwtMW, perm1)
 
 	api.Handle("/{exam_id:[0-9]+}", perm3(http.HandlerFunc(h.SaveExternalSle))).Methods("POST")

@@ -25,7 +25,7 @@ func RegisterPosTerminalRoutes(db *gorm.DB, rdb *redis.Client, cfg *config.Confi
 	perm64 := middleware.ActivePermission(db, 64)
 	perm80 := middleware.ActivePermission(db, 80)
 
-	api := r.PathPrefix("/api").Subrouter()
+	api := r.PathPrefix("/api/terminal").Subrouter()
 	api.Use(jwtMW)
 
 	// ─── Terminal CRUD (perm 80 for management) ──────────────────────────────

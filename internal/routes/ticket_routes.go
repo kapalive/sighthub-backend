@@ -18,7 +18,7 @@ func RegisterTicketRoutes(db *gorm.DB, rdb *redis.Client, cfg *config.Config, sc
 
 	jwtMW := pkgAuth.JWTMiddleware(cfg.JWTSecretKey, rdb)
 
-	api := r.PathPrefix("/api/tickets").Subrouter()
+	api := r.PathPrefix("/api/ticket").Subrouter()
 	api.Use(jwtMW)
 
 	api.HandleFunc("/{ticket_id:[0-9]+}/notify-patient", h.NotifyPatient).Methods("POST")

@@ -12,6 +12,6 @@ func RegisterLicenseRoutes(db *gorm.DB, r *mux.Router) {
 	s := licenseSvc.New(db)
 	h := licenseH.New(s)
 
-	api := r.PathPrefix("/api/license").Subrouter()
+	api := r.PathPrefix("/license").Subrouter()
 	api.HandleFunc("/kms/store", h.KMSStore).Methods("POST")
 }

@@ -33,11 +33,16 @@ func (t *ThirdTrial) ToMap() map[string]interface{} {
 	return map[string]interface{}{
 		"id_third_trial": t.IDThirdTrial,
 		"od_brand": t.OdBrand, "os_brand": t.OsBrand,
+		"od_b_cur": t.OdBCur, "os_b_cur": t.OsBCur,
+		"od_dia": t.OdDia, "os_dia": t.OsDia,
+		"od_pwr": t.OdPwr, "os_pwr": t.OsPwr,
+		"od_cyl": t.OdCyl, "os_cyl": t.OsCyl,
+		"od_axis": t.OdAxis, "os_axis": t.OsAxis,
 		"od_add": t.OdAdd, "os_add": t.OsAdd,
 		"od_dva_20": t.OdDva20, "os_dva_20": t.OsDva20,
 		"od_nva_20": t.OdNva20, "os_nva_20": t.OsNva20,
 		"trial": t.Trial, "final": t.Final,
 		"need_to_order": t.NeedToOrder, "dispense_from_stock": t.DispenseFromStock,
-		"front_desk_note": t.FrontDeskNote, "type_add": t.TypeAdd,
+		"front_desk_note": t.FrontDeskNote, "type": t.TypeAdd,
 	}
 }

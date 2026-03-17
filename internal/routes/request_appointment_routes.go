@@ -12,7 +12,7 @@ func RegisterRequestAppointmentRoutes(db *gorm.DB, r *mux.Router) {
 	s := reqApptSvc.New(db)
 	h := reqApptH.New(s)
 
-	api := r.PathPrefix("/api/request-appointment").Subrouter()
+	api := r.PathPrefix("/lcKfullwgLGRJRGB4YDk/appointment").Subrouter()
 
 	// All endpoints are public (no JWT) — called by patients from the browser
 	api.HandleFunc("/locations", h.GetLocations).Methods("GET")

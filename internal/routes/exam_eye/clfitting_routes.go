@@ -22,7 +22,7 @@ func RegisterClFittingRoutes(db *gorm.DB, rdb *redis.Client, cfg *config.Config,
 	perm1 := middleware.ActivePermission(db, 1)
 	perm3 := middleware.ActivePermission(db, 3)
 
-	api := r.PathPrefix("/api/exam_eye/cl_fitting").Subrouter()
+	api := r.PathPrefix("/api/exam_eye/clfitting").Subrouter()
 	api.Use(jwtMW, perm1)
 
 	api.Handle("/{exam_id:[0-9]+}", perm3(http.HandlerFunc(h.SaveClFitting))).Methods("POST")

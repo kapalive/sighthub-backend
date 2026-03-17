@@ -19,7 +19,7 @@ func RegisterZeissRoutes(db *gorm.DB, rdb *redis.Client, cfg *config.Config, r *
 	jwtMW := pkgAuth.JWTMiddleware(cfg.JWTSecretKey, rdb)
 	perm1 := middleware.ActivePermission(db, 1)
 
-	api := r.PathPrefix("/api/integrations/zeiss").Subrouter()
+	api := r.PathPrefix("/api/ziess").Subrouter()
 
 	// oauth2redirect is called by ZEISS — no JWT required
 	api.HandleFunc("/oauth2redirect", h.OAuth2Redirect).Methods("GET")

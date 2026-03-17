@@ -23,7 +23,7 @@ func RegisterARReportRoutes(db *gorm.DB, rdb *redis.Client, cfg *config.Config, 
 	perm34 := middleware.ActivePermission(db, 34)
 	perm35 := middleware.ActivePermission(db, 35)
 
-	api := r.PathPrefix("/api/ar").Subrouter()
+	api := r.PathPrefix("/api/ar_report").Subrouter()
 	api.Use(jwtMW, perm33)
 
 	// ─── Balance due / Credits ────────────────────────────────────────────────
