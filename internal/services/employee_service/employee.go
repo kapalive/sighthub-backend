@@ -71,9 +71,14 @@ type AddEmployeeInput struct {
 	Roles        interface{}            `json:"roles"`
 	Provider     bool                   `json:"provider"`
 	ProviderInfo map[string]interface{} `json:"provider_info"`
-	LocationID   int                    `json:"location_id"`
+	LocationID   int                    `json:"-"`
+	RawLocID     interface{}            `json:"location_id"`
 	Signature    *string                `json:"signature"`
 	JobTitleID   *int64                 `json:"job_title_id"`
+}
+
+func (a *AddEmployeeInput) ParseLocationID() {
+	a.LocationID = toInt(a.RawLocID)
 }
 
 type UpdateEmployeeInput struct {
@@ -81,9 +86,15 @@ type UpdateEmployeeInput struct {
 	Roles        interface{}            `json:"roles"`
 	Provider     bool                   `json:"provider"`
 	ProviderInfo map[string]interface{} `json:"provider_info"`
-	LocationID   int                    `json:"location_id"`
+	LocationID   int                    `json:"-"`
+	RawLocID     interface{}            `json:"location_id"`
 	Signature    *string                `json:"signature"`
 	JobTitleID   *int64                 `json:"job_title_id"`
+}
+
+// ParseLocationID converts RawLocID (string or number) into LocationID int.
+func (u *UpdateEmployeeInput) ParseLocationID() {
+	u.LocationID = toInt(u.RawLocID)
 }
 
 type EmployeeDetailResponse struct {
@@ -1137,6 +1148,22 @@ func strPtrVal(m map[string]interface{}, key string) *string {
 		return nil
 	}
 	return &v
+}
+
+func toInt(v interface{}) int {
+	switch val := v.(type) {
+	case float64:
+		return int(val)
+	case string:
+		n := 0
+		fmt.Sscanf(val, "%d", &n)
+		return n
+	case int:
+		return val
+	case int64:
+		return int(val)
+	}
+	return 0
 }
 
 func int64Ptr(id int) *int64 {

@@ -133,6 +133,7 @@ func (h *Handler) AddEmployee(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "invalid request body")
 		return
 	}
+	input.ParseLocationID()
 	id, err := h.svc.AddEmployee(username, input)
 	if err != nil {
 		if strings.Contains(err.Error(), "already exists") {
@@ -161,6 +162,7 @@ func (h *Handler) UpdateEmployee(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "invalid request body")
 		return
 	}
+	input.ParseLocationID()
 	if err := h.svc.UpdateEmployee(username, eid, input); err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return

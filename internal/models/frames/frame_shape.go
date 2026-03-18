@@ -12,16 +12,10 @@ type FrameShape struct {
 func (FrameShape) TableName() string { return "frame_shape" }
 
 func (f *FrameShape) ToMap() map[string]interface{} {
-	m := map[string]interface{}{
-		"id_frame_shape":    f.IDFrameShape,
-		"title_frame_shape": f.TitleFrameShape,
+	return map[string]interface{}{
+		"frame_shape_id":   f.IDFrameShape,
+		"frame_shape_name": f.TitleFrameShape,
 	}
-	if f.Description != nil {
-		m["description"] = *f.Description
-	} else {
-		m["description"] = nil
-	}
-	return m
 }
 
 func (f *FrameShape) String() string {

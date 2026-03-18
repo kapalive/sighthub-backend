@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"strings"
 
 	"sighthub-backend/config"
 	"sighthub-backend/internal/services/auth_service"
@@ -159,7 +160,8 @@ func (h *Handler) TokenCheck(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	claims, err := pkgAuth.ParseToken(body.AccessToken, h.cfg.JWTSecretKey)
+	tok := strings.TrimPrefix(body.AccessToken, "Bearer ")
+	claims, err := pkgAuth.ParseToken(tok, h.cfg.JWTSecretKey)
 	if err != nil {
 		jsonResponse(w, map[string]interface{}{"valid": false, "error": err.Error()}, http.StatusOK)
 		return

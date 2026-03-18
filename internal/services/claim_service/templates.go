@@ -3,6 +3,7 @@ package claim_service
 import (
 	"errors"
 	"fmt"
+	"os"
 	"strings"
 
 	"gorm.io/gorm"
@@ -10,7 +11,7 @@ import (
 	empModel "sighthub-backend/internal/models/employees"
 	insuranceModel "sighthub-backend/internal/models/insurance"
 	locModel "sighthub-backend/internal/models/location"
-	marketingModel "sighthub-backend/internal/models/marketing"
+
 	"sighthub-backend/pkg/activitylog"
 	"sighthub-backend/pkg/pdfutil"
 )
@@ -304,14 +305,17 @@ func (s *Service) buildTemplateData(t *insuranceModel.ClaimTemplate) map[string]
 
 // getCMS1500TemplatePath gets the PDF template path from the database.
 func (s *Service) getCMS1500TemplatePath() (string, error) {
-	var form marketingModel.Form
-	if err := s.db.Where("id_form = ? AND is_active = ?", 1, true).First(&form).Error; err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return "", errors.New("PDF template not found")
-		}
-		return "", err
+	// Берём форму из pkg/pdfutil/ рядом с бинарником
+	candidates := []string{
+		"pkg/pdfutil/form_cms1500.pdf",
+		"/home/aleks/sighthub-backend/pkg/pdfutil/form_cms1500.pdf",
 	}
-	return form.PathFile, nil
+	for _, p := range candidates {
+		if _, err := os.Stat(p); err == nil {
+			return p, nil
+		}
+	}
+	return "", errors.New("CMS-1500 PDF template not found")
 }
 
 // ── GET /templates ────────────────────────────────────────────────────────────

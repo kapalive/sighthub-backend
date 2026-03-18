@@ -43,7 +43,7 @@ func (h *Handler) ListShapes(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) CreateShape(w http.ResponseWriter, r *http.Request) {
 	var body struct {
-		Title       string  `json:"title_frame_shape"`
+		Title       string  `json:"frame_shape_name"`
 		Description *string `json:"description"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {

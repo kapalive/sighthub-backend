@@ -22,5 +22,6 @@ func RegisterEmailTemplateRoutes(db *gorm.DB, rdb *redis.Client, cfg *config.Con
 	api.Use(jwtMW, middleware.ActivePermission(db, 80))
 
 	api.HandleFunc("", h.GetAllTemplates).Methods("GET")
+	api.HandleFunc("/", h.GetAllTemplates).Methods("GET")
 	api.HandleFunc("/settings", h.SetOrgTemplate).Methods("POST")
 }

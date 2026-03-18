@@ -7,20 +7,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"os/exec"
 	"strings"
-	"time"
 
 	pdfcpuapi "github.com/pdfcpu/pdfcpu/pkg/api"
-	"github.com/pdfcpu/pdfcpu/pkg/pdfcpu/form"
 	"github.com/pdfcpu/pdfcpu/pkg/pdfcpu/model"
 )
-
-// radioFields — поля CMS-1500, которые являются RadioButtonGroup (не text).
-var radioFields = map[string]bool{
-	"insurance_type": true, "sex": true, "ins_sex": true, "rel_to_ins": true,
-	"employment": true, "pt_auto_accident": true, "other_accident": true,
-	"tax_id_type": true, "accept_assign": true, "lab": true, "ins_benefit_plan": true,
-}
 
 // FillFields заполняет PDF-форму значениями из map[fieldID]value.
 // Читает из inPath, пишет в outPath.
@@ -36,77 +28,66 @@ func FillFields(inPath, outPath string, values map[string]string) error {
 	return os.WriteFile(outPath, filled, 0o644)
 }
 
+// pyFillScript is an inline Python script that uses pypdf to fill AcroForm fields.
+// It reads the template PDF from stdin, field values as JSON from a temp file
+// (path passed as argv[1]), and writes the filled PDF to stdout.
+const pyFillScript = `
+import sys, json
+from pypdf import PdfReader, PdfWriter
+import io
+
+fields_path = sys.argv[1]
+with open(fields_path, "r") as f:
+    fields = json.load(f)
+
+reader = PdfReader(io.BytesIO(sys.stdin.buffer.read()))
+writer = PdfWriter()
+writer.append(reader)
+writer.update_page_form_field_values(writer.pages[0], fields, auto_regenerate=True)
+buf = io.BytesIO()
+writer.write(buf)
+sys.stdout.buffer.write(buf.getvalue())
+`
+
 // FillFieldsBytes заполняет PDF-форму и возвращает байты результата.
-func FillFieldsBytes(pdfData []byte, values map[string]string) ([]byte, error) {
-	jsonData, err := buildFillJSON(values)
-	if err != nil {
-		return nil, fmt.Errorf("fill: build json: %w", err)
-	}
-
-	conf := model.NewDefaultConfiguration()
-	conf.ValidationMode = model.ValidationRelaxed
-
-	var out bytes.Buffer
-	err = pdfcpuapi.FillForm(
-		bytes.NewReader(pdfData),
-		bytes.NewReader(jsonData),
-		&out,
-		conf,
-	)
-	if err != nil {
-		return nil, err
-	}
-	return out.Bytes(), nil
-}
-
-// buildFillJSON строит JSON для pdfcpu.FillForm.
-// Разбивает поля на text и radio по известному списку radioFields.
-func buildFillJSON(values map[string]string) ([]byte, error) {
-	type header struct {
-		Source  string `json:"source"`
-		Version string `json:"version"`
-		Created string `json:"created"`
-		Creator string `json:"creator"`
-	}
-
-	textFields := make([]*form.TextField, 0, len(values))
-	radioGroups := make([]*form.RadioButtonGroup, 0)
-
-	for id, val := range values {
-		if radioFields[id] {
-			radioGroups = append(radioGroups, &form.RadioButtonGroup{
-				ID:    id,
-				Value: val,
-			})
-		} else {
-			textFields = append(textFields, &form.TextField{
-				ID:    id,
-				Value: val,
-			})
+// Использует pypdf через subprocess (python3) для корректной работы с AcroForm.
+func FillFieldsBytes(pdfData []byte, values map[string]string) (result []byte, retErr error) {
+	defer func() {
+		if r := recover(); r != nil {
+			retErr = fmt.Errorf("fill: pypdf panic: %v", r)
 		}
-	}
+	}()
 
-	type payload struct {
-		Header header    `json:"header"`
-		Forms  []form.Form `json:"forms"`
+	// Serialize field values to a temp JSON file.
+	jsonData, err := json.Marshal(values)
+	if err != nil {
+		return nil, fmt.Errorf("fill: marshal fields: %w", err)
 	}
-
-	p := payload{
-		Header: header{
-			Source:  "sighthub-backend",
-			Version: "v1.0",
-			Created: time.Now().UTC().Format(time.RFC3339),
-			Creator: "pdfutil",
-		},
-		Forms: []form.Form{
-			{
-				TextFields:        textFields,
-				RadioButtonGroups: radioGroups,
-			},
-		},
+	tmpJSON, err := os.CreateTemp("", "pdfutil_fields_*.json")
+	if err != nil {
+		return nil, fmt.Errorf("fill: create temp json: %w", err)
 	}
+	defer os.Remove(tmpJSON.Name())
+	if _, err := tmpJSON.Write(jsonData); err != nil {
+		tmpJSON.Close()
+		return nil, fmt.Errorf("fill: write temp json: %w", err)
+	}
+	tmpJSON.Close()
 
-	return json.Marshal(p)
+	// Run python3 with the inline script.
+	cmd := exec.Command("python3", "-c", pyFillScript, tmpJSON.Name())
+	cmd.Stdin = bytes.NewReader(pdfData)
+	var stdout, stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+
+	if err := cmd.Run(); err != nil {
+		return nil, fmt.Errorf("fill: pypdf failed: %w\nstderr: %s", err, stderr.String())
+	}
+	if stdout.Len() == 0 {
+		return nil, fmt.Errorf("fill: pypdf returned empty output\nstderr: %s", stderr.String())
+	}
+	return stdout.Bytes(), nil
 }
 
 // ==============================================================================

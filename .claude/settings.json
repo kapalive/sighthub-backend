@@ -97,7 +97,18 @@
       "Bash(2)",
       "Read(//proc/3575858/**)",
       "Bash(source /home/aleks/sighthub-backend/.env)",
-      "Bash(python3 -c \"import sys,json; c=json.load\\(sys.stdin\\); print\\(fhost={c.get\\(''''db_host''''\\)} port={c.get\\(''''db_port''''\\)} dbname={c.get\\(''''db_name''''\\)} user={c.get\\(''''db_username''''\\)}\\)\")"
+      "Bash(python3 -c \"import sys,json; c=json.load\\(sys.stdin\\); print\\(fhost={c.get\\(''''db_host''''\\)} port={c.get\\(''''db_port''''\\)} dbname={c.get\\(''''db_name''''\\)} user={c.get\\(''''db_username''''\\)}\\)\")",
+      "Bash(ls /etc/systemd/system/sighthub*)",
+      "Bash(grep -n \"ListFrameShapes\\\\|ListFrameTypeMaterials\" /home/aleks/sighthub-backend/internal/services/settings_service/*.go)",
+      "Bash(PGPASSWORD=Ri250Ca100w psql -h 172.16.6.4 -U icore -d eyesync_db -c \"SELECT id_form, path_file, is_active FROM form WHERE id_form = 1;\")",
+      "Bash(PGPASSWORD=Ri250Ca100w psql -h 172.16.6.4 -U icore -d eyesync_db -c \"SELECT table_name FROM information_schema.tables WHERE table_name LIKE ''%form%'';\")",
+      "Bash(PGPASSWORD=Ri250Ca100w psql -h 172.16.6.4 -U icore -d eyesync_db -c \"SELECT * FROM forms WHERE id_form = 1;\")",
+      "Read(//var/log/**)",
+      "Bash(journalctl -u sighthub-backend-dev --no-pager -n 30)",
+      "Bash(/usr/local/go/bin/go run:*)",
+      "Bash(find /home/aleks/eyesync -name form_cms1500*)",
+      "Read(//home/aleks/**)",
+      "Bash(python3 -c \"import pypdf; print\\(''pypdf OK:'', pypdf.__version__\\)\")"
     ],
     "additionalDirectories": [
       "/tmp"

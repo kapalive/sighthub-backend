@@ -7,7 +7,9 @@ import (
 
 	"sighthub-backend/config"
 	apptH "sighthub-backend/internal/handlers/appointment_book_handler/appointment"
+	settApptH "sighthub-backend/internal/handlers/settings_handler/appointment"
 	apptSvc "sighthub-backend/internal/services/appointment_service"
+	settSvc "sighthub-backend/internal/services/settings_service"
 	"sighthub-backend/internal/middleware"
 	pkgAuth "sighthub-backend/pkg/auth"
 )
@@ -15,6 +17,7 @@ import (
 func RegisterAppointmentBookRoutes(db *gorm.DB, rdb *redis.Client, cfg *config.Config, r *mux.Router) {
 	s := apptSvc.New(db)
 	h := apptH.New(s, db)
+	hSettings := settApptH.New(settSvc.New(db))
 
 	jwtMW := pkgAuth.JWTMiddleware(cfg.JWTSecretKey, rdb)
 
@@ -29,6 +32,7 @@ func RegisterAppointmentBookRoutes(db *gorm.DB, rdb *redis.Client, cfg *config.C
 	// ── JWT + perm 6: read-only ──────────────────────────────────────────────
 	readR := api.PathPrefix("").Subrouter()
 	readR.Use(jwtMW, middleware.ActivePermission(db, 6))
+	readR.HandleFunc("/appointment-duration", hSettings.GetAppointmentDuration).Methods("GET")
 	readR.HandleFunc("/doctors", h.GetDoctors).Methods("GET")
 	readR.HandleFunc("/status-appointments", h.GetStatusAppointments).Methods("GET")
 	readR.HandleFunc("/appointments", h.GetAppointments).Methods("GET")

@@ -205,7 +205,22 @@ install-jq:
 		echo "  ✓ jq установлен"; \
 	fi
 
-install-deps: install-go install-redis install-jq
+install-pypdf:
+	@echo "── Python3 + pypdf ──"
+	@if python3 -c "import pypdf" 2>/dev/null; then \
+		echo "  pypdf уже установлен"; \
+	else \
+		if ! command -v python3 >/dev/null 2>&1; then \
+			$(PKG_UPDATE); \
+			$(PKG_INSTALL) python3 python3-pip; \
+		fi; \
+		sudo pip3 install --break-system-packages pypdf 2>/dev/null \
+			|| pip3 install --break-system-packages pypdf 2>/dev/null \
+			|| pip3 install pypdf; \
+		echo "  ✓ pypdf установлен"; \
+	fi
+
+install-deps: install-go install-redis install-jq install-pypdf
 	@echo ""
 	@echo "✓ Все зависимости установлены"
 
@@ -361,8 +376,27 @@ install: install-deps check setup-user build setup-secrets setup-config setup-se
 update: build
 	@sudo chown $(SERVICE_USER):$(SERVICE_GROUP) $(BINARY)
 	@sudo chmod 750 $(BINARY)
-	@sudo systemctl restart $(APP_NAME)-prod 2>/dev/null || true
-	@sudo systemctl restart $(APP_NAME)-dev  2>/dev/null || true
+	@# Пробуем systemd, если не работает — убиваем по PID и стартуем
+	@if sudo systemctl restart $(APP_NAME)-prod 2>/dev/null; then \
+		echo "  ✓ $(APP_NAME)-prod перезапущен (systemd)"; \
+	else \
+		PID=$$(sudo lsof -ti:8001 2>/dev/null | head -1); \
+		if [ -n "$$PID" ]; then sudo kill $$PID 2>/dev/null; sleep 1; fi; \
+		sudo -u $(SERVICE_USER) APP_ENV=production CONFIG_FILE=$(CONFIG_DIR)/config.json \
+			nohup $(BINARY) > /var/log/$(APP_NAME)-prod.log 2>&1 & \
+		sleep 1; \
+		echo "  ✓ $(APP_NAME)-prod перезапущен (manual, port 8001)"; \
+	fi
+	@if sudo systemctl restart $(APP_NAME)-dev 2>/dev/null; then \
+		echo "  ✓ $(APP_NAME)-dev перезапущен (systemd)"; \
+	else \
+		PID=$$(sudo lsof -ti:8002 2>/dev/null | head -1); \
+		if [ -n "$$PID" ]; then sudo kill $$PID 2>/dev/null; sleep 1; fi; \
+		sudo -u $(SERVICE_USER) APP_ENV=development CONFIG_FILE=$(CONFIG_DIR)/config.development.json \
+			nohup $(BINARY) > /var/log/$(APP_NAME)-dev.log 2>&1 & \
+		sleep 1; \
+		echo "  ✓ $(APP_NAME)-dev перезапущен (manual, port 8002)"; \
+	fi
 	@echo "✓ $(APP_NAME) обновлён и перезапущен (prod + dev)"
 
 # ─── Service Control ──────────────────────────────────────────────────────────

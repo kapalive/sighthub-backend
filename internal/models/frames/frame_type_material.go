@@ -12,7 +12,7 @@ func (FrameTypeMaterial) TableName() string { return "frame_type_material" }
 
 func (f *FrameTypeMaterial) ToMap() map[string]interface{} {
 	return map[string]interface{}{
-		"id_frame_type_material": f.IDFrameTypeMaterial,
+		"frame_type_material_id": f.IDFrameTypeMaterial,
 		"material":               f.Material,
 	}
 }
