@@ -10,7 +10,7 @@ type TempCountInventory struct {
 	CountDate        time.Time `gorm:"column:count_date;not null;default:now()"       json:"count_date"`
 	InventoryID      int64     `gorm:"column:inventory_id;not null"                   json:"inventory_id"`
 	LocationID       int       `gorm:"column:location_id;not null"                    json:"location_id"`
-	BrandID          int       `gorm:"column:brand_id;not null"                       json:"brand_id"`
+	BrandID          *int      `gorm:"column:brand_id"                                json:"brand_id,omitempty"`
 	VendorID         *int      `gorm:"column:vendor_id"                               json:"vendor_id,omitempty"`
 	InStock          bool      `gorm:"column:in_stock;not null;default:false"         json:"in_stock"`
 	InventoryCountID int64     `gorm:"column:inventory_count_id;not null"             json:"inventory_count_id"`

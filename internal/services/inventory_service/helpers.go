@@ -57,7 +57,7 @@ func (s *Service) GetStores(locationIDs []int64) ([]map[string]interface{}, erro
 		LocationID int64  `gorm:"column:id_location"`
 		FullName   string `gorm:"column:full_name"`
 	}
-	err := s.db.Raw(`SELECT id_location, full_name FROM location WHERE id_location IN ?`, locationIDs).Scan(&rows).Error
+	err := s.db.Raw(`SELECT id_location, full_name FROM location WHERE id_location IN ? AND showcase = true`, locationIDs).Scan(&rows).Error
 	if err != nil {
 		return nil, err
 	}

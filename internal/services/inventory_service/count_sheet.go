@@ -405,24 +405,29 @@ func (s *Service) GetCountSheetItems(username string, idCountSheet int64) (map[s
 	var locationName string
 	s.db.Raw(`SELECT full_name FROM location WHERE id_location = ?`, locationID).Scan(&locationName)
 
-	// Brand/vendor info from first counted item
-	var brandInfo, vendorInfo interface{}
+	// Brand/vendor info from count sheet
+	var csInfo struct {
+		BrandID    *int    `gorm:"column:brand_id"`
+		BrandName  *string `gorm:"column:brand_name"`
+		VendorID   *int    `gorm:"column:vendor_id"`
+		VendorName *string `gorm:"column:vendor_name"`
+	}
 	s.db.Raw(`
-		SELECT b.id_brand, b.brand_name FROM temp_count_inventory tci
-		JOIN inventory i ON tci.inventory_id = i.id_inventory
-		JOIN model m ON i.model_id = m.id_model
-		JOIN product p ON m.product_id = p.id_product
-		JOIN brand b ON p.brand_id = b.id_brand
-		WHERE tci.inventory_count_id = ? AND tci.location_id = ?
-		LIMIT 1
-	`, idCountSheet, locationID).Scan(&brandInfo)
+		SELECT ic.brand_id, b.brand_name, ic.vendor_id, v.vendor_name
+		FROM inventory_count ic
+		LEFT JOIN brand b ON b.id_brand = ic.brand_id
+		LEFT JOIN vendor v ON v.id_vendor = ic.vendor_id
+		WHERE ic.id_inventory_count = ?
+	`, idCountSheet).Scan(&csInfo)
 
 	total := len(counted) + len(missing)
 	return map[string]interface{}{
 		"location":       locationName,
 		"id_count_sheet": idCountSheet,
-		"brand":          brandInfo,
-		"vendor":         vendorInfo,
+		"brand_id":       csInfo.BrandID,
+		"brand_name":     csInfo.BrandName,
+		"vendor_id":      csInfo.VendorID,
+		"vendor_name":    csInfo.VendorName,
 		"quantity":       fmt.Sprintf("%d/%d", len(counted), total),
 		"counted_items":  countedList,
 		"missing_items":  missingList,
@@ -468,24 +473,26 @@ func (s *Service) AddItemToCountSheet(username string, idCountSheet int64, rawSK
 
 	now := time.Now().UTC()
 
-	// Get brand_id from product
-	var brandID *int64
-	s.db.Raw(`SELECT p.brand_id FROM model m JOIN product p ON m.product_id = p.id_product WHERE m.id_model = ?`, inv.ModelID).Scan(&brandID)
-
-	brandIDVal := 0
-	if brandID != nil {
-		brandIDVal = int(*brandID)
+	// Get brand_id and vendor_id from product
+	var prodInfo struct {
+		BrandID  *int `gorm:"column:brand_id"`
+		VendorID *int `gorm:"column:vendor_id"`
 	}
+	s.db.Raw(`SELECT p.brand_id, p.vendor_id FROM model m JOIN product p ON m.product_id = p.id_product WHERE m.id_model = ?`, inv.ModelID).Scan(&prodInfo)
 
 	// Move from Missing to TempCountInventory
-	s.db.Create(&invModel.TempCountInventory{
+	tci := invModel.TempCountInventory{
 		InventoryID:      inv.IDInventory,
 		LocationID:       int(locationID),
-		BrandID:          brandIDVal,
 		InStock:          true,
 		InventoryCountID: cs.IDInventoryCount,
 		CountDate:        now,
-	})
+	}
+	tci.BrandID = prodInfo.BrandID
+	tci.VendorID = prodInfo.VendorID
+	if err := s.db.Create(&tci).Error; err != nil {
+		return nil, fmt.Errorf("failed to add item: %w", err)
+	}
 
 	inventoryID := inv.IDInventory
 	s.db.Create(&invModel.InventoryTransaction{

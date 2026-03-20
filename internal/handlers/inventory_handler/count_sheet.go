@@ -1,6 +1,7 @@
 package inventory_handler
 
 import (
+	"fmt"
 	"net/http"
 	"strconv"
 
@@ -8,6 +9,21 @@ import (
 	invSvc "sighthub-backend/internal/services/inventory_service"
 	pkgAuth "sighthub-backend/pkg/auth"
 )
+
+func toInt64(v interface{}) int64 {
+	switch val := v.(type) {
+	case float64:
+		return int64(val)
+	case string:
+		n, _ := strconv.ParseInt(val, 10, 64)
+		return n
+	case nil:
+		return 0
+	default:
+		n, _ := strconv.ParseInt(fmt.Sprintf("%v", val), 10, 64)
+		return n
+	}
+}
 
 // GET /count_sheets
 func (h *Handler) GetCountSheets(w http.ResponseWriter, r *http.Request) {
@@ -133,19 +149,21 @@ func (h *Handler) GetCountSheetItems(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) AddItemToCountSheet(w http.ResponseWriter, r *http.Request) {
 	username := pkgAuth.UsernameFromContext(r.Context())
 
-	var body struct {
-		IDCountSheet int64  `json:"id_count_sheet"`
-		SKU          string `json:"sku"`
-	}
-	if err := decodeJSON(r, &body); err != nil {
+	var raw map[string]interface{}
+	if err := decodeJSON(r, &raw); err != nil {
 		jsonResponse(w, 400, map[string]string{"error": "invalid request body"})
 		return
 	}
-	if body.IDCountSheet == 0 || body.SKU == "" {
+
+	idCountSheet := toInt64(raw["id_count_sheet"])
+	skuInt := toInt64(raw["sku"])
+
+	if idCountSheet == 0 || skuInt == 0 {
 		jsonResponse(w, 400, map[string]string{"error": "id_count_sheet and sku are required"})
 		return
 	}
-	result, err := h.svc.AddItemToCountSheet(username, body.IDCountSheet, body.SKU)
+	sku := strconv.FormatInt(skuInt, 10)
+	result, err := h.svc.AddItemToCountSheet(username, idCountSheet, sku)
 	if err != nil {
 		jsonResponse(w, httpStatus(err), map[string]string{"error": err.Error()})
 		return

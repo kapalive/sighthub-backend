@@ -1369,7 +1369,7 @@ func (s *Service) AddItemsToInvoice(username string, invoiceID int64, input AddI
 							tx.Create(&invModel.TempCountInventory{
 									InventoryID:      frame.IDInventory,
 									LocationID:       locIntID,
-									BrandID:          brandIntID,
+									BrandID:          &brandIntID,
 									VendorID:         vendorIntID,
 									InStock:          true,
 									InventoryCountID: activeIC.IDInventoryCount,

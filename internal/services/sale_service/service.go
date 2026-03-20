@@ -1,6 +1,7 @@
 package sale_service
 
 import (
+	"encoding/json"
 	"fmt"
 	"math"
 	"strings"
@@ -62,10 +63,21 @@ type SaleItem struct {
 }
 
 type YearlyRepItem struct {
-	EmpID        int                `json:"emp_id"`
-	EmployeeName string             `json:"employee_name"`
-	Months       map[string]float64 `json:"months,omitempty"`
-	Total        float64            `json:"Total"`
+	EmpID        int                `json:"-"`
+	EmployeeName string             `json:"-"`
+	Months       map[string]float64 `json:"-"`
+	Total        float64            `json:"-"`
+}
+
+func (y YearlyRepItem) MarshalJSON() ([]byte, error) {
+	m := make(map[string]interface{})
+	m["emp_id"] = y.EmpID
+	m["employee_name"] = y.EmployeeName
+	m["Total"] = y.Total
+	for k, v := range y.Months {
+		m[k] = v
+	}
+	return json.Marshal(m)
 }
 
 type ProfCodeItem struct {
@@ -518,12 +530,32 @@ func (s *Service) GetSaleItems(
 
 func (s *Service) YearlyComparisonByRep(
 	locationID int, yearStart, yearEnd, startMonth, endMonth int,
+	vendorID, brandID *int,
 ) (active []YearlyRepItem, inactive []YearlyRepItem, err error) {
 
 	startDate := time.Date(yearStart, time.Month(startMonth), 1, 0, 0, 0, 0, time.UTC)
 	endDate := time.Date(yearEnd, time.Month(endMonth), 1, 0, 0, 0, 0, time.UTC).AddDate(0, 1, -1)
 
-	query := `
+	extraJoins := ""
+	extraWhere := ""
+	args := []interface{}{locationID, startDate, endDate}
+
+	if vendorID != nil || brandID != nil {
+		extraJoins = `
+		JOIN inventory inv ON inv.id_inventory = iis.item_id AND iis.item_type = 'Frames'
+		JOIN model m ON m.id_model = inv.model_id
+		JOIN product p ON p.id_product = m.product_id`
+		if vendorID != nil {
+			extraWhere += ` AND p.vendor_id = ?`
+			args = append(args, *vendorID)
+		}
+		if brandID != nil {
+			extraWhere += ` AND p.brand_id = ?`
+			args = append(args, *brandID)
+		}
+	}
+
+	query := fmt.Sprintf(`
 		SELECT e.id_employee,
 		       e.first_name, e.last_name, e.active,
 		       EXTRACT(YEAR FROM i.date_create)  AS yr,
@@ -532,13 +564,15 @@ func (s *Service) YearlyComparisonByRep(
 		FROM employee e
 		JOIN invoice i             ON i.employee_id  = e.id_employee
 		JOIN invoice_item_sale iis ON iis.invoice_id = i.id_invoice
+		%s
 		WHERE i.location_id = ?
 		  AND i.date_create >= ? AND i.date_create <= ?
+		  %s
 		GROUP BY e.id_employee, e.first_name, e.last_name, e.active,
 		         EXTRACT(YEAR FROM i.date_create), EXTRACT(MONTH FROM i.date_create)
-		ORDER BY e.last_name, e.first_name`
+		ORDER BY e.last_name, e.first_name`, extraJoins, extraWhere)
 
-	rows, err := s.db.Raw(query, locationID, startDate, endDate).Rows()
+	rows, err := s.db.Raw(query, args...).Rows()
 	if err != nil {
 		return nil, nil, err
 	}

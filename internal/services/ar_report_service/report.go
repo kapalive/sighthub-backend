@@ -78,7 +78,7 @@ type BalanceDueGroup struct {
 	Invoices     []BalanceDueInvoice `json:"invoices"`
 }
 
-func (s *Service) GetBalanceDue(username string, locationID int) ([]BalanceDueGroup, error) {
+func (s *Service) GetBalanceDue(username string, locationID int, periodMonths int) ([]BalanceDueGroup, error) {
 	type row struct {
 		IDInvoice         int64      `gorm:"column:id_invoice"`
 		NumberInvoice     string     `gorm:"column:number_invoice"`
@@ -121,9 +121,10 @@ func (s *Service) GetBalanceDue(username string, locationID int) ([]BalanceDueGr
 		JOIN patient p ON p.id_patient = i.patient_id
 		LEFT JOIN employee e ON e.id_employee = i.employee_id
 		WHERE i.location_id = ?
-		  AND i.number_invoice LIKE 'S%'
+		  AND i.number_invoice LIKE 'S%%'
+		  AND (? = 0 OR i.date_create >= NOW() - MAKE_INTERVAL(months => ?))
 		ORDER BY i.employee_id, i.date_create DESC
-	`, locationID).Scan(&rows).Error
+	`, locationID, periodMonths, periodMonths).Scan(&rows).Error
 	if err != nil {
 		return nil, err
 	}

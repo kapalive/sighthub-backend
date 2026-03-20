@@ -31,7 +31,14 @@ func (h *Handler) GetBalanceDue(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	result, err := h.svc.GetBalanceDue(username, locID)
+	period := 0
+	if v := r.URL.Query().Get("period"); v != "" {
+		if p, err := strconv.Atoi(v); err == nil && p > 0 {
+			period = p
+		}
+	}
+
+	result, err := h.svc.GetBalanceDue(username, locID, period)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return

@@ -559,6 +559,16 @@ func (s *Service) CreateAppointment(input CreateAppointmentInput) (*AppointmentD
 		return nil, fmt.Errorf("invalid end_time format. Use HH:MM")
 	}
 
+	// 1. Check past time — round current time up to end of minute
+	now := time.Now()
+	nowRounded := time.Date(now.Year(), now.Month(), now.Day(), now.Hour(), now.Minute()+1, 0, 0, now.Location())
+	requestedDT := time.Date(desiredDate.Year(), desiredDate.Month(), desiredDate.Day(),
+		startTime.Hour(), startTime.Minute(), 0, 0, now.Location())
+	if requestedDT.Before(nowRounded) {
+		return nil, fmt.Errorf("cannot schedule appointment in the past")
+	}
+
+	// 2. Check doctor schedule
 	dayOfWeek := strings.ToLower(desiredDate.Format("Monday"))
 	schedEntry, err := s.findOrCreateSchedule(*input.DoctorID, dayOfWeek)
 	if err != nil {
@@ -745,7 +755,16 @@ func (s *Service) UpdateAppointment(id int64, input UpdateAppointmentInput) erro
 	startTime, _ := time.Parse("15:04", startTimeStr)
 	endTime, _ := time.Parse("15:04", endTimeStr)
 
-	// Validate doctor
+	// 1. Check past time — round current time up to end of minute
+	now := time.Now()
+	nowRounded := time.Date(now.Year(), now.Month(), now.Day(), now.Hour(), now.Minute()+1, 0, 0, now.Location())
+	requestedDT := time.Date(desiredDate.Year(), desiredDate.Month(), desiredDate.Day(),
+		startTime.Hour(), startTime.Minute(), 0, 0, now.Location())
+	if requestedDT.Before(nowRounded) {
+		return fmt.Errorf("cannot schedule appointment in the past")
+	}
+
+	// 2. Validate doctor
 	var doctor empModel.Employee
 	doctorErr := s.db.
 		Joins("JOIN job_title ON job_title.id_job_title = employee.job_title_id").
@@ -758,6 +777,7 @@ func (s *Service) UpdateAppointment(id int64, input UpdateAppointmentInput) erro
 		return doctorErr
 	}
 
+	// 3. Check doctor schedule
 	dayOfWeek := strings.ToLower(desiredDate.Format("Monday"))
 	schedEntry, err := s.findOrCreateSchedule(*input.DoctorID, dayOfWeek)
 	if err != nil {

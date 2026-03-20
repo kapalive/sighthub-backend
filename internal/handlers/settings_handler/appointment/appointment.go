@@ -150,7 +150,7 @@ func (h *Handler) GetIntakeFormSettings(w http.ResponseWriter, r *http.Request) 
 
 func (h *Handler) SetAppointmentDuration(w http.ResponseWriter, r *http.Request) {
 	var body struct {
-		Duration int `json:"duration"`
+		Duration int `json:"appointment_duration"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		jsonError(w, "Invalid JSON", 400)

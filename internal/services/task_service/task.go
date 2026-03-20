@@ -503,6 +503,7 @@ func (s *Service) UpdateTask(taskID int64, input UpdateTaskInput) (*taskModel.Ta
 				newStatus = &s2
 			}
 			desc := "Task updated"
+			now := time.Now()
 			history := &taskModel.TaskHistory{
 				TaskID:        taskID,
 				OldEmployeeID: oldEmpID,
@@ -510,6 +511,7 @@ func (s *Service) UpdateTask(taskID int64, input UpdateTaskInput) (*taskModel.Ta
 				OldStatus:     oldStatus,
 				NewStatus:     newStatus,
 				Description:   &desc,
+				LastUpdate:    &now,
 			}
 			if err := tx.Create(history).Error; err != nil {
 				return err
@@ -544,6 +546,7 @@ func (s *Service) DeleteTask(taskID int64) error {
 			oldStatus := task.Status
 			newStatus := "deleted"
 			desc := "Task deleted"
+			now := time.Now()
 			h := &taskModel.TaskHistory{
 				TaskID:        taskID,
 				OldEmployeeID: task.EmployeeID,
@@ -551,6 +554,7 @@ func (s *Service) DeleteTask(taskID int64) error {
 				Description:   &desc,
 				OldStatus:     &oldStatus,
 				NewStatus:     &newStatus,
+				LastUpdate:    &now,
 			}
 			if err := tx.Create(h).Error; err != nil {
 				return err

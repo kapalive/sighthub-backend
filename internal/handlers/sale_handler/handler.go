@@ -274,7 +274,19 @@ func (h *Handler) YearlyComparisonByRep(w http.ResponseWriter, r *http.Request) 
 	endMonth := svc.ParseMonth(q.Get("end_month"), 12)
 	yearStart, yearEnd := svc.ParseYearRange(q.Get("year"))
 
-	active, inactive, err := h.svc.YearlyComparisonByRep(locationID, yearStart, yearEnd, startMonth, endMonth)
+	var vendorID, brandID *int
+	if v := q.Get("vendor_id"); v != "" {
+		if id, err := strconv.Atoi(v); err == nil {
+			vendorID = &id
+		}
+	}
+	if v := q.Get("brand_id"); v != "" {
+		if id, err := strconv.Atoi(v); err == nil {
+			brandID = &id
+		}
+	}
+
+	active, inactive, err := h.svc.YearlyComparisonByRep(locationID, yearStart, yearEnd, startMonth, endMonth, vendorID, brandID)
 	if err != nil {
 		jsonError(w, err.Error(), 500)
 		return

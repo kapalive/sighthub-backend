@@ -17,7 +17,12 @@ import (
 	"sighthub-backend/internal/handlers/settings_handler/smtp"
 	"sighthub-backend/internal/handlers/settings_handler/ticket"
 	"sighthub-backend/internal/handlers/settings_handler/vendor"
+	"net/http"
+
+	homeHandler "sighthub-backend/internal/handlers/home_handler"
+	intHandler "sighthub-backend/internal/handlers/integration_handler"
 	"sighthub-backend/internal/middleware"
+	intSvc "sighthub-backend/internal/services/integration_service"
 	"sighthub-backend/internal/services/settings_service"
 	pkgAuth "sighthub-backend/pkg/auth"
 )
@@ -199,4 +204,15 @@ func RegisterSettingsRoutes(db *gorm.DB, rdb *redis.Client, cfg *config.Config, 
 	api.HandleFunc("/job-titles", hJob.Create).Methods("POST")
 	api.HandleFunc("/job-titles/{id:[0-9]+}", hJob.Update).Methods("PUT")
 	api.HandleFunc("/job-titles/{id:[0-9]+}", hJob.Delete).Methods("DELETE")
+
+	// ── Integrations (VisionWeb, Zeiss) ─────────────────────────────────
+	hInt := intHandler.NewHandler(intSvc.New(db))
+	api.HandleFunc("/integration", hInt.ListIntegrations).Methods("GET")
+	api.HandleFunc("/integration/{code}", hInt.GetIntegration).Methods("GET")
+	api.HandleFunc("/integration/{code}", hInt.SetIntegration).Methods("POST")
+
+	// ── Set Stores List (same as /home/set-stores-list) ─────────────────
+	hHome := homeHandler.New(db)
+	storeMW := middleware.StorePermission(db, 12, 81)
+	api.Handle("/set-stores-list", storeMW(http.HandlerFunc(hHome.GetStoresList))).Methods("GET")
 }
