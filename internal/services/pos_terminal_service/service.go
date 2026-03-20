@@ -421,7 +421,7 @@ func (s *Service) PosCommit(el *EmpLocation, invoiceID int64, req PosCommitReque
 
 	empID := int64(el.Employee.IDEmployee)
 	ph := patients.PaymentHistory{
-		PatientID:            &inv.PatientID,
+		PatientID:            inv.PatientID,
 		InvoiceID:            inv.IDInvoice,
 		Amount:               amount,
 		PaymentTimestamp:      time.Now(),
@@ -434,9 +434,9 @@ func (s *Service) PosCommit(el *EmpLocation, invoiceID int64, req PosCommitReque
 
 	if leftover > 0 {
 		var cb patients.ClientBalance
-		if s.db.Where("patient_id = ? AND location_id = ?", inv.PatientID, inv.LocationID).First(&cb).Error != nil {
+		if s.db.Where("patient_id = ? AND location_id = ?", *inv.PatientID, inv.LocationID).First(&cb).Error != nil {
 			cb = patients.ClientBalance{
-				PatientID:  inv.PatientID,
+				PatientID:  *inv.PatientID,
 				Credit:     0,
 				LocationID: int(inv.LocationID),
 			}

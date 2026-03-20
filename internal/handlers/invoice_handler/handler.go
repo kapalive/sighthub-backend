@@ -3,6 +3,7 @@ package invoice_handler
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"strconv"
 	"time"
@@ -64,8 +65,11 @@ func (h *Handler) UpdateInvoice(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, "invalid JSON", http.StatusBadRequest)
 		return
 	}
+	// DEBUG: log parsed items
+	fmt.Printf("[DEBUG UpdateInvoice] invoice=%d items=%+v\n", id, body.Items)
 	result, err := h.svc.UpdateInvoice(el, id, body.DateCreate, body.Discount, body.Items)
 	if err != nil {
+		fmt.Printf("[DEBUG UpdateInvoice] error: %v\n", err)
 		jsonError(w, err.Error(), httpStatus(err))
 		return
 	}
@@ -771,6 +775,82 @@ func (h *Handler) GetTransferLocations(w http.ResponseWriter, r *http.Request) {
 	}
 	transferType := r.URL.Query().Get("type")
 	result, err := h.svc.GetTransferLocations(el, transferType)
+	if err != nil {
+		jsonError(w, err.Error(), httpStatus(err))
+		return
+	}
+	jsonResponse(w, result, http.StatusOK)
+}
+
+// ─── Local Transfers ─────────────────────────────────────────────────────────
+
+// POST /api/inventory/local-transfer
+func (h *Handler) CreateLocalTransfer(w http.ResponseWriter, r *http.Request) {
+	username := pkgAuth.UsernameFromContext(r.Context())
+	el, err := h.svc.GetEmpLocation(username)
+	if err != nil {
+		jsonError(w, err.Error(), http.StatusNotFound)
+		return
+	}
+	var req invoiceSvc.CreateInvoiceRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		jsonError(w, "invalid JSON", http.StatusBadRequest)
+		return
+	}
+	if req.ToLocationID == nil || *req.ToLocationID == 0 {
+		jsonError(w, "location_id required", http.StatusBadRequest)
+		return
+	}
+	if len(req.Items) == 0 {
+		jsonError(w, "items required", http.StatusBadRequest)
+		return
+	}
+	result, err := h.svc.DoLocalTransfer(el, req)
+	if err != nil {
+		jsonError(w, err.Error(), httpStatus(err))
+		return
+	}
+	jsonResponse(w, result, http.StatusCreated)
+}
+
+// DELETE /api/inventory/local-transfer?transaction_id=123
+func (h *Handler) ReverseLocalTransfer(w http.ResponseWriter, r *http.Request) {
+	username := pkgAuth.UsernameFromContext(r.Context())
+	el, err := h.svc.GetEmpLocation(username)
+	if err != nil {
+		jsonError(w, err.Error(), http.StatusNotFound)
+		return
+	}
+
+	txID, err := strconv.ParseInt(r.URL.Query().Get("transaction_id"), 10, 64)
+	if err != nil || txID == 0 {
+		jsonError(w, "transaction_id required", http.StatusBadRequest)
+		return
+	}
+
+	if err := h.svc.ReverseLocalTransfer(el, txID); err != nil {
+		jsonError(w, err.Error(), httpStatus(err))
+		return
+	}
+	jsonResponse(w, map[string]string{"message": "Local transfer reversed"}, http.StatusOK)
+}
+
+// GET /api/inventory/local-transfers
+func (h *Handler) GetLocalTransfers(w http.ResponseWriter, r *http.Request) {
+	username := pkgAuth.UsernameFromContext(r.Context())
+	el, err := h.svc.GetEmpLocation(username)
+	if err != nil {
+		jsonError(w, err.Error(), http.StatusNotFound)
+		return
+	}
+
+	page, _ := strconv.Atoi(r.URL.Query().Get("page"))
+	perPage, _ := strconv.Atoi(r.URL.Query().Get("per_page"))
+	dateFrom := r.URL.Query().Get("date_from")
+	dateTo := r.URL.Query().Get("date_to")
+	direction := r.URL.Query().Get("direction") // "transfer", "receipt", or empty for all
+
+	result, err := h.svc.GetLocalTransfers(el, page, perPage, dateFrom, dateTo, direction)
 	if err != nil {
 		jsonError(w, err.Error(), httpStatus(err))
 		return

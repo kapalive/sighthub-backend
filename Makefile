@@ -235,6 +235,7 @@ deps:
 
 build: deps
 	@echo "── Сборка $(APP_NAME) ──"
+	@rm -f $(BINARY)
 	CGO_ENABLED=0 $(GO_CMD) build -o $(BINARY) ./cmd/main.go
 	@echo "  ✓ Бинарник: $(BINARY)"
 
@@ -371,33 +372,19 @@ install: install-deps check setup-user build setup-secrets setup-config setup-se
 	@echo "  Запуск: make start APP_ENV=$(APP_ENV)"
 	@echo "══════════════════════════════════════════"
 
-# ─── Update (build + restart both prod & dev) ────────────────────────────────
+# ─── Update (build + systemd restart) ─────────────────────────────────────────
 
 update: build
 	@sudo chown $(SERVICE_USER):$(SERVICE_GROUP) $(BINARY)
 	@sudo chmod 750 $(BINARY)
-	@# Пробуем systemd, если не работает — убиваем по PID и стартуем
-	@if sudo systemctl restart $(APP_NAME)-prod 2>/dev/null; then \
-		echo "  ✓ $(APP_NAME)-prod перезапущен (systemd)"; \
-	else \
-		PID=$$(sudo lsof -ti:8001 2>/dev/null | head -1); \
-		if [ -n "$$PID" ]; then sudo kill $$PID 2>/dev/null; sleep 1; fi; \
-		sudo -u $(SERVICE_USER) APP_ENV=production CONFIG_FILE=$(CONFIG_DIR)/config.json \
-			nohup $(BINARY) > /var/log/$(APP_NAME)-prod.log 2>&1 & \
-		sleep 1; \
-		echo "  ✓ $(APP_NAME)-prod перезапущен (manual, port 8001)"; \
-	fi
-	@if sudo systemctl restart $(APP_NAME)-dev 2>/dev/null; then \
-		echo "  ✓ $(APP_NAME)-dev перезапущен (systemd)"; \
-	else \
-		PID=$$(sudo lsof -ti:8002 2>/dev/null | head -1); \
-		if [ -n "$$PID" ]; then sudo kill $$PID 2>/dev/null; sleep 1; fi; \
-		sudo -u $(SERVICE_USER) APP_ENV=development CONFIG_FILE=$(CONFIG_DIR)/config.development.json \
-			nohup $(BINARY) > /var/log/$(APP_NAME)-dev.log 2>&1 & \
-		sleep 1; \
-		echo "  ✓ $(APP_NAME)-dev перезапущен (manual, port 8002)"; \
-	fi
-	@echo "✓ $(APP_NAME) обновлён и перезапущен (prod + dev)"
+	@sudo systemctl daemon-reload
+	@sudo systemctl enable $(APP_NAME)-prod $(APP_NAME)-dev 2>/dev/null || true
+	@sudo systemctl restart $(APP_NAME)-prod
+	@sudo systemctl restart $(APP_NAME)-dev
+	@sleep 1
+	@sudo systemctl is-active --quiet $(APP_NAME)-prod && echo "  ✓ prod (8001) запущен" || echo "  ✗ prod НЕ ПОДНЯЛСЯ"
+	@sudo systemctl is-active --quiet $(APP_NAME)-dev  && echo "  ✓ dev  (8002) запущен" || echo "  ✗ dev НЕ ПОДНЯЛСЯ"
+	@echo "✓ $(APP_NAME) обновлён и перезапущен"
 
 # ─── Service Control ──────────────────────────────────────────────────────────
 

@@ -314,10 +314,10 @@ func (s *Service) ConfirmReturn(username string, returnID int64) (*ConfirmReturn
 
 		// Credit client balance
 		var cb patModel.ClientBalance
-		if err := tx.Where("patient_id = ? AND location_id = ?", inv.PatientID, inv.LocationID).
+		if err := tx.Where("patient_id = ? AND location_id = ?", *inv.PatientID, inv.LocationID).
 			First(&cb).Error; err != nil {
 			cb = patModel.ClientBalance{
-				PatientID:  inv.PatientID,
+				PatientID:  *inv.PatientID,
 				LocationID: int(inv.LocationID),
 				Credit:     0,
 			}
@@ -333,7 +333,7 @@ func (s *Service) ConfirmReturn(username string, returnID int64) (*ConfirmReturn
 		note := fmt.Sprintf("Confirmed Return -> added to client balance. Return ID %d", ri.ReturnID)
 		tc := patModel.TransferCredit{
 			InvoiceID: inv.IDInvoice,
-			PatientID: &inv.PatientID,
+			PatientID: inv.PatientID,
 			Amount:    totalReturnAmount,
 			Note:      &note,
 		}

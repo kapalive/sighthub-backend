@@ -446,7 +446,7 @@ func (s *Service) CreateInvoice(username string, patientID int64) (map[string]in
 		Due:           0,
 		EmployeeID:    func() *int64 { v := int64(emp.IDEmployee); return &v }(),
 		LocationID:    int64(loc.IDLocation),
-		PatientID:     patientID,
+		PatientID:     &patientID,
 	}
 
 	if err := s.db.Create(&inv).Error; err != nil {
@@ -555,7 +555,11 @@ func (s *Service) GetInvoice(username string, invoiceID int64, groupByFrame bool
 		paymentMethodName = inv.PaymentMethod.MethodName
 	}
 
-	insuranceInfo := buildInsuranceInfo(s.db, invoiceID, inv.PatientID)
+	var patID int64
+	if inv.PatientID != nil {
+		patID = *inv.PatientID
+	}
+	insuranceInfo := buildInsuranceInfo(s.db, invoiceID, patID)
 
 	var itemList []invoices.InvoiceItemSale
 	s.db.Where("invoice_id = ?", invoiceID).Find(&itemList)
@@ -767,7 +771,11 @@ func (s *Service) BuildInvoiceHTMLContext(invoiceID int64) (map[string]interface
 		derefStr(patient.ZipCode),
 	}, " "))
 
-	insuranceInfo := buildInsuranceInfo(s.db, invoiceID, inv.PatientID)
+	var patID2 int64
+	if inv.PatientID != nil {
+		patID2 = *inv.PatientID
+	}
+	insuranceInfo := buildInsuranceInfo(s.db, invoiceID, patID2)
 
 	var itemList []invoices.InvoiceItemSale
 	s.db.Where("invoice_id = ?", invoiceID).Find(&itemList)

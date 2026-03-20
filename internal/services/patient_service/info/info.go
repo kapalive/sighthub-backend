@@ -54,7 +54,7 @@ type PatientDetail struct {
 	AssignedSex       string      `json:"assigned_sex"`
 	MailingList       bool        `json:"mailing_list"`
 	Survey            bool        `json:"survey"`
-	PreferredLanguage interface{} `json:"preferred_language"`
+	PreferredLanguageID interface{} `json:"preferred_language_id"`
 	PatientCredit     string      `json:"patient_credit"`
 }
 
@@ -290,15 +290,9 @@ func (s *Service) GetPatient(username string, patientID int64) (*PatientDetail, 
 	}
 
 	// preferred_language
-	var prefLang interface{}
+	var prefLangID interface{}
 	if patient.PreferredLanguageID != nil {
-		var lang patModel.PreferredLanguage
-		if s.db.First(&lang, *patient.PreferredLanguageID).Error == nil {
-			prefLang = map[string]interface{}{
-				"id_preferred_language": lang.IDPreferredLanguage,
-				"lang":                  lang.Language,
-			}
-		}
+		prefLangID = *patient.PreferredLanguageID
 	}
 
 	dob := ""
@@ -328,7 +322,7 @@ func (s *Service) GetPatient(username string, patientID int64) (*PatientDetail, 
 		AssignedSex:       derefStr(patient.AssignedSex),
 		MailingList:       derefBool(patient.MailingList),
 		Survey:            derefBool(patient.Survey),
-		PreferredLanguage: prefLang,
+		PreferredLanguageID: prefLangID,
 		PatientCredit:     fmt.Sprintf("%.2f", credit),
 	}, nil
 }

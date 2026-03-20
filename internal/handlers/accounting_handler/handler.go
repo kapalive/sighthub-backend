@@ -116,7 +116,8 @@ func (h *Handler) GetVendorInvoicesList(w http.ResponseWriter, r *http.Request) 
 	if perPage < 1 {
 		perPage = 20
 	}
-	result, err := h.svc.GetVendorInvoicesList(vendorID, page, perPage)
+	username := pkgAuth.UsernameFromContext(r.Context())
+	result, err := h.svc.GetVendorInvoicesList(username, vendorID, page, perPage)
 	if err != nil {
 		jsonResponse(w, errorStatus(err), map[string]string{"error": err.Error()})
 		return

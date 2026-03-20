@@ -38,7 +38,7 @@ type Invoice struct {
 	DoctorID            *int64                    `gorm:"column:doctor_id"                                        json:"doctor_id,omitempty"`
 	LocationID          int64                     `gorm:"column:location_id"                                       json:"location_id"`
 	ToLocationID        *int64                    `gorm:"column:to_location_id"                                   json:"to_location_id,omitempty"`
-	PatientID           int64                     `gorm:"column:patient_id"                                        json:"patient_id"`
+	PatientID           *int64                    `gorm:"column:patient_id"                                        json:"patient_id,omitempty"`
 	VendorID            *int64                    `gorm:"column:vendor_id"                                         json:"vendor_id,omitempty"`
 	InsurancePolicyID   *int64                    `gorm:"column:insurance_policy_id"                              json:"insurance_policy_id,omitempty"`
 	Remake              bool                      `gorm:"column:remake;default:false"                              json:"remake"`

@@ -54,7 +54,7 @@ func (s *Service) GetReturnInvoices(el *EmpLocation, f ReturnInvoiceFilter) (int
 
 	var rtvInvoices []vendors.ReturnToVendorInvoice
 	s.db.Where("id_return_to_vendor_invoice IN ?", invoiceIDs).
-		Preload("Vendor").Preload("Items").Find(&rtvInvoices)
+		Preload("Vendor").Find(&rtvInvoices)
 
 	if f.GroupByVendor {
 		grouped := make(map[int64]map[string]interface{})

@@ -92,7 +92,7 @@ func (s *Service) AddPatientPayment(username string, invoiceID int64, input Pati
 
 		empID := int64(emp.IDEmployee)
 		ph := patModel.PaymentHistory{
-			PatientID:        &inv.PatientID,
+			PatientID:        inv.PatientID,
 			InvoiceID:        invoiceID,
 			Amount:           amount,
 			PaymentTimestamp: time.Now(),
@@ -113,10 +113,10 @@ func (s *Service) AddPatientPayment(username string, invoiceID int64, input Pati
 			if leftover > 0 {
 				creditAdded = leftover
 				var cb patModel.ClientBalance
-				err := tx.Where("patient_id = ? AND location_id = ?", inv.PatientID, inv.LocationID).First(&cb).Error
+				err := tx.Where("patient_id = ? AND location_id = ?", *inv.PatientID, inv.LocationID).First(&cb).Error
 				if err != nil {
 					cb = patModel.ClientBalance{
-						PatientID:  inv.PatientID,
+						PatientID:  *inv.PatientID,
 						LocationID: int(inv.LocationID),
 						Credit:     0,
 					}
@@ -199,7 +199,7 @@ func (s *Service) PayWithCredit(username string, invoiceID int64, input CreditPa
 		pmID := int64(20)
 		empID := int64(emp.IDEmployee)
 		ph := patModel.PaymentHistory{
-			PatientID:        &inv.PatientID,
+			PatientID:        inv.PatientID,
 			InvoiceID:        invoiceID,
 			Amount:           creditAmount,
 			PaymentTimestamp: time.Now(),
@@ -846,7 +846,7 @@ func (s *Service) TransferCredit(username string, invoiceID int64, input Transfe
 		empID := int64(emp.IDEmployee)
 		note := fmt.Sprintf("Transfer credit from %s %s", payer.FirstName, payer.LastName)
 		ph := patModel.PaymentHistory{
-			PatientID:        &inv.PatientID,
+			PatientID:        inv.PatientID,
 			InvoiceID:        invoiceID,
 			Amount:           amount,
 			PaymentTimestamp: time.Now(),

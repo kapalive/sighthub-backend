@@ -154,8 +154,19 @@ func (s *Service) GetEmployeeLocationID(username string) (int, error) {
 	return locID, nil
 }
 
-func (s *Service) GetLocations() ([]LocationItem, error) {
-	rows, err := s.db.Raw(`SELECT id_location, full_name FROM location ORDER BY full_name`).Rows()
+func (s *Service) GetLocations(username string) ([]LocationItem, error) {
+	rows, err := s.db.Raw(`
+		SELECT DISTINCT l.id_location, l.full_name
+		FROM employee_permission ep
+		JOIN employee_login el ON el.id_employee_login = ep.employee_login_id
+		JOIN permissions_combination pc ON pc.id_permissions_combination = ep.permissions_combination_id
+		JOIN permissions_sub_block_store psbs ON psbs.id_permissions_sub_block = pc.permissions_sub_block_store_id
+		JOIN location l ON l.id_location = psbs.store_id
+		WHERE el.employee_login = ?
+		  AND ep.is_active = true
+		  AND pc.permissions_id IN (41,42,43,44,45,46)
+		ORDER BY l.full_name
+	`, username).Rows()
 	if err != nil {
 		return nil, err
 	}
@@ -259,13 +270,18 @@ var PB_KEY_MAP = map[string]string{
 
 func (s *Service) GetSaleItems(
 	locationID int, dateStart, dateEnd time.Time,
-	employeeID *int, showInterCompany bool,
+	employeeID *int,
 	pbKey *string, invoiceContains *string,
 	saleKeyFilter *string, saleKeyContains *string,
 	sunOnly bool, totalBy string,
 	minBal, maxBal *float64,
 	vendorID, brandID *int,
 ) ([]SaleItem, error) {
+
+	// Validate min/max balance
+	if minBal != nil && maxBal != nil && *minBal > *maxBal {
+		return []SaleItem{}, nil
+	}
 
 	query := `
 		SELECT i.number_invoice,
@@ -289,8 +305,8 @@ func (s *Service) GetSaleItems(
 		      AND inv.id_inventory = iis.item_id
 		LEFT JOIN price_book pb ON pb.inventory_id = inv.id_inventory`
 
-	// additional joins for vendor/brand filtering
-	needProductJoin := false
+	// additional joins for vendor/brand filtering or sun_only
+	needProductJoin := sunOnly
 	needLensJoin := false
 	needCLJoin := false
 
@@ -338,9 +354,8 @@ func (s *Service) GetSaleItems(
 		args = append(args, *employeeID)
 	}
 
-	if !showInterCompany {
-		query += ` AND i.number_invoice NOT ILIKE 'I%'`
-	}
+	// Always exclude inter-company transfer invoices from sale reports
+	query += ` AND i.number_invoice NOT ILIKE 'I%'`
 
 	if effectivePbKey != "" {
 		query += ` AND LOWER(TRIM(CAST(iis.item_type AS TEXT))) = ?`
@@ -353,8 +368,27 @@ func (s *Service) GetSaleItems(
 	}
 
 	if saleKeyFilter != nil {
+		// Map frontend values to DB values
+		skMap := map[string]string{
+			"frame":        "frames",
+			"frames":       "frames",
+			"lens":         "lens options",
+			"lens_options":  "lens options",
+			"contact_lens": "contact lens",
+			"contact lens": "contact lens",
+			"add_service":  "add service",
+			"add service":  "add service",
+			"treatment":    "treatment",
+			"prof_service": "prof. service",
+			"prof. service": "prof. service",
+			"insurance":    "insurance",
+		}
+		skLower := strings.ToLower(*saleKeyFilter)
+		if mapped, ok := skMap[skLower]; ok {
+			skLower = mapped
+		}
 		query += ` AND LOWER(TRIM(CAST(iis.sale_key AS TEXT))) = ?`
-		args = append(args, strings.ToLower(*saleKeyFilter))
+		args = append(args, skLower)
 	}
 
 	if saleKeyContains != nil {
@@ -363,21 +397,24 @@ func (s *Service) GetSaleItems(
 	}
 
 	if sunOnly {
-		query += ` AND iis.description ILIKE '%SUN%'`
+		query += ` AND LOWER(TRIM(CAST(iis.item_type AS TEXT))) = 'frames'
+		           AND inv.id_inventory IS NOT NULL
+		           AND m.sunglass = true`
 	}
 
-	if totalBy == "pt_bal" {
+	switch totalBy {
+	case "patient_sale", "pt_bal", "patient":
 		query += ` AND i.pt_bal > 0`
-	} else if totalBy == "ins_bal" {
+	case "insurance", "ins_bal":
 		query += ` AND i.ins_bal > 0`
 	}
 
 	if minBal != nil {
-		query += ` AND i.final_amount >= ?`
+		query += ` AND (iis.price * iis.quantity) >= ?`
 		args = append(args, *minBal)
 	}
 	if maxBal != nil {
-		query += ` AND i.final_amount <= ?`
+		query += ` AND (iis.price * iis.quantity) <= ?`
 		args = append(args, *maxBal)
 	}
 
@@ -413,7 +450,7 @@ func (s *Service) GetSaleItems(
 	}
 	defer rows.Close()
 
-	var items []SaleItem
+	items := make([]SaleItem, 0)
 	for rows.Next() {
 		var (
 			invNum, desc                  string

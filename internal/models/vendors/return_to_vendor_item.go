@@ -1,10 +1,7 @@
 // internal/models/vendors/return_to_vendor_item.go
 package vendors
 
-import (
-	"fmt"
-	"sighthub-backend/internal/models/interfaces"
-)
+import "fmt"
 
 // ReturnToVendorItem представляет модель для возврата товаров поставщикам
 type ReturnToVendorItem struct {
@@ -14,9 +11,7 @@ type ReturnToVendorItem struct {
 	ReasonReturn            string  `gorm:"column:reason_return;type:reason_return_vendor;not null"                      json:"reason_return"`
 	PurchaseCost            float64 `gorm:"column:purchase_cost;type:numeric(10,2);not null;default:0.00"               json:"purchase_cost"`
 
-	// Используем интерфейс вместо импорта модели
-	ReturnToVendorInvoice ReturnToVendorInvoice         `gorm:"foreignKey:ReturnToVendorInvoiceID;references:IDReturnToVendorInvoice" json:"-"`
-	Inventory             interfaces.InventoryInterface `gorm:"foreignKey:InventoryID;references:IDInventory"                         json:"-"`
+	ReturnToVendorInvoice ReturnToVendorInvoice `gorm:"foreignKey:ReturnToVendorInvoiceID;references:IDReturnToVendorInvoice" json:"-"`
 }
 
 func (ReturnToVendorItem) TableName() string { return "return_to_vendor_item" }

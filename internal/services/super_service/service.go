@@ -241,7 +241,7 @@ func (s *Service) CreateSuperInvoice(username string, examID int64, input Invoic
 		CreatedAt:     now,
 		EmployeeID:    &empID,
 		LocationID:    int64(exam.LocationID),
-		PatientID:     exam.PatientID,
+		PatientID:     &exam.PatientID,
 		TotalAmount:   0,
 		PTBal:         0,
 		InsBal:        0,

@@ -496,9 +496,9 @@ func (s *Service) GetDailyCloseDetail(username, dateStr string) (map[string]inte
 
 		// Customer
 		customerStr := "No Patient"
-		if inv.PatientID > 0 {
+		if inv.PatientID != nil && *inv.PatientID > 0 {
 			var pat patientModel.Patient
-			if s.db.First(&pat, inv.PatientID).Error == nil {
+			if s.db.First(&pat, *inv.PatientID).Error == nil {
 				custName := strings.TrimSpace(pat.FirstName + " " + pat.LastName)
 				if pat.Email != nil && *pat.Email != "" {
 					if custName != "" {

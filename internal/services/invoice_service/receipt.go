@@ -230,9 +230,25 @@ func (s *Service) buildItemRow(invID int64, iType string, ts time.Time) *Receipt
 // ─── Confirm Receipt ──────────────────────────────────────────────────────────
 
 type ConfirmReceiptRequest struct {
-	InvoiceID   int64  `json:"invoice_id"`
-	SKU         string `json:"sku"`
-	InventoryID *int64 `json:"inventory_id"`
+	InvoiceID   interface{} `json:"invoice_id"`
+	SKU         string      `json:"sku"`
+	InventoryID *int64      `json:"inventory_id"`
+	parsedInvID int64
+}
+
+func (r *ConfirmReceiptRequest) GetInvoiceID() int64 {
+	if r.parsedInvID != 0 {
+		return r.parsedInvID
+	}
+	switch v := r.InvoiceID.(type) {
+	case float64:
+		r.parsedInvID = int64(v)
+	case string:
+		fmt.Sscanf(v, "%d", &r.parsedInvID)
+	case int64:
+		r.parsedInvID = v
+	}
+	return r.parsedInvID
 }
 
 type ConfirmReceiptResult struct {
@@ -241,7 +257,8 @@ type ConfirmReceiptResult struct {
 }
 
 func (s *Service) ConfirmReceipt(el *EmpLocation, req ConfirmReceiptRequest) (*ConfirmReceiptResult, error) {
-	if req.InvoiceID == 0 {
+	invoiceID := req.GetInvoiceID()
+	if invoiceID == 0 {
 		return nil, fmt.Errorf("%w: invoice_id required", ErrBadRequest)
 	}
 	if req.SKU == "" && req.InventoryID == nil {
@@ -249,15 +266,17 @@ func (s *Service) ConfirmReceipt(el *EmpLocation, req ConfirmReceiptRequest) (*C
 	}
 
 	var inv invoices.Invoice
-	if err := s.db.First(&inv, req.InvoiceID).Error; err != nil {
+	if err := s.db.First(&inv, invoiceID).Error; err != nil {
 		return nil, ErrNotFound
 	}
 
 	var item invModel.Inventory
 	if req.SKU != "" {
-		if err := s.db.Where("sku = ?", req.SKU).First(&item).Error; err != nil {
+		found, err := s.findInventoryBySKU(req.SKU)
+		if err != nil {
 			return nil, ErrNotFound
 		}
+		item = *found
 	} else {
 		if err := s.db.First(&item, *req.InventoryID).Error; err != nil {
 			return nil, ErrNotFound
@@ -306,7 +325,7 @@ func (s *Service) ConfirmReceipt(el *EmpLocation, req ConfirmReceiptRequest) (*C
 			FromLocationID:  txn.FromLocationID,
 			ToLocationID:    &locID,
 			TransferredBy:   txn.TransferredBy,
-			InvoiceID:       &req.InvoiceID,
+			InvoiceID:       &invoiceID,
 			StatusItems:     "Ready for Sale",
 			TransactionType: "Received from location",
 			DateTransaction: now,
@@ -317,12 +336,12 @@ func (s *Service) ConfirmReceipt(el *EmpLocation, req ConfirmReceiptRequest) (*C
 			InventoryID:    item.IDInventory,
 			FromLocationID: fromLocID,
 			ToLocationID:   locID,
-			TransferredBy:  txn.TransferredBy,
-			ReceivedBy:     empID,
+			TransferredBy:  &txn.TransferredBy,
+			ReceivedBy:     &empID,
 			StatusItems:    "Ready for Sale",
 			InvoiceID:      txnInvoiceID,
 			InvoiceFrom:    txn.InvoiceID,
-			InvoiceTo:      &req.InvoiceID,
+			InvoiceTo:      &invoiceID,
 		}
 		s.db.Create(&transfer)
 

@@ -14,6 +14,12 @@ type PlaningCommunication struct {
 	Note                   *string    `gorm:"column:note;type:text"                                    json:"note,omitempty"`
 	SourceTable            *string    `gorm:"column:source_table;type:varchar(50);index"               json:"source_table,omitempty"`
 	SourceID               *int64     `gorm:"column:source_id;index"                                   json:"source_id,omitempty"`
+
+	// Call tracking
+	CallStatus    *string    `gorm:"column:call_status;type:varchar(20);default:'pending'"  json:"call_status,omitempty"`
+	CallAttempts  int        `gorm:"column:call_attempts;default:0"                         json:"call_attempts"`
+	LastAttemptAt *time.Time `gorm:"column:last_attempt_at;type:timestamptz"                json:"last_attempt_at,omitempty"`
+	LastAttemptBy *int64     `gorm:"column:last_attempt_by"                                 json:"last_attempt_by,omitempty"`
 }
 
 func (PlaningCommunication) TableName() string { return "planing_communication" }

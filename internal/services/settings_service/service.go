@@ -474,6 +474,8 @@ func (s *Service) CreateLensMaterial(name string, idx *float64, desc *string) (m
 }
 
 func (s *Service) UpdateLensMaterial(id int, data map[string]interface{}) error {
+	delete(data, "id_lens_material")
+	delete(data, "id_lenses_materials")
 	return s.DB.Model(&lenses.LensesMaterial{}).Where("id_lenses_materials = ?", id).Updates(data).Error
 }
 

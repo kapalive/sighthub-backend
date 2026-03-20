@@ -15,11 +15,10 @@ type InventoryTransfer struct {
 	FromLocationID int64     `gorm:"column:from_location_id;not null" json:"from_location_id"`
 	ToLocationID   int64     `gorm:"column:to_location_id;not null" json:"to_location_id"`
 	DateTransfer   time.Time `gorm:"column:date_transfer;default:CURRENT_TIMESTAMP" json:"date_transfer"`
-	TransferredBy  int64     `gorm:"column:transferred_by" json:"transferred_by"`
-	ReceivedBy     int64     `gorm:"column:received_by" json:"received_by"`
+	TransferredBy  *int64    `gorm:"column:transferred_by" json:"transferred_by,omitempty"`
+	ReceivedBy     *int64    `gorm:"column:received_by" json:"received_by,omitempty"`
 	StatusItems    types.StatusItemsInventory `gorm:"column:status_items;not null" json:"status_items"`
 	InvoiceID      int64     `gorm:"column:invoice_id;not null" json:"invoice_id"`
-	OldInvoiceID   *int64    `gorm:"column:old_invoice_id" json:"old_invoice_id,omitempty"`
 	InvoiceFrom    *int64    `gorm:"column:invoice_from" json:"invoice_from,omitempty"`
 	InvoiceTo      *int64    `gorm:"column:invoice_to" json:"invoice_to,omitempty"`
 	SystemNote     *string   `gorm:"column:system_note" json:"system_note,omitempty"`
@@ -42,7 +41,6 @@ func (i *InventoryTransfer) ToMap() map[string]interface{} {
 		"received_by":      i.ReceivedBy,
 		"status_items":     i.StatusItems,
 		"invoice_id":       i.InvoiceID,
-		"old_invoice_id":   i.OldInvoiceID,
 		"invoice_from":     i.InvoiceFrom,
 		"invoice_to":       i.InvoiceTo,
 		"system_note":      i.SystemNote,
@@ -67,25 +65,23 @@ func (i *InventoryTransfer) GetToLocation(locationVendor interfaces.LocationInte
 
 // Получить данные о сотруднике, который выполнил трансфер
 func (i *InventoryTransfer) GetTransferredBy(employeeVendor interfaces.EmployeeInterface) (map[string]interface{}, error) {
-	return employeeVendor.GetEmployeeByID(i.TransferredBy)
+	if i.TransferredBy == nil {
+		return nil, nil
+	}
+	return employeeVendor.GetEmployeeByID(*i.TransferredBy)
 }
 
 // Получить данные о сотруднике, который принял трансфер
 func (i *InventoryTransfer) GetReceivedBy(employeeVendor interfaces.EmployeeInterface) (map[string]interface{}, error) {
-	return employeeVendor.GetEmployeeByID(i.ReceivedBy)
+	if i.ReceivedBy == nil {
+		return nil, nil
+	}
+	return employeeVendor.GetEmployeeByID(*i.ReceivedBy)
 }
 
 // Получить инвойс по ID через интерфейс Invoice
 func (i *InventoryTransfer) GetInvoice(invoiceVendor interfaces.InvoiceInterface) (map[string]interface{}, error) {
 	return invoiceVendor.GetInvoiceByID(i.InvoiceID)
-}
-
-// Получить старый инвойс через интерфейс Invoice
-func (i *InventoryTransfer) GetOldInvoice(invoiceVendor interfaces.InvoiceInterface) (map[string]interface{}, error) {
-	if i.OldInvoiceID == nil {
-		return nil, nil
-	}
-	return invoiceVendor.GetInvoiceByID(*i.OldInvoiceID)
 }
 
 // Получить инвойс "From" через интерфейс Invoice

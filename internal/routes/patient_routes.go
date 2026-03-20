@@ -19,6 +19,7 @@ import (
 	"sighthub-backend/internal/middleware"
 	infoSvc "sighthub-backend/internal/services/patient_service/info"
 	invSvc "sighthub-backend/internal/services/patient_service/invoice"
+	recallSvc "sighthub-backend/internal/services/patient_service/recall"
 	rxSvc "sighthub-backend/internal/services/patient_service/rx"
 	pkgAuth "sighthub-backend/pkg/auth"
 )
@@ -28,6 +29,7 @@ func RegisterPatientRoutes(db *gorm.DB, rdb *redis.Client, cfg *config.Config, r
 	infoService := infoSvc.New(db, cfg.DBName)
 	rxService   := rxSvc.New(db)
 	invoiceService := invSvc.New(db)
+	recallService := recallSvc.New(db)
 
 	// ─── Handlers ──────────────────────────────────────────────────────────────
 	ih  := infoHandler.New(infoService)
@@ -37,6 +39,7 @@ func RegisterPatientRoutes(db *gorm.DB, rdb *redis.Client, cfg *config.Config, r
 	ish := insHandler.New(db)
 	ch  := commHandler.New(db)
 	rch := recallHandler.New(db)
+	rlh := recallHandler.NewListHandler(recallService)
 	rpt := reportHandler.New(db)
 
 	// ─── Middleware ────────────────────────────────────────────────────────────
@@ -100,6 +103,9 @@ func RegisterPatientRoutes(db *gorm.DB, rdb *redis.Client, cfg *config.Config, r
 	api.HandleFunc("/{patient_id:[0-9]+}/log-call", ch.LogCall).Methods("POST")
 
 	// ─── Recall routes ─────────────────────────────────────────────────────────
+
+	api.HandleFunc("/recall-list", rlh.GetRecallList).Methods("GET")
+	api.HandleFunc("/recall/{recall_id:[0-9]+}/result", rlh.LogCallResult).Methods("POST")
 
 	api.HandleFunc("/{patient_id:[0-9]+}/recall", rch.GetRecalls).Methods("GET")
 	api.HandleFunc("/{patient_id:[0-9]+}/recall", rch.CreateRecall).Methods("POST")

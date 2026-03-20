@@ -212,7 +212,7 @@ func (s *Service) GetInvoiceByID(ctx context.Context, invoiceID int64) (*Invoice
 		DoctorID:            inv.DoctorID,
 		LocationID:          inv.LocationID,
 		ToLocationID:        inv.ToLocationID,
-		PatientID:           inv.PatientID,
+		PatientID:           func() int64 { if inv.PatientID != nil { return *inv.PatientID }; return 0 }(),
 		VendorID:            func() int64 { if inv.VendorID != nil { return *inv.VendorID }; return 0 }(),
 		InsurancePolicyID:   inv.InsurancePolicyID,
 		Remake:              inv.Remake,

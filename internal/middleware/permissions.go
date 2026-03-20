@@ -425,6 +425,39 @@ func ActivePermission(db *gorm.DB, permissionID int) func(http.Handler) http.Han
 	}
 }
 
+// AnyActivePermission checks that the user has at least one active permission from the list.
+func AnyActivePermission(db *gorm.DB, permissionIDs ...int) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			username := pkgAuth.UsernameFromContext(r.Context())
+			if username == "" {
+				jsonErr(w, "Unauthorized", http.StatusUnauthorized)
+				return
+			}
+
+			var login authModel.EmployeeLogin
+			if err := db.Where("employee_login = ?", username).First(&login).Error; err != nil {
+				jsonErr(w, "User not found", http.StatusNotFound)
+				return
+			}
+
+			var count int64
+			db.Table("employee_permission ep").
+				Joins("JOIN permissions_combination pc ON pc.id_permissions_combination = ep.permissions_combination_id").
+				Where("ep.employee_login_id = ? AND ep.is_active = true AND pc.permissions_id IN ?",
+					login.IDEmployeeLogin, permissionIDs).
+				Count(&count)
+
+			if count == 0 {
+				jsonErr(w, "Permission denied", http.StatusForbidden)
+				return
+			}
+
+			next.ServeHTTP(w, r)
+		})
+	}
+}
+
 // ─── GetPermittedLocationIDs helper ───────────────────────────────────────────
 //
 // Standalone helper (not middleware) that returns permitted location IDs

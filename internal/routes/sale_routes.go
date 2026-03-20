@@ -19,7 +19,7 @@ func RegisterSaleRoutes(db *gorm.DB, rdb *redis.Client, cfg *config.Config, r *m
 	h := sale_handler.New(s, db)
 
 	jwtMW := pkgAuth.JWTMiddleware(cfg.JWTSecretKey, rdb)
-	baseMW := middleware.ActivePermission(db, 41)
+	baseMW := middleware.AnyActivePermission(db, 41, 42, 43, 44, 45, 46)
 
 	api := r.PathPrefix("/api/sale").Subrouter()
 	api.Use(jwtMW, baseMW)

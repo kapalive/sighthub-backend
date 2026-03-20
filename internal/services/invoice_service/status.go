@@ -2,6 +2,7 @@ package invoice_service
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	"gorm.io/gorm"
@@ -126,23 +127,23 @@ func (s *Service) GetTransferLocations(el *EmpLocation, transferType string) ([]
 	var locs []location.Location
 
 	if transferType == "local" {
-		q := s.db.Model(&location.Location{})
-		hasFilter := false
-
+		// Same store/warehouse group, excluding current location (like Python)
+		var orConds []string
+		var orArgs []interface{}
 		if el.Location.StoreID != 0 {
-			q = q.Or("store_id = ?", el.Location.StoreID)
-			hasFilter = true
+			orConds = append(orConds, "store_id = ?")
+			orArgs = append(orArgs, el.Location.StoreID)
 		}
 		if el.Location.WarehouseID != nil {
-			q = q.Or("warehouse_id = ?", *el.Location.WarehouseID)
-			hasFilter = true
+			orConds = append(orConds, "warehouse_id = ?")
+			orArgs = append(orArgs, *el.Location.WarehouseID)
 		}
-		if !hasFilter {
+		if len(orConds) == 0 {
 			return []map[string]interface{}{}, nil
 		}
-
-		q = q.Where("id_location != ?", el.Location.IDLocation)
-		if err := q.Find(&locs).Error; err != nil && err != gorm.ErrRecordNotFound {
+		orSQL := "(" + strings.Join(orConds, " OR ") + ") AND id_location != ?"
+		orArgs = append(orArgs, el.Location.IDLocation)
+		if err := s.db.Where(orSQL, orArgs...).Find(&locs).Error; err != nil && err != gorm.ErrRecordNotFound {
 			return nil, err
 		}
 	} else {

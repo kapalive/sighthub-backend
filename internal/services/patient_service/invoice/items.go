@@ -582,7 +582,7 @@ func (s *Service) AddGiftCard(username string, invoiceID int64, input AddGiftCar
 		pmID := int64(14)
 		empID := int64(emp.IDEmployee)
 		ph := patModel.PaymentHistory{
-			PatientID:        &inv.PatientID,
+			PatientID:        inv.PatientID,
 			InvoiceID:        invoiceID,
 			Amount:           gcAmount,
 			PaymentTimestamp: time.Now(),
@@ -595,7 +595,7 @@ func (s *Service) AddGiftCard(username string, invoiceID int64, input AddGiftCar
 
 		gcID := input.GiftCardID
 		invIDInt := int(invoiceID)
-		patIDInt := int(inv.PatientID)
+		patIDInt := func() int { if inv.PatientID != nil { return int(*inv.PatientID) }; return 0 }()
 		gct := marketingModel.GiftCardTransaction{
 			GiftCardID:           &gcID,
 			TransactionType:      "usage",

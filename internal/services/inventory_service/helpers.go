@@ -16,6 +16,7 @@ func (s *Service) GetVendorsWithBrands() ([]map[string]interface{}, error) {
 		FROM vendor v
 		JOIN vendor_brand vb ON v.id_vendor = vb.id_vendor
 		WHERE v.frames = true
+		ORDER BY v.vendor_name
 	`).Scan(&rows).Error
 	if err != nil {
 		return nil, err

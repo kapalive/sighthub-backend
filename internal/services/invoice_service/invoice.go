@@ -12,7 +12,286 @@ import (
 	"sighthub-backend/internal/models/invoices"
 	"sighthub-backend/internal/models/location"
 	"sighthub-backend/internal/models/types"
+	pkgSKU "sighthub-backend/pkg/sku"
 )
+
+// ─── Local Transfer (no invoice) ──────────────────────────────────────────────
+
+func (s *Service) handleLocalTransfer(el *EmpLocation, req CreateInvoiceRequest) (*CreateInvoiceResult, error) {
+	toLocID := *req.ToLocationID
+	empID := int64(el.Employee.IDEmployee)
+	fromLocID := int64(el.Location.IDLocation)
+
+	var targetLoc location.Location
+	if err := s.db.First(&targetLoc, toLocID).Error; err != nil {
+		return nil, fmt.Errorf("%w: target location not found", ErrBadRequest)
+	}
+
+	_, items, err := s.calculateTotal("I", req.Items)
+	if err != nil {
+		return nil, err
+	}
+
+	for i := range items {
+		item := &items[i]
+		if item.LocationID != fromLocID {
+			fmt.Printf("[DEBUG local] item %d loc=%d fromLoc=%d\n", item.IDInventory, item.LocationID, fromLocID)
+			return nil, fmt.Errorf("%w: item %d does not belong to current location (item_loc=%d, emp_loc=%d)", ErrBadRequest, item.IDInventory, item.LocationID, fromLocID)
+		}
+		st := string(item.StatusItemsInventory)
+		if st != "Ready for Sale" && st != "Defective" {
+			return nil, fmt.Errorf("%w: item %d has status '%s' and cannot be transferred", ErrBadRequest, item.IDInventory, st)
+		}
+
+		oldInvoiceID := item.InvoiceID
+		item.LocationID = toLocID
+		// Status stays the same — local transfer
+		s.db.Save(item)
+
+		s.db.Create(&invModel.InventoryTransfer{
+			InventoryID:    item.IDInventory,
+			FromLocationID: fromLocID,
+			ToLocationID:   toLocID,
+			TransferredBy:  &empID,
+			StatusItems:    item.StatusItemsInventory,
+			InvoiceID:      oldInvoiceID,
+			InvoiceFrom:    &oldInvoiceID,
+			SystemNote:     strPtr(fmt.Sprintf("Local transfer item %d from %d to %d", item.IDInventory, fromLocID, toLocID)),
+		})
+		s.db.Create(&invModel.InventoryTransaction{
+			InventoryID:     &item.IDInventory,
+			FromLocationID:  &fromLocID,
+			ToLocationID:    &toLocID,
+			TransferredBy:   empID,
+			TransactionType: "Local",
+			StatusItems:     item.StatusItemsInventory,
+			OldInvoiceID:    &oldInvoiceID,
+		})
+	}
+
+	empName := el.Employee.FirstName + " " + el.Employee.LastName
+	return &CreateInvoiceResult{
+		Message:        "Local transfer completed",
+		Employee:       empName,
+		TotalQuantity:  len(items),
+		ToLocationID:   &toLocID,
+		ToLocationName: &targetLoc.FullName,
+	}, nil
+}
+
+// ─── Do Local Transfer (explicit, no invoice) ───────────────────────────────
+
+func (s *Service) DoLocalTransfer(el *EmpLocation, req CreateInvoiceRequest) (*CreateInvoiceResult, error) {
+	if req.ToLocationID == nil {
+		return nil, fmt.Errorf("%w: location_id required", ErrBadRequest)
+	}
+	return s.handleLocalTransfer(el, req)
+}
+
+// ─── Reverse Local Transfer ──────────────────────────────────────────────────
+
+func (s *Service) ReverseLocalTransfer(el *EmpLocation, transactionID int64) error {
+	var tx invModel.InventoryTransaction
+	if err := s.db.Where("id_transaction = ? AND transaction_type = ?", transactionID, "Local").First(&tx).Error; err != nil {
+		return fmt.Errorf("%w: local transfer transaction not found", ErrNotFound)
+	}
+
+	locID := int64(el.Location.IDLocation)
+	// Employee must be in from or to location
+	if (tx.FromLocationID == nil || *tx.FromLocationID != locID) &&
+		(tx.ToLocationID == nil || *tx.ToLocationID != locID) {
+		return fmt.Errorf("%w: transaction does not belong to your location", ErrForbidden)
+	}
+
+	if tx.InventoryID == nil {
+		return fmt.Errorf("%w: transaction has no inventory_id", ErrBadRequest)
+	}
+
+	var item invModel.Inventory
+	if err := s.db.Where("id_inventory = ?", *tx.InventoryID).First(&item).Error; err != nil {
+		return fmt.Errorf("%w: inventory item not found", ErrNotFound)
+	}
+
+	// Item must currently be at the to_location (where it was sent)
+	if tx.ToLocationID == nil || item.LocationID != *tx.ToLocationID {
+		return fmt.Errorf("%w: item is no longer at the transfer destination, cannot reverse", ErrBadRequest)
+	}
+
+	empID := int64(el.Employee.IDEmployee)
+	fromLocID := *tx.ToLocationID   // reverse: from = old to
+	toLocID := *tx.FromLocationID   // reverse: to = old from
+
+	item.LocationID = toLocID
+	s.db.Save(&item)
+
+	// Log reverse transaction
+	s.db.Create(&invModel.InventoryTransaction{
+		InventoryID:     tx.InventoryID,
+		FromLocationID:  &fromLocID,
+		ToLocationID:    &toLocID,
+		TransferredBy:   empID,
+		TransactionType: "Local",
+		StatusItems:     item.StatusItemsInventory,
+		Notes:           strPtr(fmt.Sprintf("Reversed transaction %d", transactionID)),
+	})
+
+	s.db.Create(&invModel.InventoryTransfer{
+		InventoryID:    *tx.InventoryID,
+		FromLocationID: fromLocID,
+		ToLocationID:   toLocID,
+		TransferredBy:  &empID,
+		StatusItems:    item.StatusItemsInventory,
+		SystemNote:     strPtr(fmt.Sprintf("Reversed local transfer (original tx %d)", transactionID)),
+	})
+
+	return nil
+}
+
+// ─── Local Transfers List ────────────────────────────────────────────────────
+
+type LocalTransferItem struct {
+	TransactionID  int64   `json:"transaction_id"`
+	Direction      string  `json:"direction"` // "transfer" or "receipt"
+	InventoryID    int64   `json:"inventory_id"`
+	SKU            string  `json:"sku"`
+	FromLocationID int64   `json:"from_location_id"`
+	FromLocation   string  `json:"from_location"`
+	ToLocationID   int64   `json:"to_location_id"`
+	ToLocation     string  `json:"to_location"`
+	Date           string  `json:"date"`
+	Status         string  `json:"status"`
+	Employee       string  `json:"employee"`
+	ProductTitle   string  `json:"product_title,omitempty"`
+	VariantTitle   string  `json:"variant_title,omitempty"`
+	BrandName      string  `json:"brand_name,omitempty"`
+}
+
+type LocalTransfersResult struct {
+	TotalItems  int64                `json:"total_items"`
+	TotalPages  int64                `json:"total_pages"`
+	CurrentPage int                  `json:"current_page"`
+	PerPage     int                  `json:"per_page"`
+	Items       []LocalTransferItem  `json:"items"`
+}
+
+func (s *Service) GetLocalTransfers(el *EmpLocation, page, perPage int, dateFrom, dateTo, direction string) (*LocalTransfersResult, error) {
+	locID := int64(el.Location.IDLocation)
+
+	query := s.db.Table("inventory_transaction t").
+		Select(`t.id_transaction, t.inventory_id, i.sku,
+			t.from_location_id, fl.full_name as from_location,
+			t.to_location_id, tl.full_name as to_location,
+			t.date_transaction, t.status_items,
+			CONCAT(e.first_name, ' ', e.last_name) as employee,
+			COALESCE(p.title_product, '') as product_title,
+			COALESCE(m.title_variant, '') as variant_title,
+			COALESCE(b.brand_name, '') as brand_name`).
+		Joins("LEFT JOIN inventory i ON i.id_inventory = t.inventory_id").
+		Joins("LEFT JOIN location fl ON fl.id_location = t.from_location_id").
+		Joins("LEFT JOIN location tl ON tl.id_location = t.to_location_id").
+		Joins("LEFT JOIN employee e ON e.id_employee = t.transferred_by").
+		Joins("LEFT JOIN model m ON m.id_model = i.model_id").
+		Joins("LEFT JOIN product p ON p.id_product = m.product_id").
+		Joins("LEFT JOIN brand b ON b.id_brand = p.brand_id").
+		Where("t.transaction_type = ?", "Local")
+
+	switch direction {
+	case "transfer":
+		query = query.Where("t.from_location_id = ?", locID)
+	case "receipt":
+		query = query.Where("t.to_location_id = ?", locID)
+	default:
+		query = query.Where("t.from_location_id = ? OR t.to_location_id = ?", locID, locID)
+	}
+
+	if dateFrom != "" {
+		query = query.Where("t.date_transaction >= ?", dateFrom)
+	}
+	if dateTo != "" {
+		query = query.Where("t.date_transaction <= ?", dateTo+" 23:59:59")
+	}
+
+	var total int64
+	countQ := s.db.Table("inventory_transaction").
+		Where("transaction_type = ?", "Local")
+	switch direction {
+	case "transfer":
+		countQ = countQ.Where("from_location_id = ?", locID)
+	case "receipt":
+		countQ = countQ.Where("to_location_id = ?", locID)
+	default:
+		countQ = countQ.Where("from_location_id = ? OR to_location_id = ?", locID, locID)
+	}
+	if dateFrom != "" {
+		countQ = countQ.Where("date_transaction >= ?", dateFrom)
+	}
+	if dateTo != "" {
+		countQ = countQ.Where("date_transaction <= ?", dateTo+" 23:59:59")
+	}
+	countQ.Count(&total)
+
+	if perPage <= 0 {
+		perPage = 25
+	}
+	if page <= 0 {
+		page = 1
+	}
+	totalPages := (total + int64(perPage) - 1) / int64(perPage)
+
+	type row struct {
+		IDTransaction  int64  `gorm:"column:id_transaction"`
+		InventoryID    int64  `gorm:"column:inventory_id"`
+		SKU            string `gorm:"column:sku"`
+		FromLocationID int64  `gorm:"column:from_location_id"`
+		FromLocation   string `gorm:"column:from_location"`
+		ToLocationID   int64  `gorm:"column:to_location_id"`
+		ToLocation     string `gorm:"column:to_location"`
+		DateTransaction time.Time `gorm:"column:date_transaction"`
+		StatusItems    string `gorm:"column:status_items"`
+		Employee       string `gorm:"column:employee"`
+		ProductTitle   string `gorm:"column:product_title"`
+		VariantTitle   string `gorm:"column:variant_title"`
+		BrandName      string `gorm:"column:brand_name"`
+	}
+
+	var rows []row
+	query.Order("t.date_transaction DESC").
+		Offset((page - 1) * perPage).
+		Limit(perPage).
+		Scan(&rows)
+
+	items := make([]LocalTransferItem, len(rows))
+	for i, r := range rows {
+		direction := "transfer"
+		if r.ToLocationID == locID {
+			direction = "receipt"
+		}
+		items[i] = LocalTransferItem{
+			TransactionID:  r.IDTransaction,
+			Direction:      direction,
+			InventoryID:    r.InventoryID,
+			SKU:            r.SKU,
+			FromLocationID: r.FromLocationID,
+			FromLocation:   r.FromLocation,
+			ToLocationID:   r.ToLocationID,
+			ToLocation:     r.ToLocation,
+			Date:           r.DateTransaction.Format("2006-01-02 15:04:05"),
+			Status:         r.StatusItems,
+			Employee:       r.Employee,
+			ProductTitle:   r.ProductTitle,
+			VariantTitle:   r.VariantTitle,
+			BrandName:      r.BrandName,
+		}
+	}
+
+	return &LocalTransfersResult{
+		TotalItems:  total,
+		TotalPages:  totalPages,
+		CurrentPage: page,
+		PerPage:     perPage,
+		Items:       items,
+	}, nil
+}
 
 // ─── Create Invoice ───────────────────────────────────────────────────────────
 
@@ -110,6 +389,14 @@ func (s *Service) CreateInvoice(el *EmpLocation, req CreateInvoiceRequest) (*Cre
 		}
 	}
 
+	var vendorIDPtr *int64
+	if vendorID != 0 {
+		vendorIDPtr = &vendorID
+	}
+	var statusInvIDPtr *int64
+	if statusInvID != 0 {
+		statusInvIDPtr = &statusInvID
+	}
 	inv := invoices.Invoice{
 		NumberInvoice:   invoiceNumber,
 		DateCreate:      time.Now(),
@@ -121,8 +408,8 @@ func (s *Service) CreateInvoice(el *EmpLocation, req CreateInvoiceRequest) (*Cre
 		EmployeeID:      &empID,
 		LocationID:      int64(el.Location.IDLocation),
 		ToLocationID:    toLocID,
-		VendorID:        &vendorID,
-		StatusInvoiceID: &statusInvID,
+		VendorID:        vendorIDPtr,
+		StatusInvoiceID: statusInvIDPtr,
 	}
 	if err := s.db.Create(&inv).Error; err != nil {
 		return nil, err
@@ -177,7 +464,7 @@ func (s *Service) CreateInvoice(el *EmpLocation, req CreateInvoiceRequest) (*Cre
 				InventoryID:    item.IDInventory,
 				FromLocationID: int64(el.Location.IDLocation),
 				ToLocationID:   effectiveToLocID,
-				TransferredBy:  empID,
+				TransferredBy:  &empID,
 				StatusItems:    item.StatusItemsInventory,
 				InvoiceID:      inv.IDInvoice,
 				InvoiceFrom:    &oldInvoiceID,
@@ -269,7 +556,7 @@ func (s *Service) UpdateInvoice(el *EmpLocation, invoiceID int64, dateCreate *st
 	if err := s.db.First(&inv, invoiceID).Error; err != nil {
 		return nil, fmt.Errorf("%w: invoice not found", ErrNotFound)
 	}
-	if inv.PatientID != 0 {
+	if inv.PatientID != nil && *inv.PatientID != 0 {
 		return nil, fmt.Errorf("%w: patient invoices cannot be updated", ErrBadRequest)
 	}
 	// For transfer invoices, only allow adding items if status = 25 (Sent to Store)
@@ -313,14 +600,16 @@ func (s *Service) UpdateInvoice(el *EmpLocation, invoiceID int64, dateCreate *st
 
 	for _, it := range items {
 		var item invModel.Inventory
-		if it.SKU != "" {
-			if err := s.db.Where("sku = ? AND location_id = ?", it.SKU, el.Location.IDLocation).First(&item).Error; err != nil {
-				return nil, fmt.Errorf("%w: item with SKU %s not found in current location", ErrBadRequest, it.SKU)
+		if it.InventoryID != nil {
+			if err := s.db.Debug().Where("id_inventory = ?", *it.InventoryID).First(&item).Error; err != nil {
+				return nil, fmt.Errorf("%w: item %d not found (db err: %v)", ErrBadRequest, *it.InventoryID, err)
 			}
-		} else if it.InventoryID != nil {
-			if err := s.db.Where("id_inventory = ? AND location_id = ?", *it.InventoryID, el.Location.IDLocation).First(&item).Error; err != nil {
-				return nil, fmt.Errorf("%w: item %d not found in current location", ErrBadRequest, *it.InventoryID)
+		} else if it.SKU != "" {
+			found, err := s.findInventoryBySKU(it.SKU)
+			if err != nil {
+				return nil, err
 			}
+			item = *found
 		} else {
 			return nil, fmt.Errorf("%w: each item must have sku or inventory_id", ErrBadRequest)
 		}
@@ -398,18 +687,21 @@ func (s *Service) UpdateInvoice(el *EmpLocation, invoiceID int64, dateCreate *st
 			StatusItems:     item.StatusItemsInventory,
 			TransactionType: txType,
 		})
-		s.db.Create(&invModel.InventoryTransfer{
+		tfr := invModel.InventoryTransfer{
 			InventoryID:    item.IDInventory,
 			FromLocationID: inv.LocationID,
 			ToLocationID:   toLocID,
-			TransferredBy:  empID,
+			TransferredBy:  &empID,
 			StatusItems:    item.StatusItemsInventory,
 			InvoiceID:      inv.IDInvoice,
 			InvoiceFrom:    &oldInvoiceID,
 			InvoiceTo:      &inv.IDInvoice,
 			SystemNote: strPtr(fmt.Sprintf("%s transfer logged from location %d to %d",
 				txType, inv.LocationID, toLocID)),
-		})
+		}
+		if err := s.db.Create(&tfr).Error; err != nil {
+			fmt.Printf("[ERROR] InventoryTransfer create failed: %v\n", err)
+		}
 	}
 
 	disc := 0.0
@@ -723,9 +1015,11 @@ func (s *Service) DeleteItem(invoiceID int64, sku string, inventoryID *int64) (m
 	var item invModel.Inventory
 	if sku != "" {
 		sku = strings.Trim(sku, "'")
-		if err := s.db.Where("sku = ?", sku).First(&item).Error; err != nil {
+		found, err := s.findInventoryBySKU(sku)
+		if err != nil {
 			return nil, fmt.Errorf("%w: item not found", ErrNotFound)
 		}
+		item = *found
 	} else if inventoryID != nil {
 		if err := s.db.First(&item, *inventoryID).Error; err != nil {
 			return nil, fmt.Errorf("%w: item not found", ErrNotFound)
@@ -900,15 +1194,45 @@ func (s *Service) createInvoiceNumber(invoiceType, shortName string) (string, er
 	return fmt.Sprintf("%s%s%07d", invoiceType, shortName, maxID+1), nil
 }
 
+// findInventoryBySKU — единая точка поиска inventory по SKU.
+// Пробует: exact → normalized (000286) → formatted (000/286) → как inventory_id.
+func (s *Service) findInventoryBySKU(sku string) (*invModel.Inventory, error) {
+	var item invModel.Inventory
+	// 1. Exact match
+	if err := s.db.Where("sku = ?", sku).First(&item).Error; err == nil {
+		return &item, nil
+	}
+	// 2. Normalized (e.g. "286" → "000286")
+	norm := pkgSKU.Normalize(sku)
+	if norm != sku {
+		if err := s.db.Where("sku = ?", norm).First(&item).Error; err == nil {
+			return &item, nil
+		}
+	}
+	// 3. Formatted (e.g. "286" → "000/286")
+	if formatted, _ := pkgSKU.Format(sku); formatted != "" && formatted != sku && formatted != norm {
+		if err := s.db.Where("sku = ?", formatted).First(&item).Error; err == nil {
+			return &item, nil
+		}
+	}
+	// 4. Try as inventory_id
+	if err := s.db.Where("id_inventory = ?", sku).First(&item).Error; err == nil {
+		return &item, nil
+	}
+	return nil, fmt.Errorf("%w: inventory with SKU %s not found", ErrBadRequest, sku)
+}
+
 func (s *Service) calculateTotal(invoiceType string, items []ItemIn) (float64, []invModel.Inventory, error) {
 	var total float64
 	var inventoryItems []invModel.Inventory
 	for _, it := range items {
 		var item invModel.Inventory
 		if it.SKU != "" {
-			if err := s.db.Where("sku = ?", it.SKU).First(&item).Error; err != nil {
-				return 0, nil, fmt.Errorf("%w: inventory with SKU %s not found", ErrBadRequest, it.SKU)
+			found, err := s.findInventoryBySKU(it.SKU)
+			if err != nil {
+				return 0, nil, err
 			}
+			item = *found
 		} else if it.InventoryID != nil {
 			if err := s.db.First(&item, *it.InventoryID).Error; err != nil {
 				return 0, nil, fmt.Errorf("%w: inventory %d not found", ErrBadRequest, *it.InventoryID)

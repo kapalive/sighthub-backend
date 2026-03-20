@@ -63,7 +63,8 @@ func normStr(s string) *string {
 // ── GET /stores ─────────────────────────────────────────────────────────────
 
 func (h *Handler) GetLocations(w http.ResponseWriter, r *http.Request) {
-	data, err := h.svc.GetLocations()
+	username := pkgAuth.UsernameFromContext(r.Context())
+	data, err := h.svc.GetLocations(username)
 	if err != nil {
 		jsonError(w, err.Error(), 500)
 		return
@@ -161,12 +162,6 @@ func (h *Handler) GetItems(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	showInterCompany := false
-	raw := strings.ToLower(q.Get("show_inter_company"))
-	if raw == "1" || raw == "true" || raw == "yes" || raw == "on" {
-		showInterCompany = true
-	}
-
 	// pb_key
 	var pbKey *string
 	pbKeyRaw := q.Get("pb_key")
@@ -194,7 +189,8 @@ func (h *Handler) GetItems(w http.ResponseWriter, r *http.Request) {
 		saleKeyContains = normStr(skc)
 	}
 
-	sunOnly := strings.ToLower(q.Get("sun_only")) == "yes"
+	sunRaw := strings.ToLower(q.Get("sun_only"))
+	sunOnly := sunRaw == "yes" || sunRaw == "true" || sunRaw == "1"
 	totalBy := q.Get("total_by")
 
 	var minBal, maxBal *float64
@@ -223,7 +219,7 @@ func (h *Handler) GetItems(w http.ResponseWriter, r *http.Request) {
 
 	data, err := h.svc.GetSaleItems(
 		locationID, dateStart, dateEnd,
-		employeeID, showInterCompany,
+		employeeID,
 		pbKey, invoiceContains,
 		saleKeyFilter, saleKeyContains,
 		sunOnly, totalBy,
@@ -235,7 +231,7 @@ func (h *Handler) GetItems(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	output := q.Get("csv")
+	output := q.Get("output")
 	if output == "csv" {
 		csv := csvutil.New()
 		csv.Row("invoice_number", "date", "sale_key", "description", "item_type",

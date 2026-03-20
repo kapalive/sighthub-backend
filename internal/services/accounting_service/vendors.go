@@ -133,14 +133,53 @@ func (s *Service) GetLocations() ([]map[string]interface{}, error) {
 
 // ── GET /vendor-invoices/:vendor_id ──────────────────────────────────────────
 
-func (s *Service) GetVendorInvoicesList(vendorID, page, perPage int) (map[string]interface{}, error) {
+func (s *Service) GetVendorInvoicesList(username string, vendorID, page, perPage int) (map[string]interface{}, error) {
+	_, loc, err := s.getEmployeeAndLocation(username)
+	if err != nil {
+		return nil, err
+	}
+	accLoc, err := s.resolveAccountingLocation(loc)
+	if err != nil {
+		return nil, err
+	}
+
+	// Collect location IDs for this store group (showcase + warehouse)
+	storeLocIDs := []int64{int64(accLoc.IDLocation)}
+	if accLoc.WarehouseID != nil {
+		storeLocIDs = append(storeLocIDs, int64(*accLoc.WarehouseID))
+	}
+	// Also find all locations with same store_id
+	if accLoc.StoreID != 0 {
+		var siblings []locModel.Location
+		s.db.Where("store_id = ?", accLoc.StoreID).Find(&siblings)
+		for _, sib := range siblings {
+			found := false
+			for _, id := range storeLocIDs {
+				if id == int64(sib.IDLocation) {
+					found = true
+					break
+				}
+			}
+			if !found {
+				storeLocIDs = append(storeLocIDs, int64(sib.IDLocation))
+			}
+		}
+	}
+
+	// VendorInvoice → Invoice.location_id
+	baseQuery := s.db.Model(&invModel.VendorInvoice{}).
+		Joins("JOIN invoice ON invoice.id_invoice = vendor_invoice.invoice_id").
+		Where("vendor_invoice.vendor_id = ? AND invoice.location_id IN ?", vendorID, storeLocIDs)
+
 	var total int64
-	s.db.Model(&invModel.VendorInvoice{}).Where("vendor_id = ?", vendorID).Count(&total)
+	baseQuery.Count(&total)
 
 	var rows []invModel.VendorInvoice
 	offset := (page - 1) * perPage
-	if err := s.db.Where("vendor_id = ?", vendorID).
-		Order("invoice_date DESC").
+	if err := s.db.
+		Joins("JOIN invoice ON invoice.id_invoice = vendor_invoice.invoice_id").
+		Where("vendor_invoice.vendor_id = ? AND invoice.location_id IN ?", vendorID, storeLocIDs).
+		Order("vendor_invoice.invoice_date DESC").
 		Offset(offset).Limit(perPage).
 		Find(&rows).Error; err != nil {
 		return nil, err

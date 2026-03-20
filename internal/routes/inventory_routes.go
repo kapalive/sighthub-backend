@@ -7,8 +7,10 @@ import (
 
 	"sighthub-backend/config"
 	"sighthub-backend/internal/handlers/inventory_handler"
+	"sighthub-backend/internal/handlers/invoice_handler"
 	"sighthub-backend/internal/middleware"
 	"sighthub-backend/internal/services/inventory_service"
+	"sighthub-backend/internal/services/invoice_service"
 	pkgAuth "sighthub-backend/pkg/auth"
 )
 
@@ -63,4 +65,11 @@ func RegisterInventoryRoutes(db *gorm.DB, rdb *redis.Client, cfg *config.Config,
 	api.HandleFunc("/preview-label", h.PreviewLabel).Methods("GET")
 	api.HandleFunc("/print-label", h.PrintLabel).Methods("GET")
 	api.HandleFunc("/print-labels-by-vendor", h.PrintLabelsByVendor).Methods("GET")
+
+	// ── Local Transfers ──────────────────────────────────────────────────
+	invSvc := invoice_service.New(db)
+	invH := invoice_handler.New(invSvc)
+	api.HandleFunc("/local-transfer", invH.CreateLocalTransfer).Methods("POST")
+	api.HandleFunc("/local-transfers", invH.GetLocalTransfers).Methods("GET")
+	api.HandleFunc("/local-transfer", invH.ReverseLocalTransfer).Methods("DELETE")
 }
