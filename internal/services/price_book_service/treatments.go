@@ -2,7 +2,6 @@ package price_book_service
 
 import (
 	"fmt"
-	"time"
 
 	"sighthub-backend/internal/models/lenses"
 )
@@ -24,63 +23,41 @@ type TreatmentListItem struct {
 }
 
 type TreatmentDetail struct {
-	IDLensTreatments int64   `json:"id_lens_treatments"`
-	ItemNbr          string  `json:"item_nbr"`
-	Vendor           *string `json:"vendor"`
-	VendorID         *int    `json:"vendor_id"`
-	Description      *string `json:"description"`
-	Price            *string `json:"price"`
-	Cost             *string `json:"cost"`
-	CanLookup        bool    `json:"can_lookup"`
-	SRCoat           bool    `json:"sr_coat"`
-	UV               bool    `json:"uv"`
-	AR               bool    `json:"ar"`
-	Tint             bool    `json:"tint"`
-	Photo            bool    `json:"photo"`
-	Polar            bool    `json:"polar"`
-	Drill            bool    `json:"drill"`
-	HighIndex        bool    `json:"high_index"`
-	VCodesLensID     *int    `json:"v_codes_lens_id"`
-	VCode            *string `json:"v_code"`
-	CreatedAt        string  `json:"created_at"`
-	ModifiedAt       string  `json:"modified_at"`
+	IDLensTreatments int64                    `json:"id_lens_treatments"`
+	ItemNbr          string                   `json:"item_nbr"`
+	Vendor           *string                  `json:"vendor"`
+	VendorID         *int                     `json:"vendor_id"`
+	Description      *string                  `json:"description"`
+	Price            *string                  `json:"price"`
+	Cost             *string                  `json:"cost"`
+	CanLookup        bool                     `json:"can_lookup"`
+	SpecialFeatures  []map[string]interface{} `json:"special_features"`
+	VCodesLensID     *int                     `json:"v_codes_lens_id"`
+	VCode            *string                  `json:"v_code"`
+	Source           *string                  `json:"source"`
 }
 
 type CreateTreatmentInput struct {
-	ItemNbr      string
-	VendorID     int
-	Price        float64
-	Description  *string
-	Cost         *float64
-	VCodesLensID *int
-	CanLookup    bool
-	SRCoat       bool
-	UV           bool
-	AR           bool
-	Tint         bool
-	Photo        bool
-	Polar        bool
-	Drill        bool
-	HighIndex    bool
+	ItemNbr         string
+	VendorID        int
+	Price           float64
+	Description     *string
+	Cost            *float64
+	VCodesLensID    *int
+	CanLookup       bool
+	SpecialFeatures []int
 }
 
 type UpdateTreatmentInput struct {
-	ItemNbr      *string
-	Description  *string
-	VendorID     *int
-	VCodesLensID *int  // -1 = clear
-	Price        *float64
-	Cost         *float64 // nil = don't change; use ClearCost = true to set NULL
-	ClearCost    bool
-	CanLookup    *bool
-	SRCoat       *bool
-	UV           *bool
-	AR           *bool
-	Tint         *bool
-	Photo        *bool
-	Polar        *bool
-	Drill        *bool
-	HighIndex    *bool
+	ItemNbr         *string
+	Description     *string
+	VendorID        *int
+	VCodesLensID    *int // -1 = clear
+	Price           *float64
+	Cost            *float64
+	ClearCost       bool
+	CanLookup       *bool
+	SpecialFeatures *[]int
 }
 
 // ─── Methods ──────────────────────────────────────────────────────────────────
@@ -149,7 +126,6 @@ func (s *Service) GetTreatments(vendorID *int) ([]TreatmentListItem, error) {
 func (s *Service) GetTreatment(id int) (*TreatmentDetail, error) {
 	var t lenses.LensTreatments
 	if err := s.db.
-		Preload("Vendor").
 		Preload("VCodesLens").
 		First(&t, id).Error; err != nil {
 		return nil, fmt.Errorf("lens treatment not found")
@@ -157,14 +133,6 @@ func (s *Service) GetTreatment(id int) (*TreatmentDetail, error) {
 
 	var vendorName *string
 	var vendorID *int
-	if t.Vendor != nil {
-		type vendorInfo interface {
-			GetVendorName() string
-			GetVendorID() int
-		}
-		// Access via raw query to avoid interface complexities
-	}
-	// simpler: query vendor separately
 	type vendorRow struct {
 		IDVendor   int
 		VendorName string
@@ -191,6 +159,22 @@ func (s *Service) GetTreatment(id int) (*TreatmentDetail, error) {
 		vCode = &t.VCodesLens.Code
 	}
 
+	// special features
+	type sfRow struct {
+		ID          int    `gorm:"column:id_lens_special_features"`
+		FeatureName string `gorm:"column:feature_name"`
+	}
+	var sfRows []sfRow
+	s.db.Table("lens_special_features sf").
+		Select("sf.id_lens_special_features, sf.feature_name").
+		Joins("JOIN treatments_feature_relation tfr ON tfr.lens_special_features_id = sf.id_lens_special_features").
+		Where("tfr.lens_treatments_id = ?", t.IDLensTreatments).
+		Scan(&sfRows)
+	sfList := make([]map[string]interface{}, len(sfRows))
+	for i, sf := range sfRows {
+		sfList[i] = map[string]interface{}{"id_lens_special_features": sf.ID, "feature_name": sf.FeatureName}
+	}
+
 	return &TreatmentDetail{
 		IDLensTreatments: t.IDLensTreatments,
 		ItemNbr:          t.ItemNbr,
@@ -200,18 +184,10 @@ func (s *Service) GetTreatment(id int) (*TreatmentDetail, error) {
 		Price:            priceStr,
 		Cost:             costStr,
 		CanLookup:        t.CanLookup,
-		SRCoat:           t.SRCoat,
-		UV:               t.UV,
-		AR:               t.AR,
-		Tint:             t.Tint,
-		Photo:            t.Photo,
-		Polar:            t.Polar,
-		Drill:            t.Drill,
-		HighIndex:        t.HighIndex,
+		SpecialFeatures:  sfList,
 		VCodesLensID:     t.VCodesLensID,
 		VCode:            vCode,
-		CreatedAt:        t.CreatedAt.Format(time.RFC3339),
-		ModifiedAt:       t.ModifiedAt.Format(time.RFC3339),
+		Source:           t.Source,
 	}, nil
 }
 
@@ -224,17 +200,12 @@ func (s *Service) CreateTreatment(in CreateTreatmentInput) (int64, error) {
 		VendorID:     in.VendorID,
 		VCodesLensID: in.VCodesLensID,
 		CanLookup:    in.CanLookup,
-		SRCoat:       in.SRCoat,
-		UV:           in.UV,
-		AR:           in.AR,
-		Tint:         in.Tint,
-		Photo:        in.Photo,
-		Polar:        in.Polar,
-		Drill:        in.Drill,
-		HighIndex:    in.HighIndex,
 	}
 	if err := s.db.Create(&t).Error; err != nil {
 		return 0, err
+	}
+	for _, sfID := range in.SpecialFeatures {
+		s.db.Exec("INSERT INTO treatments_feature_relation (lens_treatments_id, lens_special_features_id) VALUES (?, ?) ON CONFLICT DO NOTHING", t.IDLensTreatments, sfID)
 	}
 	return t.IDLensTreatments, nil
 }
@@ -273,33 +244,16 @@ func (s *Service) UpdateTreatment(id int, in UpdateTreatmentInput) error {
 	if in.CanLookup != nil {
 		updates["can_lookup"] = *in.CanLookup
 	}
-	if in.SRCoat != nil {
-		updates["sr_coat"] = *in.SRCoat
-	}
-	if in.UV != nil {
-		updates["uv"] = *in.UV
-	}
-	if in.AR != nil {
-		updates["ar"] = *in.AR
-	}
-	if in.Tint != nil {
-		updates["tint"] = *in.Tint
-	}
-	if in.Photo != nil {
-		updates["photo"] = *in.Photo
-	}
-	if in.Polar != nil {
-		updates["polar"] = *in.Polar
-	}
-	if in.Drill != nil {
-		updates["drill"] = *in.Drill
-	}
-	if in.HighIndex != nil {
-		updates["high_index"] = *in.HighIndex
-	}
-
 	if len(updates) > 0 {
-		return s.db.Model(&t).Updates(updates).Error
+		if err := s.db.Model(&t).Updates(updates).Error; err != nil {
+			return err
+		}
+	}
+	if in.SpecialFeatures != nil {
+		s.db.Exec("DELETE FROM treatments_feature_relation WHERE lens_treatments_id = ?", t.IDLensTreatments)
+		for _, sfID := range *in.SpecialFeatures {
+			s.db.Exec("INSERT INTO treatments_feature_relation (lens_treatments_id, lens_special_features_id) VALUES (?, ?) ON CONFLICT DO NOTHING", t.IDLensTreatments, sfID)
+		}
 	}
 	return nil
 }

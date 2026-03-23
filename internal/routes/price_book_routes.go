@@ -10,8 +10,10 @@ import (
 	pblens "sighthub-backend/internal/handlers/price_book_handler/lens"
 	pbcl "sighthub-backend/internal/handlers/price_book_handler/contact_lens"
 	pbother "sighthub-backend/internal/handlers/price_book_handler/other"
+	vwhandler "sighthub-backend/internal/handlers/visionweb_handler"
 	"sighthub-backend/internal/middleware"
 	"sighthub-backend/internal/services/price_book_service"
+	"sighthub-backend/internal/services/visionweb_service"
 	pkgAuth "sighthub-backend/pkg/auth"
 )
 
@@ -22,6 +24,7 @@ func RegisterPriceBookRoutes(db *gorm.DB, rdb *redis.Client, cfg *config.Config,
 	hLens := pblens.New(svc)
 	hCL := pbcl.New(svc)
 	hOther := pbother.New(svc)
+	hVW := vwhandler.NewHandler(visionweb_service.New(db))
 
 	jwtMW := pkgAuth.JWTMiddleware(cfg.JWTSecretKey, rdb)
 	// permission 26 = price-book read, 28 = create, 29 = update, 30 = delete
@@ -43,6 +46,11 @@ func RegisterPriceBookRoutes(db *gorm.DB, rdb *redis.Client, cfg *config.Config,
 	frameWrite.Use(writeMW)
 	frameWrite.HandleFunc("/custom_glasses/{inventory_id}", hFrame.CreateCustomGlasses).Methods("POST")
 	frameWrite.HandleFunc("/revert_custom_glasses/{inventory_id}", hFrame.RevertCustomGlasses).Methods("POST")
+
+	// ─── VisionWeb Import (requires write permission) ─────────────────────
+	vwWrite := api.NewRoute().Subrouter()
+	vwWrite.Use(writeMW)
+	vwWrite.HandleFunc("/import-vw", hVW.ImportFromVisionWeb).Methods("POST")
 
 	// ─── Lenses ───────────────────────────────────────────────────────────────
 	api.HandleFunc("/lens/brand_vendor", hLens.GetLensBrandsVendors).Methods("GET")
@@ -93,10 +101,8 @@ func RegisterPriceBookRoutes(db *gorm.DB, rdb *redis.Client, cfg *config.Config,
 	api.HandleFunc("/treatments", hOther.GetTreatments).Methods("GET")
 	api.HandleFunc("/treatments/{id}", hOther.GetTreatment).Methods("GET")
 
-	trWrite := api.NewRoute().Subrouter()
-	trWrite.Use(writeMW)
-	trWrite.HandleFunc("/treatments", hOther.CreateTreatment).Methods("POST")
-
+	// Treatments: no manual POST — imported from VisionWeb only
+	// Update and delete still available for price/cost adjustments
 	trUpdate := api.NewRoute().Subrouter()
 	trUpdate.Use(updateMW)
 	trUpdate.HandleFunc("/treatments/{id}", hOther.UpdateTreatment).Methods("PUT")

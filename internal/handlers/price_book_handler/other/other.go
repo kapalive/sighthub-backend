@@ -85,14 +85,13 @@ func (h *Handler) CreateTreatment(w http.ResponseWriter, r *http.Request) {
 	if v, ok := body["cost"].(float64); ok { in.Cost = &v }
 	if v, ok := body["v_codes_lens_id"].(float64); ok { vv := int(v); in.VCodesLensID = &vv }
 	if v, ok := body["can_lookup"].(bool); ok { in.CanLookup = v }
-	if v, ok := body["sr_coat"].(bool); ok { in.SRCoat = v }
-	if v, ok := body["uv"].(bool); ok { in.UV = v }
-	if v, ok := body["ar"].(bool); ok { in.AR = v }
-	if v, ok := body["tint"].(bool); ok { in.Tint = v }
-	if v, ok := body["photo"].(bool); ok { in.Photo = v }
-	if v, ok := body["polar"].(bool); ok { in.Polar = v }
-	if v, ok := body["drill"].(bool); ok { in.Drill = v }
-	if v, ok := body["high_index"].(bool); ok { in.HighIndex = v }
+	if arr, ok := body["special_features"].([]interface{}); ok {
+		for _, v := range arr {
+			if f, ok := v.(float64); ok {
+				in.SpecialFeatures = append(in.SpecialFeatures, int(f))
+			}
+		}
+	}
 
 	id, err := h.svc.CreateTreatment(in)
 	if err != nil {
@@ -146,14 +145,15 @@ func (h *Handler) UpdateTreatment(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	if v, ok := body["can_lookup"].(bool); ok { in.CanLookup = &v }
-	if v, ok := body["sr_coat"].(bool); ok { in.SRCoat = &v }
-	if v, ok := body["uv"].(bool); ok { in.UV = &v }
-	if v, ok := body["ar"].(bool); ok { in.AR = &v }
-	if v, ok := body["tint"].(bool); ok { in.Tint = &v }
-	if v, ok := body["photo"].(bool); ok { in.Photo = &v }
-	if v, ok := body["polar"].(bool); ok { in.Polar = &v }
-	if v, ok := body["drill"].(bool); ok { in.Drill = &v }
-	if v, ok := body["high_index"].(bool); ok { in.HighIndex = &v }
+	if arr, ok := body["special_features"].([]interface{}); ok {
+		sfs := make([]int, 0, len(arr))
+		for _, v := range arr {
+			if f, ok := v.(float64); ok {
+				sfs = append(sfs, int(f))
+			}
+		}
+		in.SpecialFeatures = &sfs
+	}
 
 	if err := h.svc.UpdateTreatment(id, in); err != nil {
 		code := http.StatusBadRequest

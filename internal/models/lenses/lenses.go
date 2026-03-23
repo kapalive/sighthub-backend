@@ -20,6 +20,7 @@ type Lenses struct {
 	Cost              *float64 `gorm:"column:cost;type:numeric(10,2)"                       json:"cost,omitempty"`
 	MFRNumber         *string  `gorm:"column:mfr_number;type:varchar(255)"                  json:"mfr_number,omitempty"`
 	CanLookup         bool     `gorm:"column:can_lookup;not null;default:true"              json:"can_lookup"`
+	Source            *string  `gorm:"column:source;type:varchar(50)"                      json:"source,omitempty"`
 
 	// --- relations (load via Preload when нужно) ---
 	LensSeries     *LensSeries            `gorm:"foreignKey:LensSeriesID;references:IDLensSeries"               json:"-"`
@@ -27,7 +28,10 @@ type Lenses struct {
 	LensesMaterial *LensesMaterial        `gorm:"foreignKey:LensesMaterialsID;references:IDLensesMaterials"     json:"-"`
 	BrandLens      *vendormodel.BrandLens `gorm:"foreignKey:BrandLensID;references:IDBrandLens"                 json:"-"`
 	Vendor         *vendormodel.Vendor    `gorm:"foreignKey:VendorID;references:IDVendor"                       json:"-"`
-	// SpecialFeatures []LensSpecialFeature // TODO: many-to-many через `lenses_feature_relation` — назови точные колонки связки, добавлю.
+	SpecialFeatures []LensSpecialFeature   `gorm:"many2many:lenses_feature_relation;foreignKey:IDLenses;joinForeignKey:lenses_id;references:IDLensSpecialFeatures;joinReferences:lens_special_features_id" json:"-"`
+	VCodes          []VCodesLens           `gorm:"many2many:lenses_v_codes_relation;foreignKey:IDLenses;joinForeignKey:lenses_id;references:IDVCodesLens;joinReferences:v_codes_lens_id" json:"-"`
+	LensStyleID     *int                   `gorm:"column:lens_style_id"                                json:"lens_style_id,omitempty"`
+	LensStyle       *LensStyle             `gorm:"foreignKey:LensStyleID;references:IDLensStyle"       json:"-"`
 }
 
 func (Lenses) TableName() string { return "lenses" }
@@ -41,6 +45,7 @@ func (l *Lenses) ToMap() map[string]interface{} {
 		"cost":                l.Cost,
 		"mfr_number":          l.MFRNumber,
 		"can_lookup":          l.CanLookup,
+		"source":              l.Source,
 		"lens_series_id":      l.LensSeriesID,
 		"lens_type_id":        l.LensTypeID,
 		"lenses_materials_id": l.LensesMaterialsID,
@@ -73,6 +78,33 @@ func (l *Lenses) ToMap() map[string]interface{} {
 		out["vendor"] = l.Vendor.ToMap()
 	} else {
 		out["vendor"] = nil
+	}
+
+	if l.LensStyle != nil {
+		out["lens_style"] = l.LensStyle.ToMap()
+	} else {
+		out["lens_style"] = nil
+	}
+	out["lens_style_id"] = l.LensStyleID
+
+	if len(l.SpecialFeatures) > 0 {
+		sf := make([]map[string]interface{}, 0, len(l.SpecialFeatures))
+		for _, f := range l.SpecialFeatures {
+			sf = append(sf, f.ToMap())
+		}
+		out["special_features"] = sf
+	} else {
+		out["special_features"] = []map[string]interface{}{}
+	}
+
+	if len(l.VCodes) > 0 {
+		vc := make([]map[string]interface{}, 0, len(l.VCodes))
+		for _, v := range l.VCodes {
+			vc = append(vc, v.ToMap())
+		}
+		out["v_codes"] = vc
+	} else {
+		out["v_codes"] = []map[string]interface{}{}
 	}
 
 	return out

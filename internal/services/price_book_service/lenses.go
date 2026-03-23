@@ -54,6 +54,7 @@ type LensListItem struct {
 	SpecialFeatures []string `json:"special_features"`
 	Price          *string  `json:"price"`
 	Cost           *string  `json:"cost"`
+	Source         *string  `json:"source"`
 	PbKey          string   `json:"pb_key"`
 }
 
@@ -67,7 +68,7 @@ type LensDetail struct {
 	Vendor      map[string]interface{} `json:"vendor"`
 	Description *string                `json:"description"`
 	VCodes      []map[string]interface{} `json:"v_codes"`
-	SpecialFeatures string             `json:"special_features"`
+	SpecialFeatures []map[string]interface{} `json:"special_features"`
 	Price       string                 `json:"price"`
 	Cost        string                 `json:"cost"`
 	MfrNumber   *string                `json:"mfr_number"`
@@ -85,6 +86,7 @@ type AddLensInput struct {
 	Price             float64
 	Cost              float64
 	VCodes            []int
+	SpecialFeatures   []int
 }
 
 type UpdateLensInput struct {
@@ -225,14 +227,28 @@ type LensFilters struct {
 	MaterialID       *int
 	SpecialFeatureID *int
 	SeriesID         *int
+	Source           *string
+	Page             int
+	PerPage          int
 }
 
-func (s *Service) GetLensList(f LensFilters) ([]LensListItem, error) {
-	q := s.db.Model(&lenses.Lenses{}).
-		Preload("BrandLens").
-		Preload("LensType").
-		Preload("LensesMaterial").
-		Preload("LensSeries")
+type LensListResponse struct {
+	Items      []LensListItem `json:"items"`
+	Total      int64          `json:"total"`
+	Page       int            `json:"page"`
+	PerPage    int            `json:"per_page"`
+	TotalPages int            `json:"total_pages"`
+}
+
+func (s *Service) GetLensList(f LensFilters) (*LensListResponse, error) {
+	if f.Page < 1 {
+		f.Page = 1
+	}
+	if f.PerPage < 1 {
+		f.PerPage = 25
+	}
+
+	q := s.db.Model(&lenses.Lenses{})
 
 	if f.BrandID != nil {
 		q = q.Where("brand_lens_id = ?", *f.BrandID)
@@ -249,13 +265,29 @@ func (s *Service) GetLensList(f LensFilters) ([]LensListItem, error) {
 	if f.SeriesID != nil {
 		q = q.Where("lens_series_id = ?", *f.SeriesID)
 	}
+	if f.Source != nil {
+		q = q.Where("source = ?", *f.Source)
+	}
 	if f.SpecialFeatureID != nil {
 		q = q.Joins("JOIN lenses_feature_relation lfr ON lfr.lenses_id = lenses.id_lenses").
 			Where("lfr.lens_special_features_id = ?", *f.SpecialFeatureID)
 	}
 
+	var total int64
+	if err := q.Count(&total).Error; err != nil {
+		return nil, err
+	}
+
+	offset := (f.Page - 1) * f.PerPage
+
 	var lens []lenses.Lenses
-	if err := q.Find(&lens).Error; err != nil {
+	if err := q.
+		Preload("BrandLens").
+		Preload("LensType").
+		Preload("LensesMaterial").
+		Preload("LensSeries").
+		Offset(offset).Limit(f.PerPage).
+		Find(&lens).Error; err != nil {
 		return nil, err
 	}
 
@@ -305,6 +337,7 @@ func (s *Service) GetLensList(f LensFilters) ([]LensListItem, error) {
 			SpecialFeatures: sfNames,
 			Price:           price,
 			Cost:            cost,
+			Source:          l.Source,
 			PbKey:           "Lens",
 		}
 		if l.BrandLens != nil {
@@ -322,7 +355,19 @@ func (s *Service) GetLensList(f LensFilters) ([]LensListItem, error) {
 		}
 		result = append(result, item)
 	}
-	return result, nil
+
+	totalPages := int(total) / f.PerPage
+	if int(total)%f.PerPage != 0 {
+		totalPages++
+	}
+
+	return &LensListResponse{
+		Items:      result,
+		Total:      total,
+		Page:       f.Page,
+		PerPage:    f.PerPage,
+		TotalPages: totalPages,
+	}, nil
 }
 
 func (s *Service) GetLens(id int) (*LensDetail, error) {
@@ -353,17 +398,20 @@ func (s *Service) GetLens(id int) (*LensDetail, error) {
 		vcList[i] = map[string]interface{}{"id_v_code": v.IDVCodesLens, "v_code": v.Code}
 	}
 
-	// special features (string)
-	type sfRow struct{ FeatureName string }
+	// special features (array of objects with id + name)
+	type sfRow struct {
+		ID          int    `gorm:"column:id_lens_special_features"`
+		FeatureName string `gorm:"column:feature_name"`
+	}
 	var sfRows []sfRow
 	s.db.Table("lens_special_features sf").
-		Select("sf.feature_name").
+		Select("sf.id_lens_special_features, sf.feature_name").
 		Joins("JOIN lenses_feature_relation lfr ON lfr.lens_special_features_id = sf.id_lens_special_features").
 		Where("lfr.lenses_id = ?", l.IDLenses).
 		Scan(&sfRows)
-	sfNames := make([]string, len(sfRows))
+	sfList := make([]map[string]interface{}, len(sfRows))
 	for i, sf := range sfRows {
-		sfNames[i] = sf.FeatureName
+		sfList[i] = map[string]interface{}{"id_lens_special_features": sf.ID, "feature_name": sf.FeatureName}
 	}
 
 	brand := map[string]interface{}{"id_brand_lens": nil, "brand_name": nil}
@@ -411,7 +459,7 @@ func (s *Service) GetLens(id int) (*LensDetail, error) {
 		Vendor:          vendor,
 		Description:     l.Description,
 		VCodes:          vcList,
-		SpecialFeatures: strings.Join(sfNames, ", "),
+		SpecialFeatures: sfList,
 		Price:           price,
 		Cost:            cost,
 		MfrNumber:       l.MFRNumber,
@@ -448,6 +496,11 @@ func (s *Service) AddLens(in AddLensInput) (int, error) {
 		}
 		s.db.Create(&lenses.LensesVCodesRelation{LensesID: l.IDLenses, VCodesLensID: vcID})
 	}
+
+	for _, sfID := range in.SpecialFeatures {
+		s.db.Create(&lenses.LensesFeatureRelation{LensesID: l.IDLenses, LensSpecialFeaturesID: sfID})
+	}
+
 	return l.IDLenses, nil
 }
 
