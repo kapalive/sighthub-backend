@@ -32,8 +32,7 @@ type TreatmentDetail struct {
 	Cost             *string                  `json:"cost"`
 	CanLookup        bool                     `json:"can_lookup"`
 	SpecialFeatures  []map[string]interface{} `json:"special_features"`
-	VCodesLensID     *int                     `json:"v_codes_lens_id"`
-	VCode            *string                  `json:"v_code"`
+	VCodes           []map[string]interface{} `json:"v_codes"`
 	Source           *string                  `json:"source"`
 }
 
@@ -52,12 +51,13 @@ type UpdateTreatmentInput struct {
 	ItemNbr         *string
 	Description     *string
 	VendorID        *int
-	VCodesLensID    *int // -1 = clear
+	VCodesLensID    *int // -1 = clear (deprecated, use VCodes)
 	Price           *float64
 	Cost            *float64
 	ClearCost       bool
 	CanLookup       *bool
 	SpecialFeatures *[]int
+	VCodes          *[]int
 }
 
 // ─── Methods ──────────────────────────────────────────────────────────────────
@@ -154,9 +154,20 @@ func (s *Service) GetTreatment(id int) (*TreatmentDetail, error) {
 		costStr = &c
 	}
 
-	var vCode *string
-	if t.VCodesLens != nil {
-		vCode = &t.VCodesLens.Code
+	// v_codes
+	type vcRow struct {
+		IDVCodesLens int    `gorm:"column:id_v_codes_lens"`
+		Code         string `gorm:"column:code"`
+	}
+	var vcRows []vcRow
+	s.db.Table("v_codes_lens vc").
+		Select("vc.id_v_codes_lens, vc.code").
+		Joins("JOIN treatments_v_codes_relation tvr ON tvr.v_codes_lens_id = vc.id_v_codes_lens").
+		Where("tvr.lens_treatments_id = ?", t.IDLensTreatments).
+		Scan(&vcRows)
+	vcList := make([]map[string]interface{}, len(vcRows))
+	for i, v := range vcRows {
+		vcList[i] = map[string]interface{}{"id_v_code": v.IDVCodesLens, "v_code": v.Code}
 	}
 
 	// special features
@@ -185,8 +196,7 @@ func (s *Service) GetTreatment(id int) (*TreatmentDetail, error) {
 		Cost:             costStr,
 		CanLookup:        t.CanLookup,
 		SpecialFeatures:  sfList,
-		VCodesLensID:     t.VCodesLensID,
-		VCode:            vCode,
+		VCodes:           vcList,
 		Source:           t.Source,
 	}, nil
 }
@@ -253,6 +263,12 @@ func (s *Service) UpdateTreatment(id int, in UpdateTreatmentInput) error {
 		s.db.Exec("DELETE FROM treatments_feature_relation WHERE lens_treatments_id = ?", t.IDLensTreatments)
 		for _, sfID := range *in.SpecialFeatures {
 			s.db.Exec("INSERT INTO treatments_feature_relation (lens_treatments_id, lens_special_features_id) VALUES (?, ?) ON CONFLICT DO NOTHING", t.IDLensTreatments, sfID)
+		}
+	}
+	if in.VCodes != nil {
+		s.db.Exec("DELETE FROM treatments_v_codes_relation WHERE lens_treatments_id = ?", t.IDLensTreatments)
+		for _, vcID := range *in.VCodes {
+			s.db.Exec("INSERT INTO treatments_v_codes_relation (lens_treatments_id, v_codes_lens_id) VALUES (?, ?) ON CONFLICT DO NOTHING", t.IDLensTreatments, vcID)
 		}
 	}
 	return nil

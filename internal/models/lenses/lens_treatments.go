@@ -24,6 +24,7 @@ type LensTreatments struct {
 	// --- relations ---
 	VCodesLens      *VCodesLens             `gorm:"foreignKey:VCodesLensID;references:IDVCodesLens"    json:"-"`
 	SpecialFeatures []LensSpecialFeature    `gorm:"many2many:treatments_feature_relation;foreignKey:IDLensTreatments;joinForeignKey:lens_treatments_id;references:IDLensSpecialFeatures;joinReferences:lens_special_features_id" json:"-"`
+	VCodes          []VCodesLens            `gorm:"many2many:treatments_v_codes_relation;foreignKey:IDLensTreatments;joinForeignKey:lens_treatments_id;references:IDVCodesLens;joinReferences:v_codes_lens_id" json:"-"`
 }
 
 func (LensTreatments) TableName() string { return "lens_treatments" }
@@ -55,6 +56,16 @@ func (l *LensTreatments) ToMap() map[string]interface{} {
 		out["special_features"] = sf
 	} else {
 		out["special_features"] = []map[string]interface{}{}
+	}
+
+	if len(l.VCodes) > 0 {
+		vc := make([]map[string]interface{}, 0, len(l.VCodes))
+		for _, v := range l.VCodes {
+			vc = append(vc, v.ToMap())
+		}
+		out["v_codes"] = vc
+	} else {
+		out["v_codes"] = []map[string]interface{}{}
 	}
 
 	return out

@@ -154,6 +154,15 @@ func (h *Handler) UpdateTreatment(w http.ResponseWriter, r *http.Request) {
 		}
 		in.SpecialFeatures = &sfs
 	}
+	if arr, ok := body["v_codes"].([]interface{}); ok {
+		vcs := make([]int, 0, len(arr))
+		for _, v := range arr {
+			if f, ok := v.(float64); ok {
+				vcs = append(vcs, int(f))
+			}
+		}
+		in.VCodes = &vcs
+	}
 
 	if err := h.svc.UpdateTreatment(id, in); err != nil {
 		code := http.StatusBadRequest

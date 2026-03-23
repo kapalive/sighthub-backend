@@ -89,6 +89,48 @@ func (h *Handler) ListIntegrations(w http.ResponseWriter, r *http.Request) {
 	h.jsonOK(w, result)
 }
 
+// GET /api/settings/integration/vw/labs
+func (h *Handler) GetVisionWebLabs(w http.ResponseWriter, r *http.Request) {
+	username := pkgAuth.UsernameFromContext(r.Context())
+	locationID := h.getLocationID(r, username)
+	if locationID == 0 {
+		h.jsonError(w, "location not found", 404)
+		return
+	}
+
+	// Get saved VW credentials for this location
+	config, err := h.svc.GetIntegration("vw", locationID)
+	if err != nil {
+		h.jsonError(w, err.Error(), 400)
+		return
+	}
+	connected, _ := config["connected"].(bool)
+	if !connected {
+		h.jsonError(w, "VisionWeb not connected for this location", 400)
+		return
+	}
+
+	// Get saved username/password from DB
+	var savedUser, savedPass string
+	h.svc.DB().Table("integration_config ic").
+		Select("ic.username, ic.password").
+		Joins("JOIN integration_company ico ON ico.id_integration_company = ic.integration_company_id").
+		Where("ico.code = 'vw' AND ic.location_id = ?", locationID).
+		Row().Scan(&savedUser, &savedPass)
+
+	if savedUser == "" {
+		h.jsonError(w, "VisionWeb credentials not found", 400)
+		return
+	}
+
+	labs, err := h.svc.GetVisionWebLabs(savedUser, savedPass)
+	if err != nil {
+		h.jsonError(w, err.Error(), 500)
+		return
+	}
+	h.jsonOK(w, labs)
+}
+
 func (h *Handler) getLocationID(r *http.Request, username string) int64 {
 	if v := r.URL.Query().Get("location_id"); v != "" {
 		id, _ := strconv.ParseInt(v, 10, 64)

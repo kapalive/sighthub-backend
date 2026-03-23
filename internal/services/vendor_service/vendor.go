@@ -25,6 +25,7 @@ type Service struct {
 }
 
 func New(db *gorm.DB) *Service { return &Service{db: db} }
+func (s *Service) DB() *gorm.DB { return s.db }
 
 // =====================================================================
 // Vendor CRUD
@@ -251,7 +252,7 @@ func (s *Service) DeleteVendor(vendorID int) error {
 	})
 }
 
-func (s *Service) GetVendor(vendorID int) (map[string]interface{}, error) {
+func (s *Service) GetVendor(vendorID int, locationIDs ...int64) (map[string]interface{}, error) {
 	var v vModel.Vendor
 	if err := s.db.First(&v, "id_vendor = ?", vendorID).Error; err != nil {
 		return nil, errors.New("Vendor not found")
@@ -938,17 +939,46 @@ type LabInput struct {
 	ZipCode       *string `json:"zip_code"`
 	StateID       *int    `json:"state_id"`
 	CountryID     *int    `json:"country_id"`
+	VendorID      *int    `json:"vendor_id"`
+	BrandLensID   *int    `json:"brand_lens_id"`
+	Source        *string `json:"source"`
+	// VW account fields (saved to vendor_location_account)
+	VwSloID       *int    `json:"vw_slo_id"`
+	VwBill        *string `json:"vw_bill"`
+	VwShip        *string `json:"vw_ship"`
+	AccountNumber *string `json:"account_number"`
+	LocationID    int64   `json:"-"` // set by handler from JWT
 }
 
-func (s *Service) ListLabs() ([]map[string]interface{}, error) {
+func (s *Service) ListLabs(locationID *int64) ([]map[string]interface{}, error) {
 	var labs []vModel.Lab
 	s.db.Order("title_lab ASC").Find(&labs)
 	result := make([]map[string]interface{}, 0, len(labs))
 	for _, l := range labs {
-		result = append(result, map[string]interface{}{
+		entry := map[string]interface{}{
 			"lab_id":    l.IDLab,
 			"title_lab": l.TitleLab,
-		})
+		}
+		// If location provided, attach VW account info from vendor_location_account
+		if locationID != nil && l.VendorID != nil {
+			type vlaRow struct {
+				AccountNumber *string `gorm:"column:account_number"`
+				VwSloID       *int    `gorm:"column:vw_slo_id"`
+				VwBill        *string `gorm:"column:vw_bill"`
+				VwShip        *string `gorm:"column:vw_ship"`
+				Source        *string `gorm:"column:source"`
+			}
+			var vla vlaRow
+			s.db.Table("vendor_location_account").
+				Where("vendor_id = ? AND location_id = ? AND is_active = true", *l.VendorID, *locationID).
+				First(&vla)
+			entry["account_number"] = vla.AccountNumber
+			entry["vw_slo_id"] = vla.VwSloID
+			entry["vw_bill"] = vla.VwBill
+			entry["vw_ship"] = vla.VwShip
+			entry["source"] = vla.Source
+		}
+		result = append(result, entry)
 	}
 	return result, nil
 }
@@ -975,11 +1005,29 @@ func (s *Service) CreateLab(input LabInput) (map[string]interface{}, error) {
 		ZipCode:       input.ZipCode,
 		StateID:       input.StateID,
 		CountryID:     input.CountryID,
+		VendorID:      input.VendorID,
+		BrandLensID:   input.BrandLensID,
+		Source:        input.Source,
 	}
 
 	err := s.db.Transaction(func(tx *gorm.DB) error {
 		if err := tx.Create(&lab).Error; err != nil {
 			return err
+		}
+		// Auto-link lab to vendor
+		if input.VendorID != nil {
+			tx.Exec("INSERT INTO vendor_labs (vendor_id, lab_id) VALUES (?, ?) ON CONFLICT DO NOTHING", *input.VendorID, lab.IDLab)
+		}
+		// Create vendor_location_account if VW fields provided
+		if input.VendorID != nil && input.LocationID > 0 && (input.VwSloID != nil || input.VwBill != nil || input.AccountNumber != nil) {
+			src := "custom"
+			if input.Source != nil {
+				src = *input.Source
+			}
+			tx.Exec(`INSERT INTO vendor_location_account (vendor_id, location_id, account_number, vw_slo_id, vw_bill, vw_ship, source, is_active)
+				VALUES (?, ?, ?, ?, ?, ?, ?, true)
+				ON CONFLICT DO NOTHING`,
+				*input.VendorID, input.LocationID, input.AccountNumber, input.VwSloID, input.VwBill, input.VwShip, src)
 		}
 		_ = pkgActivity.Log(tx, "vendor", "lab_create", pkgActivity.WithEntity(int64(lab.IDLab)))
 		return nil
@@ -990,12 +1038,31 @@ func (s *Service) CreateLab(input LabInput) (map[string]interface{}, error) {
 	return lab.ToMap(), nil
 }
 
-func (s *Service) GetLab(labID int) (map[string]interface{}, error) {
+func (s *Service) GetLab(labID int, locationID *int64) (map[string]interface{}, error) {
 	var lab vModel.Lab
 	if err := s.db.First(&lab, "id_lab = ?", labID).Error; err != nil {
 		return nil, &NotFoundError{Msg: "Lab not found"}
 	}
-	return lab.ToMap(), nil
+	result := lab.ToMap()
+	if locationID != nil && lab.VendorID != nil {
+		type vlaRow struct {
+			AccountNumber *string `gorm:"column:account_number"`
+			VwSloID       *int    `gorm:"column:vw_slo_id"`
+			VwBill        *string `gorm:"column:vw_bill"`
+			VwShip        *string `gorm:"column:vw_ship"`
+			Source        *string `gorm:"column:source"`
+		}
+		var vla vlaRow
+		s.db.Table("vendor_location_account").
+			Where("vendor_id = ? AND location_id = ? AND is_active = true", *lab.VendorID, *locationID).
+			First(&vla)
+		result["account_number"] = vla.AccountNumber
+		result["vw_slo_id"] = vla.VwSloID
+		result["vw_bill"] = vla.VwBill
+		result["vw_ship"] = vla.VwShip
+		result["source"] = vla.Source
+	}
+	return result, nil
 }
 
 func (s *Service) UpdateLab(labID int, data map[string]interface{}) (map[string]interface{}, error) {
@@ -1094,10 +1161,25 @@ func (s *Service) RemoveVendorLab(vendorID, labID int) error {
 		return &NotFoundError{Msg: "Lab not associated with this vendor"}
 	}
 
+	// Check if lab can be fully deleted
+	var ticketCount int64
+	s.db.Table("lab_ticket").Where("lab_id = ?", labID).Count(&ticketCount)
+	var otherVendorCount int64
+	s.db.Table("vendor_labs").Where("lab_id = ? AND vendor_id != ?", labID, vendorID).Count(&otherVendorCount)
+
+	canDelete := ticketCount == 0 && otherVendorCount == 0
+
 	return s.db.Transaction(func(tx *gorm.DB) error {
-		_ = pkgActivity.Log(tx, "vendor", "lab_unlink", pkgActivity.WithEntity(int64(vendorID)),
-			pkgActivity.WithDetails(map[string]interface{}{"lab_id": labID}))
-		return tx.Delete(&vl).Error
+		// Always unlink from this vendor
+		tx.Delete(&vl)
+		if canDelete {
+			// Full delete: lab + vendor_location_account
+			tx.Exec("DELETE FROM vendor_location_account WHERE vendor_id = ?", vendorID)
+			tx.Delete(&lab)
+		}
+		_ = pkgActivity.Log(tx, "vendor", "lab_delete", pkgActivity.WithEntity(int64(vendorID)),
+			pkgActivity.WithDetails(map[string]interface{}{"lab_id": labID, "full_delete": canDelete}))
+		return nil
 	})
 }
 

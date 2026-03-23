@@ -18,8 +18,11 @@ type Lab struct {
 	City          *string `gorm:"column:city;type:varchar(100)"                    json:"city,omitempty"`
 	ZipCode       *string `gorm:"column:zip_code;type:varchar(7)"                  json:"zip_code,omitempty"`
 
-	StateID   *int `gorm:"column:state_id"   json:"state_id,omitempty"`
-	CountryID *int `gorm:"column:country_id" json:"country_id,omitempty"`
+	StateID       *int    `gorm:"column:state_id"   json:"state_id,omitempty"`
+	CountryID     *int    `gorm:"column:country_id" json:"country_id,omitempty"`
+	VendorID      *int    `gorm:"column:vendor_id"  json:"vendor_id,omitempty"`
+	BrandLensID   *int    `gorm:"column:brand_lens_id" json:"brand_lens_id,omitempty"`
+	Source        *string `gorm:"column:source;type:varchar(20)" json:"source,omitempty"`
 
 	State   *general.SalesTaxByState `gorm:"foreignKey:StateID;references:IDSalesTax" json:"-"`
 	Country *general.Country         `gorm:"foreignKey:CountryID;references:IDCountry" json:"-"`
@@ -39,6 +42,9 @@ func (l *Lab) ToMap() map[string]interface{} {
 		"address_line_2": l.AddressLine2,
 		"city":           l.City,
 		"zip_code":       l.ZipCode,
+		"vendor_id":      l.VendorID,
+		"brand_lens_id":  l.BrandLensID,
+		"source":         l.Source,
 	}
 
 	if l.StateID != nil {

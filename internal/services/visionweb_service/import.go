@@ -327,26 +327,46 @@ type ImportAllResult struct {
 }
 
 func (s *Service) ImportAllVisionWeb() (*ImportAllResult, error) {
-	type labRow struct {
-		IDLab       int    `gorm:"column:id_lab"`
-		TitleLab    string `gorm:"column:title_lab"`
+	// Get all vendor_location_accounts with VW slo_id configured
+	type vlaRow struct {
 		VendorID    int    `gorm:"column:vendor_id"`
-		BrandLensID int    `gorm:"column:brand_lens_id"`
 		VwSloID     int    `gorm:"column:vw_slo_id"`
+		VendorName  string `gorm:"column:vendor_name"`
 	}
-	var labs []labRow
-	s.db.Table("lab").Where("source = 'vision_web' AND vw_slo_id IS NOT NULL AND vendor_id IS NOT NULL AND brand_lens_id IS NOT NULL").Scan(&labs)
+	var vlas []vlaRow
+	s.db.Table("vendor_location_account vla").
+		Select("DISTINCT vla.vendor_id, vla.vw_slo_id, v.vendor_name").
+		Joins("JOIN vendor v ON v.id_vendor = vla.vendor_id").
+		Where("vla.source = 'vision_web' AND vla.vw_slo_id IS NOT NULL").
+		Scan(&vlas)
 
-	if len(labs) == 0 {
+	if len(vlas) == 0 {
 		return nil, fmt.Errorf("no labs configured for VisionWeb import")
 	}
 
 	result := &ImportAllResult{}
-	for _, lab := range labs {
-		r, err := s.ImportFromVisionWeb(lab.VwSloID, lab.VendorID, lab.BrandLensID)
+	for _, vla := range vlas {
+		// Find brand_lens for this vendor
+		var brandLensID int
+		s.db.Table("brand_lens bl").
+			Select("bl.id_brand_lens").
+			Joins("JOIN lenses l ON l.brand_lens_id = bl.id_brand_lens").
+			Where("l.vendor_id = ? AND l.source = 'vision_web'", vla.VendorID).
+			Limit(1).Scan(&brandLensID)
+		if brandLensID == 0 {
+			// No existing brand — try lab table
+			s.db.Table("lab").Select("brand_lens_id").Where("vendor_id = ?", vla.VendorID).Scan(&brandLensID)
+		}
+		if brandLensID == 0 {
+			// Create brand from vendor name
+			s.db.Exec("INSERT INTO brand_lens (brand_name) VALUES (?) ON CONFLICT DO NOTHING", vla.VendorName)
+			s.db.Table("brand_lens").Select("id_brand_lens").Where("brand_name = ?", vla.VendorName).Scan(&brandLensID)
+		}
+
+		r, err := s.ImportFromVisionWeb(vla.VwSloID, vla.VendorID, brandLensID)
 		if err != nil {
 			result.Labs = append(result.Labs, ImportResult{
-				SupplierName: lab.TitleLab + " (error: " + err.Error() + ")",
+				SupplierName: vla.VendorName + " (error: " + err.Error() + ")",
 			})
 			continue
 		}

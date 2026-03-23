@@ -2,6 +2,7 @@ package integration_service
 
 import (
 	"encoding/json"
+	"encoding/xml"
 	"errors"
 	"fmt"
 	"io"
@@ -16,10 +17,11 @@ import (
 )
 
 const (
-	vwAPIUser   = "qademo"
-	vwAPIPass   = "xNH3L7K1wl9lezUZQwdA"
-	vwTokenURL  = "https://regauth.visionweb.com/connect/token"
-	vwStatusURL = "https://regapi.visionweb.com/order/OrderTracking/GetTrackingUpdates"
+	vwAPIUser          = "qademo"
+	vwAPIPass          = "xNH3L7K1wl9lezUZQwdA"
+	vwTokenURL         = "https://regauth.visionweb.com/connect/token"
+	vwUserAccountsURL  = "https://www.visionwebqa.com/services/services/UserAccountsService"
+	vwRefID            = "ROSIGHTHUB"
 )
 
 type Service struct{ db *gorm.DB }
@@ -68,13 +70,16 @@ func (s *Service) SetIntegration(code string, locationID int64, username, passwo
 
 	connected := false
 	var checkErr string
+	var labs []VWLabInfo
 
 	switch code {
 	case "vw":
-		ok, err := s.checkVisionWebAuth(username, password)
-		connected = ok
+		vwLabs, err := s.GetVisionWebLabs(username, password)
 		if err != nil {
 			checkErr = err.Error()
+		} else {
+			connected = true
+			labs = vwLabs
 		}
 	case "zeiss":
 		connected = false
@@ -124,45 +129,164 @@ func (s *Service) SetIntegration(code string, locationID int64, username, passwo
 	if !connected && checkErr != "" {
 		result["error"] = checkErr
 	}
+	if labs != nil {
+		result["labs"] = labs
+	}
 
 	return result, nil
 }
 
+// ─── VisionWeb SOAP UserAccountsService ──────────────────────────────────────
+
+type vwUserProfile struct {
+	XMLName  xml.Name       `xml:"VW_USER_PROFILE"`
+	Login    vwLogin        `xml:"LOGIN"`
+	CBU      vwCBU          `xml:"CBU"`
+	Errors   vwErrorMessages `xml:"ERROR_MESSAGES"`
+}
+
+type vwLogin struct {
+	Name string `xml:"Name,attr"`
+}
+
+type vwCBU struct {
+	Suppliers []vwSupplier `xml:"SUPPLIERS>SUPPLIER"`
+}
+
+type vwSupplier struct {
+	Name      string              `xml:"Name,attr"`
+	Locations []vwSupplierLocation `xml:"SUPPLIER_LOCATIONS>SUPPLIER_LOCATION"`
+}
+
+type vwSupplierLocation struct {
+	ID       string       `xml:"Id,attr"`
+	Name     string       `xml:"Name,attr"`
+	Accounts []vwAccount  `xml:"ACCOUNTS>ACCOUNT"`
+}
+
+type vwAccount struct {
+	Billing  vwBillShip `xml:"BILLING_ACCOUNT"`
+	Shipping vwBillShip `xml:"SHIPPING_ACCOUNT"`
+}
+
+type vwBillShip struct {
+	Number string `xml:"Number,attr"`
+}
+
+type vwErrorMessages struct {
+	Messages []vwErrorMsg `xml:"ERROR_MESSAGE"`
+}
+
+type vwErrorMsg struct {
+	ID      string `xml:"ID"`
+	Message string `xml:"MESSAGE"`
+}
+
+type VWLabInfo struct {
+	SupplierName string `json:"supplier_name"`
+	SloID        string `json:"slo_id"`
+	LocationName string `json:"location_name"`
+	BillAccount  string `json:"bill_account"`
+	ShipAccount  string `json:"ship_account"`
+}
+
 func (s *Service) checkVisionWebAuth(username, password string) (bool, error) {
-	token, err := s.getVWToken("VW.OP.Order.WebApi")
+	_, err := s.GetVisionWebLabs(username, password)
 	if err != nil {
-		return false, fmt.Errorf("VisionWeb API auth failed: %w", err)
+		return false, err
 	}
+	return true, nil
+}
 
-	body := `{"OrderIds": [], "StartDate": "2026-01-01", "EndDate": "2026-01-02"}`
-	req, _ := http.NewRequest("POST", vwStatusURL, strings.NewReader(body))
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", "Bearer "+token)
-	req.Header.Set("username", username)
-	req.Header.Set("password", password)
+func (s *Service) GetVisionWebLabs(username, password string) ([]VWLabInfo, error) {
+	soapBody := fmt.Sprintf(`<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:web="http://webservices.login.visionweb.com">
+   <soapenv:Header/>
+   <soapenv:Body>
+      <web:getUserProfileByLogin>
+         <web:username>%s</web:username>
+         <web:password>%s</web:password>
+         <web:refid>%s</web:refid>
+      </web:getUserProfileByLogin>
+   </soapenv:Body>
+</soapenv:Envelope>`, username, password, vwRefID)
 
-	resp, err := http.DefaultClient.Do(req)
+	req, _ := http.NewRequest("POST", vwUserAccountsURL, strings.NewReader(soapBody))
+	req.Header.Set("Content-Type", "text/xml; charset=utf-8")
+	req.Header.Set("SOAPAction", `"getUserProfileByLogin"`)
+
+	resp, err := (&http.Client{Timeout: 15 * time.Second}).Do(req)
 	if err != nil {
-		return false, fmt.Errorf("VisionWeb connection failed: %w", err)
+		return nil, fmt.Errorf("VisionWeb connection failed: %w", err)
 	}
 	defer resp.Body.Close()
 
 	respBody, _ := io.ReadAll(resp.Body)
-	if resp.StatusCode == 401 || resp.StatusCode == 403 {
-		return false, fmt.Errorf("invalid username or password")
+	bodyStr := string(respBody)
+
+	// Extract VW_USER_PROFILE from SOAP response (HTML-encoded inside SOAP)
+	// The response contains HTML entities that need to be unescaped
+	start := strings.Index(bodyStr, "&lt;VW_USER_PROFILE")
+	if start < 0 {
+		start = strings.Index(bodyStr, "<VW_USER_PROFILE")
 	}
 
-	var result map[string]interface{}
-	if err := json.Unmarshal(respBody, &result); err == nil {
-		if errMsg, ok := result["Error"]; ok && errMsg != nil {
-			errStr := fmt.Sprintf("%v", errMsg)
-			if strings.Contains(strings.ToLower(errStr), "auth") || strings.Contains(strings.ToLower(errStr), "credential") {
-				return false, fmt.Errorf("invalid username or password")
+	var profileXML string
+	if start >= 0 && strings.Contains(bodyStr, "&lt;") {
+		// HTML-encoded XML inside SOAP
+		end := strings.Index(bodyStr[start:], "</p612:getUserProfileByLoginReturn>")
+		if end < 0 {
+			end = strings.Index(bodyStr[start:], "</")
+			if end < 0 {
+				end = len(bodyStr) - start
 			}
+		}
+		raw := bodyStr[start : start+end]
+		// Unescape HTML entities
+		profileXML = strings.ReplaceAll(raw, "&lt;", "<")
+		profileXML = strings.ReplaceAll(profileXML, "&gt;", ">")
+		profileXML = strings.ReplaceAll(profileXML, "&amp;", "&")
+		profileXML = strings.ReplaceAll(profileXML, "&quot;", `"`)
+		profileXML = strings.ReplaceAll(profileXML, "&apos;", "'")
+	} else if start >= 0 {
+		end := strings.Index(bodyStr, "</VW_USER_PROFILE>")
+		if end >= 0 {
+			profileXML = bodyStr[start : end+len("</VW_USER_PROFILE>")]
 		}
 	}
 
-	return true, nil
+	if profileXML == "" {
+		return nil, fmt.Errorf("invalid response from VisionWeb")
+	}
+
+	var profile vwUserProfile
+	if err := xml.Unmarshal([]byte(profileXML), &profile); err != nil {
+		return nil, fmt.Errorf("failed to parse VisionWeb response: %w", err)
+	}
+
+	// Check for errors
+	if len(profile.Errors.Messages) > 0 {
+		msg := profile.Errors.Messages[0]
+		return nil, fmt.Errorf("invalid username or password (%s: %s)", msg.ID, msg.Message)
+	}
+
+	// Extract labs
+	var labs []VWLabInfo
+	for _, sup := range profile.CBU.Suppliers {
+		for _, loc := range sup.Locations {
+			lab := VWLabInfo{
+				SupplierName: sup.Name,
+				SloID:        loc.ID,
+				LocationName: loc.Name,
+			}
+			if len(loc.Accounts) > 0 {
+				lab.BillAccount = loc.Accounts[0].Billing.Number
+				lab.ShipAccount = loc.Accounts[0].Shipping.Number
+			}
+			labs = append(labs, lab)
+		}
+	}
+
+	return labs, nil
 }
 
 func (s *Service) getVWToken(scope string) (string, error) {

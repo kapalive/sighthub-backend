@@ -8,8 +8,10 @@ import (
 	"gorm.io/gorm"
 
 	"sighthub-backend/config"
+	intHandler "sighthub-backend/internal/handlers/integration_handler"
 	vendorHandler "sighthub-backend/internal/handlers/vendor_handler/vendor"
 	"sighthub-backend/internal/middleware"
+	intSvc "sighthub-backend/internal/services/integration_service"
 	vendorSvc "sighthub-backend/internal/services/vendor_service"
 	pkgAuth "sighthub-backend/pkg/auth"
 )
@@ -58,8 +60,12 @@ func RegisterVendorRoutes(db *gorm.DB, rdb *redis.Client, cfg *config.Config, r 
 	api.Handle("/lab/{id_lab:[0-9]+}", perm40(http.HandlerFunc(h.DeleteLab))).Methods("DELETE")
 
 	// --- Vendor-Lab links ---
-	api.Handle("/{vendor_id:[0-9]+}/add_lab", perm39(http.HandlerFunc(h.AddVendorLab))).Methods("PUT")
+	// add_lab removed — lab auto-links to vendor on POST /lab
 	api.Handle("/{vendor_id:[0-9]+}/remove_lab/{lab_id:[0-9]+}", perm39(http.HandlerFunc(h.RemoveVendorLab))).Methods("DELETE")
+
+	// --- Integration VW Labs ---
+	hInt := intHandler.NewHandler(intSvc.New(db))
+	api.HandleFunc("/integration/vw/labs", hInt.GetVisionWebLabs).Methods("GET")
 
 	// --- Countries / States ---
 	api.HandleFunc("/countries", h.GetCountries).Methods("GET")
