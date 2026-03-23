@@ -286,4 +286,9 @@ func RegisterPatientRoutes(db *gorm.DB, rdb *redis.Client, cfg *config.Config, r
 	).Methods("DELETE")
 	api.HandleFunc("/invoice/{invoice_id:[0-9]+}/returns", ivh.GetReturnsByInvoice).Methods("GET")
 	api.HandleFunc("/return/{return_id:[0-9]+}", ivh.GetReturn).Methods("GET")
+
+	// ── Invoice Price Book (source-filtered) ──────────────────────────────
+	api.HandleFunc("/invoice/{invoice_id:[0-9]+}/price-book/lens/list", ivh.InvPBLensList).Methods("GET")
+	api.HandleFunc("/invoice/{invoice_id:[0-9]+}/price-book/treatment/list", ivh.InvPBTreatmentList).Methods("GET")
+	api.HandleFunc("/invoice/{invoice_id:[0-9]+}/price-book/additional/list", ivh.InvPBAddServiceList).Methods("GET")
 }

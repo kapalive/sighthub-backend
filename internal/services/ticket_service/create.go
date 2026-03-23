@@ -325,12 +325,16 @@ func (s *Service) CreateTicket(username string, invoiceID int64, req *CreateTick
 			LensOrder:  &lensOrder,
 		}
 
-		// Find lens item in invoice
-		var lensItem invoiceModel.InvoiceItemSale
-		err := tx.Where("invoice_id = ? AND item_type IN ?", invoiceID, []string{"Lens", "Lenses"}).
-			Order("id_invoice_sale DESC").
-			First(&lensItem).Error
-		if err == nil && lensItem.ItemID != nil {
+		// Find lens item in invoice (must be exactly one)
+		var lensItems []invoiceModel.InvoiceItemSale
+		tx.Where("invoice_id = ? AND item_type IN ?", invoiceID, []string{"Lens", "Lenses"}).
+			Find(&lensItems)
+		if len(lensItems) > 1 {
+			tx.Rollback()
+			return nil, fmt.Errorf("invoice has %d lens items — cannot create lab ticket (expected 1)", len(lensItems))
+		}
+		if len(lensItems) == 1 && lensItems[0].ItemID != nil {
+			lensItem := lensItems[0]
 			var ln lenses.Lenses
 			if err := tx.First(&ln, *lensItem.ItemID).Error; err == nil {
 				ticketLens.LensesMaterialsID = ln.LensesMaterialsID

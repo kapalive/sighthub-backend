@@ -156,6 +156,10 @@ func (h *Handler) GetLensList(w http.ResponseWriter, r *http.Request) {
 	if v := qint(q.Get("material_id")); v != nil { f.MaterialID = v }
 	if v := qint(q.Get("special_feature_id")); v != nil { f.SpecialFeatureID = v }
 	if v := qint(q.Get("series_id")); v != nil { f.SeriesID = v }
+	if v := q.Get("source"); v != "" { f.Source = &v }
+	if v := q.Get("search"); v != "" { f.Search = &v }
+	if v := qint(q.Get("page")); v != nil { f.Page = *v } else { f.Page = 1 }
+	if v := qint(q.Get("per_page")); v != nil { f.PerPage = *v } else { f.PerPage = 25 }
 
 	results, err := h.svc.GetLensList(f)
 	if err != nil {
@@ -193,6 +197,7 @@ func (h *Handler) AddLens(w http.ResponseWriter, r *http.Request) {
 		Price             float64 `json:"price"`
 		Cost              float64 `json:"cost"`
 		VCodes            []int   `json:"v_codes"`
+		SpecialFeatures   []int   `json:"special_features"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		jsonError(w, "Invalid request body", http.StatusBadRequest)
@@ -214,6 +219,7 @@ func (h *Handler) AddLens(w http.ResponseWriter, r *http.Request) {
 		Price:             body.Price,
 		Cost:              body.Cost,
 		VCodes:            body.VCodes,
+		SpecialFeatures:   body.SpecialFeatures,
 	})
 	if err != nil {
 		code := http.StatusBadRequest

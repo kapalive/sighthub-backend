@@ -293,3 +293,34 @@ func strPtr(s string) *string {
 	}
 	return &s
 }
+
+// GET /api/ticket/{ticket_id}/print
+func (h *Handler) PrintTicket(w http.ResponseWriter, r *http.Request) {
+	ticketID, _ := strconv.ParseInt(mux.Vars(r)["ticket_id"], 10, 64)
+	if ticketID == 0 {
+		jsonResponse(w, 400, map[string]string{"error": "invalid ticket_id"})
+		return
+	}
+	includeInvoice := r.URL.Query().Get("include_invoice") == "true"
+	result, err := h.svc.PrintTicket(ticketID, includeInvoice)
+	if err != nil {
+		jsonResponse(w, errorStatus(err), map[string]string{"error": err.Error()})
+		return
+	}
+	jsonResponse(w, 200, result)
+}
+
+// GET /api/ticket/{ticket_id}/lens_options
+func (h *Handler) GetTicketLensOptions(w http.ResponseWriter, r *http.Request) {
+	ticketID, _ := strconv.ParseInt(mux.Vars(r)["ticket_id"], 10, 64)
+	if ticketID == 0 {
+		jsonResponse(w, 400, map[string]string{"error": "invalid ticket_id"})
+		return
+	}
+	result, err := h.svc.GetTicketLensOptions(ticketID)
+	if err != nil {
+		jsonResponse(w, errorStatus(err), map[string]string{"error": err.Error()})
+		return
+	}
+	jsonResponse(w, 200, result)
+}

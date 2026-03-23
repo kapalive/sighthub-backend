@@ -2,6 +2,7 @@ package price_book_service
 
 import (
 	"fmt"
+	"regexp"
 	"strings"
 
 	"sighthub-backend/internal/models/lenses"
@@ -228,6 +229,7 @@ type LensFilters struct {
 	SpecialFeatureID *int
 	SeriesID         *int
 	Source           *string
+	Search           *string
 	Page             int
 	PerPage          int
 }
@@ -271,6 +273,14 @@ func (s *Service) GetLensList(f LensFilters) (*LensListResponse, error) {
 	if f.SpecialFeatureID != nil {
 		q = q.Joins("JOIN lenses_feature_relation lfr ON lfr.lenses_id = lenses.id_lenses").
 			Where("lfr.lens_special_features_id = ?", *f.SpecialFeatureID)
+	}
+	if f.Search != nil && *f.Search != "" {
+		words := strings.Fields(strings.TrimSpace(*f.Search))
+		for _, w := range words {
+			// each word must match start of any word in description (case-insensitive)
+			safe := regexp.QuoteMeta(w)
+			q = q.Where("description ~* ?", `(^|\s)`+safe)
+		}
 	}
 
 	var total int64
@@ -473,6 +483,7 @@ func (s *Service) AddLens(in AddLensInput) (int, error) {
 		return 0, fmt.Errorf("brand_lens not found")
 	}
 
+	customSource := "custom"
 	l := lenses.Lenses{
 		LensName:          in.LensName,
 		BrandLensID:       &in.BrandLensID,
@@ -483,6 +494,7 @@ func (s *Service) AddLens(in AddLensInput) (int, error) {
 		VendorID:          in.VendorID,
 		Price:             &in.Price,
 		Cost:              &in.Cost,
+		Source:            &customSource,
 	}
 	if err := s.db.Create(&l).Error; err != nil {
 		return 0, err

@@ -326,3 +326,110 @@ func (h *Handler) UnfinalizeInvoice(w http.ResponseWriter, r *http.Request) {
 	}
 	jsonResponse(w, map[string]string{"message": "Invoice unfinalized successfully"}, http.StatusOK)
 }
+
+// ─── Invoice Price Book ──────────────────────────────────────────────────────
+
+func qint(vals ...string) *int {
+	for _, v := range vals {
+		if v == "" {
+			continue
+		}
+		n, err := strconv.Atoi(v)
+		if err == nil {
+			return &n
+		}
+	}
+	return nil
+}
+
+// GET /invoice/{invoice_id}/price-book/lens/list
+func (h *Handler) InvPBLensList(w http.ResponseWriter, r *http.Request) {
+	invoiceID, err := parseInvoiceID(r)
+	if err != nil {
+		jsonError(w, "invalid invoice_id", http.StatusBadRequest)
+		return
+	}
+	q := r.URL.Query()
+	f := invSvc.InvPBLensFilters{}
+	if v := qint(q.Get("brand_id")); v != nil {
+		f.BrandID = v
+	}
+	if v := qint(q.Get("vendor_id")); v != nil {
+		f.VendorID = v
+	}
+	if v := qint(q.Get("type_id")); v != nil {
+		f.TypeID = v
+	}
+	if v := qint(q.Get("material_id")); v != nil {
+		f.MaterialID = v
+	}
+	if v := qint(q.Get("special_feature_id")); v != nil {
+		f.SpecialFeatureID = v
+	}
+	if v := qint(q.Get("series_id")); v != nil {
+		f.SeriesID = v
+	}
+	if v := q.Get("search"); v != "" {
+		f.Search = &v
+	}
+	if v := qint(q.Get("page")); v != nil {
+		f.Page = *v
+	} else {
+		f.Page = 1
+	}
+	if v := qint(q.Get("per_page")); v != nil {
+		f.PerPage = *v
+	} else {
+		f.PerPage = 25
+	}
+
+	result, err := h.svc.InvoicePBLenses(invoiceID, f)
+	if err != nil {
+		jsonError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	jsonResponse(w, result, http.StatusOK)
+}
+
+// GET /invoice/{invoice_id}/price-book/treatment/list
+func (h *Handler) InvPBTreatmentList(w http.ResponseWriter, r *http.Request) {
+	invoiceID, err := parseInvoiceID(r)
+	if err != nil {
+		jsonError(w, "invalid invoice_id", http.StatusBadRequest)
+		return
+	}
+	var search *string
+	if v := r.URL.Query().Get("search"); v != "" {
+		search = &v
+	}
+	result, err := h.svc.InvoicePBTreatments(invoiceID, search)
+	if err != nil {
+		jsonError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	jsonResponse(w, result, http.StatusOK)
+}
+
+// GET /invoice/{invoice_id}/price-book/additional/list
+func (h *Handler) InvPBAddServiceList(w http.ResponseWriter, r *http.Request) {
+	invoiceID, err := parseInvoiceID(r)
+	if err != nil {
+		jsonError(w, "invalid invoice_id", http.StatusBadRequest)
+		return
+	}
+	q := r.URL.Query()
+	var typeID *int
+	if v := qint(q.Get("type_id")); v != nil {
+		typeID = v
+	}
+	var search *string
+	if v := q.Get("search"); v != "" {
+		search = &v
+	}
+	result, err := h.svc.InvoicePBAddServices(invoiceID, typeID, search)
+	if err != nil {
+		jsonError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	jsonResponse(w, result, http.StatusOK)
+}

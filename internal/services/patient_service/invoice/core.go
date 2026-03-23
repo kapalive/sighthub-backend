@@ -600,6 +600,7 @@ func (s *Service) GetInvoice(username string, invoiceID int64, groupByFrame bool
 
 		var itemName *string
 		var addInfo *string
+		var itemSource *string
 		itype := item.ItemType
 		if item.ItemID != nil {
 			switch itype {
@@ -607,6 +608,7 @@ func (s *Service) GetInvoice(username string, invoiceID int64, groupByFrame bool
 				var obj lensModel.Lenses
 				if s.db.First(&obj, *item.ItemID).Error == nil {
 					itemName = ptrStr(obj.LensName)
+					itemSource = obj.Source
 				}
 			case "Contact Lens":
 				var obj clModel.ContactLensItem
@@ -617,6 +619,7 @@ func (s *Service) GetInvoice(username string, invoiceID int64, groupByFrame bool
 				var obj lensModel.LensTreatments
 				if s.db.First(&obj, *item.ItemID).Error == nil {
 					itemName = ptrStr(obj.ItemNbr)
+					itemSource = obj.Source
 				}
 			case "Prof. service":
 				var obj svcModel.ProfessionalService
@@ -656,7 +659,7 @@ func (s *Service) GetInvoice(username string, invoiceID int64, groupByFrame bool
 			itemIDStr = strconv.FormatInt(*item.ItemID, 10)
 		}
 
-		itemsData = append(itemsData, map[string]interface{}{
+		m := map[string]interface{}{
 			"item_sale_id": strconv.FormatInt(item.IDInvoiceSale, 10),
 			"pb_key":       item.ItemType,
 			"sale_key":     item.SaleKey,
@@ -672,7 +675,11 @@ func (s *Service) GetInvoice(username string, invoiceID int64, groupByFrame bool
 			"pt_balance":   ptBal,
 			"ins_balance":  insBal,
 			"add_info":     addInfo,
-		})
+		}
+		if itemSource != nil {
+			m["source"] = *itemSource
+		}
+		itemsData = append(itemsData, m)
 	}
 
 	if groupByFrame {
@@ -892,11 +899,16 @@ func (s *Service) LookupBySKU(username, rawSKU string) (map[string]interface{}, 
 
 	// Find inventory in current location or its warehouse
 	var frame invModel.Inventory
-	query := s.db.Where("sku = ? AND (location_id = ?", normalized, loc.IDLocation)
+	locIDs := []interface{}{loc.IDLocation}
 	if loc.WarehouseID != nil {
-		query = s.db.Where("sku = ? AND (location_id = ? OR location_id = ?)", normalized, loc.IDLocation, *loc.WarehouseID)
+		locIDs = append(locIDs, *loc.WarehouseID)
 	}
-	if err := query.First(&frame).Error; err != nil {
+	// Try normalized SKU first, then raw
+	err = s.db.Where("sku = ? AND location_id IN ?", normalized, locIDs).First(&frame).Error
+	if err != nil && normalized != rawSKU {
+		err = s.db.Where("sku = ? AND location_id IN ?", rawSKU, locIDs).First(&frame).Error
+	}
+	if err != nil {
 		return nil, errors.New("item not found")
 	}
 
@@ -1007,6 +1019,64 @@ func (s *Service) AddItemsToInvoice(username string, invoiceID int64, input AddI
 
 		globalSaleKey := normKey(input.SaleKey)
 
+		// ── Source-based validation for Treatment / Add service / Lens ──
+		var invoiceLensSource string
+		if pbKey == "Treatment" || pbKey == "Add service" {
+			var lensItems []invoices.InvoiceItemSale
+			tx.Where("invoice_id = ? AND item_type = ?", invoiceID, "Lens").
+				Find(&lensItems)
+
+			if pbKey == "Treatment" && len(lensItems) == 0 {
+				return errors.New("cannot add treatments: invoice has no lenses")
+			}
+
+			// Treatment not allowed if additional services already in invoice
+			if pbKey == "Treatment" {
+				var addSvcCount int64
+				tx.Model(&invoices.InvoiceItemSale{}).
+					Where("invoice_id = ? AND item_type = ?", invoiceID, "Add service").
+					Count(&addSvcCount)
+				if addSvcCount > 0 {
+					return errors.New("cannot add treatments: invoice already has additional services")
+				}
+			}
+
+			if len(lensItems) > 0 && lensItems[0].ItemID != nil {
+				var srcs []string
+				tx.Model(&lensModel.Lenses{}).
+					Where("id_lenses = ?", *lensItems[0].ItemID).
+					Pluck("source", &srcs)
+				if len(srcs) > 0 && srcs[0] != "" {
+					invoiceLensSource = srcs[0]
+				} else {
+					invoiceLensSource = "custom"
+				}
+
+				switch invoiceLensSource {
+				case "custom":
+					if pbKey == "Treatment" {
+						return errors.New("cannot add treatments to custom lenses")
+					}
+				case "vision_web", "zeiss":
+					if pbKey == "Add service" {
+						return fmt.Errorf("cannot add additional services to %s lenses", invoiceLensSource)
+					}
+				}
+			}
+		}
+
+		// If invoice already has "Add service", only custom lenses allowed
+		if pbKey == "Lens" {
+			var addSvcCount int64
+			tx.Model(&invoices.InvoiceItemSale{}).
+				Where("invoice_id = ? AND item_type = ?", invoiceID, "Add service").
+				Count(&addSvcCount)
+			if addSvcCount > 0 {
+				// Will validate each lens source inside the loop
+				invoiceLensSource = "has_add_service"
+			}
+		}
+
 		for _, itemData := range input.Items {
 			var (
 				itemID       *int64
@@ -1098,6 +1168,16 @@ func (s *Service) AddItemsToInvoice(username string, invoiceID int64, input AddI
 				if tx.First(&lens, rawID).Error != nil {
 					continue
 				}
+				// If invoice has Add service — only custom lenses allowed
+				if invoiceLensSource == "has_add_service" {
+					lSrc := "custom"
+					if lens.Source != nil && *lens.Source != "" {
+						lSrc = *lens.Source
+					}
+					if lSrc != "custom" {
+						return fmt.Errorf("cannot add %s lenses: invoice already has additional services", lSrc)
+					}
+				}
 				lid := int64(lens.IDLenses)
 				itemID = &lid
 				description = derefStr(lens.Description)
@@ -1158,6 +1238,16 @@ func (s *Service) AddItemsToInvoice(username string, invoiceID int64, input AddI
 				var tr lensModel.LensTreatments
 				if tx.First(&tr, rawID).Error != nil {
 					continue
+				}
+				// Validate treatment source matches lens source
+				if invoiceLensSource != "" && invoiceLensSource != "custom" {
+					trSource := "custom"
+					if tr.Source != nil && *tr.Source != "" {
+						trSource = *tr.Source
+					}
+					if trSource != invoiceLensSource {
+						return fmt.Errorf("treatment source '%s' does not match lens source '%s'", trSource, invoiceLensSource)
+					}
 				}
 				trid := tr.IDLensTreatments
 				itemID = &trid

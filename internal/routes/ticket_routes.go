@@ -45,6 +45,8 @@ func RegisterTicketRoutes(db *gorm.DB, rdb *redis.Client, cfg *config.Config, sc
 	api.HandleFunc("/contact_lens/brands", h.GetContactLensBrands).Methods("GET")
 	api.HandleFunc("/invoice/{invoice_id:[0-9]+}", h.GetTicketsByInvoice).Methods("GET")
 	api.HandleFunc("/{id_lab_ticket:[0-9]+}", h.GetTicketByID).Methods("GET")
+	api.HandleFunc("/{ticket_id:[0-9]+}/print", h.PrintTicket).Methods("GET")
+	api.HandleFunc("/{ticket_id:[0-9]+}/lens_options", h.GetTicketLensOptions).Methods("GET")
 
 	// ── POST / PUT endpoints ────────────────────────────────────────────
 	api.HandleFunc("/invoice/{invoice_id:[0-9]+}", h.CreateTicket).Methods("POST")
