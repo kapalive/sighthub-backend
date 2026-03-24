@@ -107,32 +107,39 @@ type UpdateRxInput struct {
 	Prescription *PrescriptionPayload `json:"prescription"`
 }
 
-// ─── GET /rx/doctors ──────────────────────────────────────────────────────────
+// ─── GET /rx/amidoctor ────────────────────────────────────────────────────────
 
-type DoctorItem struct {
-	DoctorID int    `json:"doctor_id"`
-	Doctor   string `json:"doctor"`
-}
-
-func (s *Service) GetDoctors(username string) ([]DoctorItem, error) {
-	_, loc, err := s.getEmployeeAndLocation(username)
-	if err != nil || loc == nil {
-		return nil, errors.New("employee or location not found")
+func (s *Service) AmIDoctor(username string) (map[string]interface{}, error) {
+	emp, _, err := s.getEmployeeAndLocation(username)
+	if err != nil || emp == nil {
+		return nil, errors.New("employee not found")
 	}
 
-	var doctors []empModel.Employee
-	if err := s.db.Where("job_title_id = 1 AND store_payroll_id = ?", loc.IDLocation).Find(&doctors).Error; err != nil {
-		return nil, err
+	// job_title_id = 1 means doctor
+	if emp.JobTitleID == nil || *emp.JobTitleID != int64(1) {
+		return nil, nil // not a doctor
 	}
 
-	out := make([]DoctorItem, len(doctors))
-	for i, d := range doctors {
-		out[i] = DoctorItem{
-			DoctorID: d.IDEmployee,
-			Doctor:   "Dr. " + d.FirstName + " " + d.LastName,
-		}
+	result := map[string]interface{}{
+		"doctor": "Dr. " + emp.FirstName + " " + emp.LastName,
+		"npi":    nil,
+		"ein":    nil,
 	}
-	return out, nil
+
+	// Look up NPI/EIN from doctor_npi_number
+	type npiRow struct {
+		NPI *string `gorm:"column:dr_npi_number"`
+		EIN *string `gorm:"column:ein"`
+	}
+	var npi npiRow
+	if s.db.Table("doctor_npi_number").
+		Where("employee_id = ?", emp.IDEmployee).
+		First(&npi).Error == nil {
+		result["npi"] = npi.NPI
+		result["ein"] = npi.EIN
+	}
+
+	return result, nil
 }
 
 // ─── Private helpers ──────────────────────────────────────────────────────────

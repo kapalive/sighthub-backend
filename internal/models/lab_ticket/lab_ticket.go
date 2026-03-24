@@ -32,6 +32,7 @@ type LabTicket struct {
 	OurNote                       *string    `gorm:"column:our_note;type:text"                                       json:"our_note,omitempty"`
 	LabInstructions               *string    `gorm:"column:lab_instructions;type:text"                               json:"lab_instructions,omitempty"`
 	EmployeeID                    int64      `gorm:"column:employee_id;not null"                                     json:"employee_id"`
+	VwOrderID                     *string    `gorm:"column:vw_order_id;type:varchar(100)"                            json:"vw_order_id,omitempty"`
 
 	// preload relations (lab_id now references vendor where lab=true)
 	Lab                  *vendors.Vendor       `gorm:"foreignKey:LabID;references:IDVendor"                                        json:"-"`
@@ -66,6 +67,7 @@ func (l *LabTicket) ToMap() map[string]interface{} {
 		"our_note":                     l.OurNote,
 		"lab_instructions":             l.LabInstructions,
 		"employee_id":                  l.EmployeeID,
+		"vw_order_id":                  l.VwOrderID,
 	}
 	if l.DateCreate != nil {
 		d := l.DateCreate.Format("2006-01-02")

@@ -536,6 +536,16 @@ func (s *Service) PlaceOrder(ticketID int64) (*OrderResult, error) {
 		RawResponse: respStr,
 	}
 
+	// Save vw_order_id to lab_ticket on any non-error result
+	saveOrderID := func() {
+		vwID := result.VWOrderID
+		if vwID == "" {
+			vwID = orderID // fallback to our internal order ID
+		}
+		s.db.Table("lab_ticket").Where("id_lab_ticket = ?", ticketID).
+			Update("vw_order_id", vwID)
+	}
+
 	// Try to extract SingleOrder or ORDER_MSG from SOAP response
 	var soapResp soapUploadResp
 	if xml.Unmarshal(respData, &soapResp) == nil && soapResp.Body.UploadFileResponse.Result != "" {
@@ -547,6 +557,7 @@ func (s *Service) PlaceOrder(ticketID int64) (*OrderResult, error) {
 			result.VWOrderID = single.VWebOrderID
 			result.Status = single.Status
 			result.ErrorList = single.ErrorList
+			saveOrderID()
 			return result, nil
 		}
 
@@ -564,6 +575,7 @@ func (s *Service) PlaceOrder(ticketID int64) (*OrderResult, error) {
 				result.ErrorList = msg.Text
 			}
 			result.RawResponse = msg.Text
+			saveOrderID()
 			return result, nil
 		}
 	}
@@ -574,6 +586,7 @@ func (s *Service) PlaceOrder(ticketID int64) (*OrderResult, error) {
 		result.VWOrderID = single.VWebOrderID
 		result.Status = single.Status
 		result.ErrorList = single.ErrorList
+		saveOrderID()
 		return result, nil
 	}
 
@@ -583,7 +596,154 @@ func (s *Service) PlaceOrder(ticketID int64) (*OrderResult, error) {
 	}
 
 	result.Status = "submitted"
+	saveOrderID()
 	return result, nil
+}
+
+// ─── Order Status ───────────────────────────────────────────────────────────
+
+const (
+	statusTokenScope = "VW.OP.Order.WebApi"
+	statusURL        = "https://regapi.visionweb.com/order/OrderTracking/GetTrackingUpdates"
+)
+
+type VWOrderStatus struct {
+	OrderID     string `json:"order_id"`
+	Status      string `json:"status"`
+	StatusCode  int    `json:"status_code,omitempty"`
+	Description string `json:"description,omitempty"`
+	TrackingID  string `json:"tracking_id,omitempty"`
+	ReceivedAt  string `json:"received_at,omitempty"`
+}
+
+func (s *Service) getStatusToken() (string, error) {
+	body := "grant_type=client_credentials&scope=" + statusTokenScope
+	req, _ := http.NewRequest("POST", tokenURL, strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.SetBasicAuth(basicUser, basicPass)
+
+	resp, err := (&http.Client{Timeout: 15 * time.Second}).Do(req)
+	if err != nil {
+		return "", fmt.Errorf("vw status token request failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	data, _ := io.ReadAll(resp.Body)
+	s1 := strings.Index(string(data), `"access_token":"`)
+	if s1 < 0 {
+		return "", fmt.Errorf("vw status token not found")
+	}
+	s1 += len(`"access_token":"`)
+	s2 := strings.Index(string(data)[s1:], `"`)
+	return string(data)[s1 : s1+s2], nil
+}
+
+func (s *Service) GetOrderStatus(vwOrderID string) (*VWOrderStatus, error) {
+	token, err := s.getStatusToken()
+	if err != nil {
+		return nil, err
+	}
+
+	reqBody := fmt.Sprintf(`{"OrderIds":["%s"]}`, vwOrderID)
+	req, _ := http.NewRequest("POST", statusURL, strings.NewReader(reqBody))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("username", vwCustomerUser)
+	req.Header.Set("password", vwCustomerPass)
+
+	resp, err := (&http.Client{Timeout: 15 * time.Second}).Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("vw status request failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	data, _ := io.ReadAll(resp.Body)
+
+	// Parse VW_TRACKING XML response
+	type vwTrackingItem struct {
+		Type       string `xml:"Type,attr"`
+		Status     string `xml:"Status,attr"`
+		TrackingID string `xml:"Tracking_Id,attr"`
+		VWTrackID  string `xml:"Visionweb_Tracking_Id,attr"`
+		ReceivedAt string `xml:"Received_at,attr"`
+		Desc       string `xml:"STATUS_DESCRIPTION"`
+	}
+	type vwTrackingAccount struct {
+		Items []vwTrackingItem `xml:"ITEM"`
+	}
+	type vwTrackingSupplier struct {
+		Accounts []vwTrackingAccount `xml:"ACCOUNT"`
+	}
+	type vwTracking struct {
+		XMLName   xml.Name             `xml:"VW_TRACKING"`
+		Suppliers []vwTrackingSupplier `xml:"SUPPLIER"`
+	}
+
+	var tracking vwTracking
+	if xml.Unmarshal(data, &tracking) == nil {
+		for _, sup := range tracking.Suppliers {
+			for _, acc := range sup.Accounts {
+				for _, item := range acc.Items {
+					statusCode := 0
+					fmt.Sscanf(item.Status, "%d", &statusCode)
+					return &VWOrderStatus{
+						OrderID:     vwOrderID,
+						Status:      statusDescription(statusCode),
+						StatusCode:  statusCode,
+						Description: item.Desc,
+						TrackingID:  item.TrackingID,
+						ReceivedAt:  item.ReceivedAt,
+					}, nil
+				}
+			}
+		}
+	}
+
+	// Fallback — return raw response if can't parse
+	return &VWOrderStatus{
+		OrderID:     vwOrderID,
+		Status:      "unknown",
+		Description: string(data),
+	}, nil
+}
+
+func statusDescription(code int) string {
+	switch code {
+	case 2:
+		return "Submitted"
+	case 5:
+		return "Received by Supplier"
+	case 7:
+		return "In Process"
+	case 10:
+		return "Waiting for Information"
+	case 15:
+		return "Waiting for Frame"
+	case 20:
+		return "RX Launch"
+	case 25:
+		return "Surfacing"
+	case 30:
+		return "Treatment"
+	case 35:
+		return "Tinting"
+	case 40:
+		return "Finishing"
+	case 45:
+		return "Inspection"
+	case 50:
+		return "Breakage-Redo"
+	case 55:
+		return "Shipping"
+	case 60:
+		return "Shipped"
+	case 900:
+		return "Cancelled"
+	case 999:
+		return "Other"
+	default:
+		return fmt.Sprintf("Status %d", code)
+	}
 }
 
 // ─── XML helpers ────────────────────────────────────────────────────────────

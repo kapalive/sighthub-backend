@@ -469,59 +469,24 @@ func GetPermittedLocationIDs(db *gorm.DB, username string, permissionID int) []i
 		return nil
 	}
 
-	type subBlockRow struct {
-		SubBlockStoreID     *int
-		SubBlockWarehouseID *int
-	}
-	var rows []subBlockRow
-	db.Table("employee_permission ep").
-		Select("pc.permissions_sub_block_store_id AS sub_block_store_id, pc.permissions_sub_block_warehouse_id AS sub_block_warehouse_id").
-		Joins("JOIN permissions_combination pc ON pc.id_permissions_combination = ep.permissions_combination_id").
-		Where("ep.employee_login_id = ? AND ep.is_active = true AND pc.permissions_id = ?",
-			login.IDEmployeeLogin, permissionID).
-		Scan(&rows)
+	// Single query: resolve employee → permission combos → sub_block_store → store → location
+	var locIDs []int
+	db.Raw(`
+		SELECT DISTINCT l.id_location
+		FROM employee_permission ep
+		JOIN permissions_combination pc ON pc.id_permissions_combination = ep.permissions_combination_id
+		LEFT JOIN permissions_sub_block_store psbs ON psbs.id_permissions_sub_block = pc.permissions_sub_block_store_id
+		LEFT JOIN permissions_sub_block_warehouse psbw ON psbw.id_permissions_sub_block = pc.permissions_sub_block_warehouse_id
+		JOIN location l ON (l.store_id = psbs.store_id OR l.warehouse_id = psbw.warehouse_id)
+		WHERE ep.employee_login_id = ? AND ep.is_active = true AND pc.permissions_id = ? AND l.store_active = true
+	`, login.IDEmployeeLogin, permissionID).Scan(&locIDs)
 
-	locationIDSet := make(map[int]struct{})
-
-	for _, rw := range rows {
-		if rw.SubBlockStoreID != nil {
-			var storeID *int
-			db.Model(&permission.PermissionsSubBlockStore{}).
-				Where("id_permissions_sub_block = ?", *rw.SubBlockStoreID).
-				Pluck("store_id", &storeID)
-			if storeID != nil {
-				var locIDs []int
-				db.Model(&location.Location{}).
-					Where("store_id = ? AND store_active = true", *storeID).
-					Pluck("id_location", &locIDs)
-				for _, id := range locIDs {
-					locationIDSet[id] = struct{}{}
-				}
-			}
-		} else if rw.SubBlockWarehouseID != nil {
-			var warehouseID *int
-			db.Model(&permission.PermissionsSubBlockWarehouse{}).
-				Where("id_permissions_sub_block = ?", *rw.SubBlockWarehouseID).
-				Pluck("warehouse_id", &warehouseID)
-			if warehouseID != nil {
-				var locIDs []int
-				db.Model(&location.Location{}).
-					Where("warehouse_id = ? AND store_active = true", *warehouseID).
-					Pluck("id_location", &locIDs)
-				for _, id := range locIDs {
-					locationIDSet[id] = struct{}{}
-				}
-			}
-		}
-	}
-
-	result := make([]int, 0, len(locationIDSet))
-	for id := range locationIDSet {
-		result = append(result, id)
-	}
-	sortInts(result)
-	return result
+	return locIDs
 }
+
+// keep imports used
+var _ = permission.PermissionsSubBlockStore{}
+var _ = permission.PermissionsSubBlockWarehouse{}
 
 // ─── PathAllowed helper ────────────────────────────────────────────────────────
 

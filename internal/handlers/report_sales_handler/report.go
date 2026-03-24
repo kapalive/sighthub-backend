@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
-	"strings"
 	"time"
 
 	"gorm.io/gorm"
@@ -105,15 +104,9 @@ func (h *Handler) Breakdown(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	showInterCompany := false
-	raw := strings.ToLower(q.Get("show_inter_company"))
-	if raw == "1" || raw == "true" || raw == "yes" || raw == "on" {
-		showInterCompany = true
-	}
-
 	outputFormat := q.Get("output")
 
-	result, err := h.svc.Breakdown(effectiveLocIDs, dateStart, dateEnd, employeeID, showInterCompany)
+	result, err := h.svc.Breakdown(effectiveLocIDs, dateStart, dateEnd, employeeID)
 	if err != nil {
 		jsonError(w, err.Error(), 500)
 		return

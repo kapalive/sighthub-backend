@@ -163,6 +163,18 @@ func (h *Handler) GetTicketByID(w http.ResponseWriter, r *http.Request) {
 		jsonResponse(w, errorStatus(err), map[string]string{"error": err.Error()})
 		return
 	}
+
+	// If ticket has VW order, fetch status from VisionWeb
+	if h.vwSvc != nil {
+		if vwID, ok := result["vw_order_id"].(*string); ok && vwID != nil && *vwID != "" {
+			if status, err := h.vwSvc.GetOrderStatus(*vwID); err == nil {
+				result["vw_order_status"] = status
+			} else {
+				result["vw_order_status"] = map[string]string{"error": err.Error()}
+			}
+		}
+	}
+
 	jsonResponse(w, http.StatusOK, result)
 }
 

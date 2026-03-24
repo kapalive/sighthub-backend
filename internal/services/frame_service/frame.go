@@ -82,6 +82,11 @@ type ModelDetailResult struct {
 	BacksideAR       bool    `json:"backside_ar"`
 	LensMaterial     *string `json:"lens_material"`
 	Accessories      *string `json:"accessories"`
+	MaterialsFrame   *string `json:"materials_frame"`
+	MaterialsTemple  *string `json:"materials_temple"`
+	Color            *string `json:"color"`
+	ColorTemplate    *string `json:"color_template"`
+	Shape            *string `json:"shape"`
 }
 
 type SearchFilters struct {
@@ -377,6 +382,11 @@ func (s *Service) GetModelsByProduct(productID int, materialFilter *string) ([]M
 		MfgNumber        *string
 		MfrSerialNumber  *string
 		Accessories      *string
+		MaterialsFrame   *string
+		MaterialsTemple  *string
+		Color            *string
+		ColorTemplate    *string
+		Shape            *string
 	}
 
 	q := s.db.Table("model m").
@@ -385,7 +395,8 @@ func (s *Service) GetModelsByProduct(productID int, materialFilter *string) ([]M
 			m.size_lens_width, m.size_bridge_width, m.size_temple_length,
 			m.sunglass, m.photo, m.polor, m.mirror, m.backside_ar,
 			m.lens_material, m.upc, m.ean, m.mfg_number, m.mfr_serial_number,
-			m.accessories`).
+			m.accessories, m.materials_frame, m.materials_temple, m.color,
+			m.color_template, m.shape`).
 		Joins("JOIN product p ON p.id_product = m.product_id").
 		Where("m.product_id = ?", productID).
 		Order("m.title_variant ASC")
@@ -421,6 +432,11 @@ func (s *Service) GetModelsByProduct(productID int, materialFilter *string) ([]M
 			BacksideAR:       r.BacksideAR,
 			LensMaterial:     r.LensMaterial,
 			Accessories:      r.Accessories,
+			MaterialsFrame:   r.MaterialsFrame,
+			MaterialsTemple:  r.MaterialsTemple,
+			Color:            r.Color,
+			ColorTemplate:    r.ColorTemplate,
+			Shape:            r.Shape,
 		}
 	}
 	return result, nil

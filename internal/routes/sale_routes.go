@@ -33,6 +33,9 @@ func RegisterSaleRoutes(db *gorm.DB, rdb *redis.Client, cfg *config.Config, r *m
 	// Sale items (complex filter)
 	api.HandleFunc("/item", h.GetItems).Methods("GET")
 
+	// Sale category report
+	api.HandleFunc("/sale_category_report", h.SaleCategoryReport).Methods("GET")
+
 	// Yearly comparisons (extra permissions via ActivePermission inline)
 	perm42 := middleware.ActivePermission(db, 42)
 	api.Handle("/yearly_comparison_by_rep", perm42(http.HandlerFunc(h.YearlyComparisonByRep))).Methods("GET")

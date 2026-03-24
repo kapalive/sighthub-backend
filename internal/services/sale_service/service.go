@@ -1024,30 +1024,51 @@ func (s *Service) CommissionReport(locationID *int, startDate, endDate time.Time
 		}
 		acc.locations[locName] = struct{}{}
 
-		// get invoice items
+		// get invoice items (sale items + service items)
+		var invItems []CommissionInvoiceItem
+
 		itemRows, err := s.db.Raw(`
 			SELECT description, COALESCE(total,0) FROM invoice_item_sale WHERE invoice_id = ?`, invID).Rows()
-		if err != nil {
-			continue
-		}
-		var invItems []CommissionInvoiceItem
-		for itemRows.Next() {
-			var desc string
-			var amt float64
-			if err := itemRows.Scan(&desc, &amt); err != nil {
-				continue
+		if err == nil {
+			for itemRows.Next() {
+				var desc string
+				var amt float64
+				if itemRows.Scan(&desc, &amt) == nil {
+					invItems = append(invItems, CommissionInvoiceItem{Name: desc, Amount: amt})
+				}
 			}
-			invItems = append(invItems, CommissionInvoiceItem{Name: desc, Amount: amt})
+			itemRows.Close()
 		}
-		itemRows.Close()
+
+		svcRows, err := s.db.Raw(`
+			SELECT COALESCE(ps.title,'Service'), COALESCE(isi.total,0)
+			FROM invoice_services_item isi
+			LEFT JOIN professional_service ps ON ps.id_professional_service = isi.professional_service_id
+			WHERE isi.invoice_id = ?`, invID).Rows()
+		if err == nil {
+			for svcRows.Next() {
+				var desc string
+				var amt float64
+				if svcRows.Scan(&desc, &amt) == nil {
+					invItems = append(invItems, CommissionInvoiceItem{Name: desc, Amount: amt})
+				}
+			}
+			svcRows.Close()
+		}
+
+		// Total from items (more accurate than invoice.final_amount)
+		var itemsTotal float64
+		for _, it := range invItems {
+			itemsTotal += it.Amount
+		}
 
 		acc.invoices = append(acc.invoices, CommissionInvoice{
 			InvoiceID: invNum,
 			Items:     invItems,
-			Total:     finalAmt,
+			Total:     round2(itemsTotal),
 		})
 		rate := acc.commPct / 100.0
-		acc.commTotal += finalAmt * rate
+		acc.commTotal += itemsTotal * rate
 	}
 
 	var result []CommissionEmployee
@@ -1271,4 +1292,209 @@ func generateYMPairs(yearStart, monthStart, yearEnd, monthEnd int) [][2]int {
 		}
 	}
 	return pairs
+}
+
+// =====================================================================
+// Sale Category Report
+// =====================================================================
+
+type SaleCategoryRow struct {
+	Date            string  `json:"date"`
+	InvoiceNumber   string  `json:"invoice_number"`
+	PatientName     string  `json:"patient_name"`
+	Total           float64 `json:"total"`
+	Cost            float64 `json:"cost"`
+	FrameOnly       float64 `json:"frame_only"`
+	OphRfRx         float64 `json:"oph_rf_rx"`
+	SunPlano        float64 `json:"sun_plano"`
+	LOnly           float64 `json:"l_only"`
+	ProfFees        float64 `json:"prof_fees"`
+	Contacts        float64 `json:"contacts"`
+	Others          float64 `json:"others"`
+	Discount        float64 `json:"discount"`
+	Tax             float64 `json:"tax"`
+	Employee        string  `json:"employee"`
+	CostInfoMissing float64 `json:"cost_info_missing"`
+}
+
+type SaleCategoryResult struct {
+	Rows    []SaleCategoryRow `json:"rows"`
+	Totals  SaleCategoryRow   `json:"totals"`
+}
+
+func (s *Service) SaleCategoryReport(locationID *int, startDate, endDate time.Time) (*SaleCategoryResult, error) {
+	query := `
+		SELECT i.id_invoice, i.number_invoice, i.date_create,
+		       COALESCE(i.discount, 0) AS inv_discount,
+		       COALESCE(i.tax_amount, 0) AS tax_amount,
+		       COALESCE(i.final_amount, 0) AS final_amount,
+		       p.first_name AS pat_first, p.last_name AS pat_last,
+		       e.first_name AS emp_first, e.last_name AS emp_last
+		FROM invoice i
+		LEFT JOIN patient p ON p.id_patient = i.patient_id
+		JOIN employee e ON e.id_employee = i.employee_id
+		WHERE i.number_invoice LIKE 'S%'
+		  AND i.date_create BETWEEN ? AND ?`
+
+	args := []interface{}{startDate, endDate}
+	if locationID != nil {
+		query += ` AND i.location_id = ?`
+		args = append(args, *locationID)
+	}
+	query += ` ORDER BY i.date_create, i.number_invoice`
+
+	invRows, err := s.db.Raw(query, args...).Rows()
+	if err != nil {
+		return nil, err
+	}
+	defer invRows.Close()
+
+	var rows []SaleCategoryRow
+	var totals SaleCategoryRow
+	totals.Date = "TOTAL:"
+
+	for invRows.Next() {
+		var invID int64
+		var invNum string
+		var dateCreate *time.Time
+		var invDiscount, taxAmt, finalAmt float64
+		var patFirst, patLast, empFirst, empLast *string
+
+		if err := invRows.Scan(&invID, &invNum, &dateCreate, &invDiscount, &taxAmt, &finalAmt,
+			&patFirst, &patLast, &empFirst, &empLast); err != nil {
+			continue
+		}
+
+		row := SaleCategoryRow{
+			InvoiceNumber: invNum,
+			Discount:      round2(invDiscount),
+			Tax:           round2(taxAmt),
+		}
+		if dateCreate != nil {
+			row.Date = dateCreate.Format("01/02/2006")
+		}
+		if patFirst != nil && patLast != nil {
+			row.PatientName = *patFirst + " " + *patLast
+		} else if patLast != nil {
+			row.PatientName = *patLast
+		}
+		if empFirst != nil && empLast != nil {
+			row.Employee = *empFirst + " " + *empLast
+		}
+
+		// Categorize invoice_item_sale items
+		type itemRow struct {
+			ItemType    string
+			Total       float64
+			Cost        float64
+			IsSunglass  *bool
+			HasLabTicket bool
+		}
+		var items []itemRow
+		s.db.Raw(`
+			SELECT iis.item_type, COALESCE(iis.total,0) AS total, COALESCE(iis.cost,0) AS cost,
+			       m.sunglass AS is_sunglass,
+			       EXISTS(SELECT 1 FROM lab_ticket lt WHERE lt.invoice_id = iis.invoice_id) AS has_lab_ticket
+			FROM invoice_item_sale iis
+			LEFT JOIN inventory inv ON inv.id_inventory = iis.item_id
+			    AND LOWER(TRIM(iis.item_type)) IN ('frames','lens')
+			LEFT JOIN model m ON m.id_model = inv.model_id
+			WHERE iis.invoice_id = ?`, invID).Scan(&items)
+
+		for _, it := range items {
+			t := it.Total
+			typ := strings.ToLower(strings.TrimSpace(it.ItemType))
+
+			switch typ {
+			case "frames":
+				if it.IsSunglass != nil && *it.IsSunglass {
+					row.SunPlano += t
+				} else if it.HasLabTicket {
+					row.OphRfRx += t
+				} else {
+					row.FrameOnly += t
+				}
+			case "lens":
+				row.LOnly += t
+			case "contact lens":
+				row.Contacts += t
+			case "prof. service":
+				row.ProfFees += t
+			default: // Add service, Treatment, misc, etc.
+				row.Others += t
+			}
+
+			row.Cost += it.Cost
+			if it.Cost == 0 && t != 0 {
+				row.CostInfoMissing += t
+			}
+		}
+
+		// Also add invoice_services_item (prof services, lens orders, contact lens)
+		type svcRow struct {
+			Total              float64
+			ProfessionalSvcID  *int64
+			ContactLensItemID  *int
+		}
+		var svcItems []svcRow
+		s.db.Raw(`
+			SELECT COALESCE(isi.total, 0) AS total,
+			       isi.professional_service_id,
+			       isi.contact_lens_item_id
+			FROM invoice_services_item isi
+			WHERE isi.invoice_id = ?`, invID).Scan(&svcItems)
+
+		for _, si := range svcItems {
+			if si.ProfessionalSvcID != nil {
+				row.ProfFees += si.Total
+			} else if si.ContactLensItemID != nil {
+				row.Contacts += si.Total
+			} else {
+				row.Others += si.Total
+			}
+		}
+
+		row.Total = round2(finalAmt)
+		row.Cost = round2(row.Cost)
+		row.FrameOnly = round2(row.FrameOnly)
+		row.OphRfRx = round2(row.OphRfRx)
+		row.SunPlano = round2(row.SunPlano)
+		row.LOnly = round2(row.LOnly)
+		row.ProfFees = round2(row.ProfFees)
+		row.Contacts = round2(row.Contacts)
+		row.Others = round2(row.Others)
+		row.CostInfoMissing = round2(row.CostInfoMissing)
+
+		// Accumulate totals
+		totals.Total += row.Total
+		totals.Cost += row.Cost
+		totals.FrameOnly += row.FrameOnly
+		totals.OphRfRx += row.OphRfRx
+		totals.SunPlano += row.SunPlano
+		totals.LOnly += row.LOnly
+		totals.ProfFees += row.ProfFees
+		totals.Contacts += row.Contacts
+		totals.Others += row.Others
+		totals.Discount += row.Discount
+		totals.Tax += row.Tax
+		totals.CostInfoMissing += row.CostInfoMissing
+
+		rows = append(rows, row)
+	}
+
+	// Round totals
+	totals.Total = round2(totals.Total)
+	totals.Cost = round2(totals.Cost)
+	totals.FrameOnly = round2(totals.FrameOnly)
+	totals.OphRfRx = round2(totals.OphRfRx)
+	totals.SunPlano = round2(totals.SunPlano)
+	totals.LOnly = round2(totals.LOnly)
+	totals.ProfFees = round2(totals.ProfFees)
+	totals.Contacts = round2(totals.Contacts)
+	totals.Others = round2(totals.Others)
+	totals.Discount = round2(totals.Discount)
+	totals.Tax = round2(totals.Tax)
+	totals.CostInfoMissing = round2(totals.CostInfoMissing)
+
+	return &SaleCategoryResult{Rows: rows, Totals: totals}, nil
 }

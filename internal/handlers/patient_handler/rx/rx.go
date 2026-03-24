@@ -33,20 +33,24 @@ func jsonError(w http.ResponseWriter, msg string, status int) {
 	json.NewEncoder(w).Encode(map[string]string{"error": msg}) //nolint:errcheck
 }
 
-// ─── GET /rx/doctors ──────────────────────────────────────────────────────────
+// ─── GET /rx/amidoctor ────────────────────────────────────────────────────────
 
-func (h *Handler) GetDoctors(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) AmIDoctor(w http.ResponseWriter, r *http.Request) {
 	username := pkgAuth.UsernameFromContext(r.Context())
 	if username == "" {
 		jsonError(w, "unauthorized", http.StatusUnauthorized)
 		return
 	}
-	doctors, err := h.svc.GetDoctors(username)
+	result, err := h.svc.AmIDoctor(username)
 	if err != nil {
 		jsonError(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	jsonResponse(w, doctors, http.StatusOK)
+	if result == nil {
+		jsonResponse(w, map[string]interface{}{"doctor": nil, "npi": nil, "ein": nil}, http.StatusOK)
+		return
+	}
+	jsonResponse(w, result, http.StatusOK)
 }
 
 // ─── GET /latest-rx ───────────────────────────────────────────────────────────

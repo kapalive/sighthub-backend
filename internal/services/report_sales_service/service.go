@@ -140,7 +140,6 @@ func (s *Service) Breakdown(
 	locationIDs []int,
 	dateStart, dateEnd time.Time,
 	employeeID *int,
-	showInterCompany bool,
 ) (*BreakdownResult, error) {
 
 	query := `
@@ -184,10 +183,6 @@ func (s *Service) Breakdown(
 	if employeeID != nil {
 		query += ` AND i.employee_id = ?`
 		args = append(args, *employeeID)
-	}
-
-	if !showInterCompany {
-		query += ` AND i.number_invoice NOT ILIKE 'I%'`
 	}
 
 	query += ` ORDER BY i.date_create, i.number_invoice`

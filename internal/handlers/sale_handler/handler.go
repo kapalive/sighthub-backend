@@ -298,6 +298,41 @@ func (h *Handler) YearlyComparisonByRep(w http.ResponseWriter, r *http.Request) 
 	})
 }
 
+// ── GET /sale_category_report ──────────────────────────────────────────────
+
+func (h *Handler) SaleCategoryReport(w http.ResponseWriter, r *http.Request) {
+	q := r.URL.Query()
+
+	var locationID *int
+	if v := q.Get("location_id"); v != "" {
+		if id, err := strconv.Atoi(v); err == nil {
+			locationID = &id
+		}
+	}
+
+	now := time.Now()
+	startDate := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, time.UTC)
+	endDate := now
+
+	if v := q.Get("start_date"); v != "" {
+		if t, err := time.Parse("2006-01-02", v); err == nil {
+			startDate = t
+		}
+	}
+	if v := q.Get("end_date"); v != "" {
+		if t, err := time.Parse("2006-01-02", v); err == nil {
+			endDate = t
+		}
+	}
+
+	data, err := h.svc.SaleCategoryReport(locationID, startDate, endDate)
+	if err != nil {
+		jsonError(w, err.Error(), 500)
+		return
+	}
+	jsonOK(w, data)
+}
+
 // ── GET /professional_codes ─────────────────────────────────────────────────
 
 func (h *Handler) ProfessionalCodes(w http.ResponseWriter, r *http.Request) {
@@ -445,21 +480,19 @@ func (h *Handler) InsuranceReport(w http.ResponseWriter, r *http.Request) {
 	startDate := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC)
 	endDate := startDate
 
-	if v := q.Get("start"); v != "" {
-		if t, err := time.Parse("2006-01-02", v); err == nil {
-			startDate = t
-		} else {
-			jsonError(w, "Invalid date format. Use YYYY-MM-DD.", 400)
-			return
+	if v := q.Get("start_date"); v == "" {
+		if v2 := q.Get("start"); v2 != "" {
+			if t, err := time.Parse("2006-01-02", v2); err == nil { startDate = t }
 		}
+	} else {
+		if t, err := time.Parse("2006-01-02", v); err == nil { startDate = t }
 	}
-	if v := q.Get("end"); v != "" {
-		if t, err := time.Parse("2006-01-02", v); err == nil {
-			endDate = t
-		} else {
-			jsonError(w, "Invalid date format. Use YYYY-MM-DD.", 400)
-			return
+	if v := q.Get("end_date"); v == "" {
+		if v2 := q.Get("end"); v2 != "" {
+			if t, err := time.Parse("2006-01-02", v2); err == nil { endDate = t }
 		}
+	} else {
+		if t, err := time.Parse("2006-01-02", v); err == nil { endDate = t }
 	}
 
 	var insuranceID *int
