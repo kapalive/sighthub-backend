@@ -210,6 +210,21 @@ func (h *Handler) UpdateModel(w http.ResponseWriter, r *http.Request) {
 	if v, ok := body["accessories"].(string); ok {
 		in.Accessories = &v
 	}
+	if v, ok := body["materials_frame"].(string); ok {
+		in.MaterialsFrame = &v
+	}
+	if v, ok := body["materials_temple"].(string); ok {
+		in.MaterialsTemple = &v
+	}
+	if v, ok := body["color"].(string); ok {
+		in.Color = &v
+	}
+	if v, ok := body["color_template"].(string); ok {
+		in.ColorTemplate = &v
+	}
+	if v, ok := body["shape"].(string); ok {
+		in.Shape = &v
+	}
 
 	model, err := h.svc.UpdateModel(id, in)
 	if err != nil {
@@ -346,6 +361,7 @@ func (h *Handler) CreateCustomGlasses(w http.ResponseWriter, r *http.Request) {
 		BacksideAR       *bool   `json:"backside_ar"`
 		UPC              *string `json:"upc"`
 		Accessories      *string `json:"accessories"`
+		BrandID          *int64  `json:"brand_id"`
 	}
 	if r.Body != nil {
 		json.NewDecoder(r.Body).Decode(&body)
@@ -365,6 +381,7 @@ func (h *Handler) CreateCustomGlasses(w http.ResponseWriter, r *http.Request) {
 		BacksideAR:       body.BacksideAR,
 		UPC:              body.UPC,
 		Accessories:      body.Accessories,
+		BrandID:          body.BrandID,
 	})
 	if err != nil {
 		msg := err.Error()
@@ -376,6 +393,36 @@ func (h *Handler) CreateCustomGlasses(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	jsonResponse(w, model.ToMap(), http.StatusCreated)
+}
+
+// GET /api/frame_library/frame-type-materials
+func (h *Handler) GetFrameTypeMaterials(w http.ResponseWriter, r *http.Request) {
+	data, err := h.svc.GetFrameTypeMaterials()
+	if err != nil {
+		jsonError(w, "Query failed", http.StatusInternalServerError)
+		return
+	}
+	jsonResponse(w, data, http.StatusOK)
+}
+
+// GET /api/frame_library/shapes
+func (h *Handler) GetFrameShapes(w http.ResponseWriter, r *http.Request) {
+	data, err := h.svc.GetFrameShapes()
+	if err != nil {
+		jsonError(w, "Query failed", http.StatusInternalServerError)
+		return
+	}
+	jsonResponse(w, data, http.StatusOK)
+}
+
+// GET /api/frame_library/lens/materials
+func (h *Handler) GetLensMaterials(w http.ResponseWriter, r *http.Request) {
+	data, err := h.svc.GetLensMaterials()
+	if err != nil {
+		jsonError(w, "Query failed", http.StatusInternalServerError)
+		return
+	}
+	jsonResponse(w, data, http.StatusOK)
 }
 
 // ─── helpers ──────────────────────────────────────────────────────────────────

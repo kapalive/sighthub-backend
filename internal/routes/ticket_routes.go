@@ -8,6 +8,7 @@ import (
 	"sighthub-backend/config"
 	ticketHandler "sighthub-backend/internal/handlers/ticket_handler"
 	ticketSvc "sighthub-backend/internal/services/ticket_service"
+	vwSvc "sighthub-backend/internal/services/visionweb_service"
 	pkgAuth "sighthub-backend/pkg/auth"
 	"sighthub-backend/pkg/scheduler"
 )
@@ -15,6 +16,7 @@ import (
 func RegisterTicketRoutes(db *gorm.DB, rdb *redis.Client, cfg *config.Config, sched *scheduler.Scheduler, r *mux.Router) {
 	svc := ticketSvc.New(db, sched)
 	h := ticketHandler.New(svc)
+	h.SetVWService(vwSvc.New(db))
 
 	jwtMW := pkgAuth.JWTMiddleware(cfg.JWTSecretKey, rdb)
 
@@ -52,4 +54,6 @@ func RegisterTicketRoutes(db *gorm.DB, rdb *redis.Client, cfg *config.Config, sc
 	api.HandleFunc("/invoice/{invoice_id:[0-9]+}", h.CreateTicket).Methods("POST")
 	api.HandleFunc("/{id_lab_ticket:[0-9]+}", h.UpdateTicket).Methods("PUT")
 	api.HandleFunc("/{ticket_id:[0-9]+}/notify-patient", h.NotifyPatient).Methods("POST")
+	api.HandleFunc("/{ticket_id:[0-9]+}/order-requirements", h.GetOrderRequirements).Methods("GET")
+	api.HandleFunc("/{ticket_id:[0-9]+}/order", h.PlaceVWOrder).Methods("POST")
 }

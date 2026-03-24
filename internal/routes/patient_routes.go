@@ -156,6 +156,7 @@ func RegisterPatientRoutes(db *gorm.DB, rdb *redis.Client, cfg *config.Config, r
 
 	api.HandleFunc("/latest-rx", rh.GetLatestRx).Methods("GET")
 	api.HandleFunc("/rx-list", rh.GetRxList).Methods("GET")
+	api.HandleFunc("/rx/doctors", rh.GetDoctors).Methods("GET")
 	api.HandleFunc("/rx", rh.GetRx).Methods("GET")
 	api.Handle("/rx",
 		perm54(http.HandlerFunc(rh.CreateRx)),

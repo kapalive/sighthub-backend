@@ -62,6 +62,7 @@ type CustomGlassesInput struct {
 	UPC              *string
 	Accessories      *string
 	TypeProduct      *string
+	BrandID          *int64
 	// PriceBook fields (optional)
 	ItemListCost    *float64
 	ItemDiscount    *float64
@@ -81,13 +82,10 @@ func (s *Service) GetPBVendorBrandCombinations() ([]VendorBrandResult, error) {
 		BrandName  string
 	}
 	var rows []row
-	err := s.db.Table("vendor v").
+	err := s.db.Table("vendor_brand vb").
 		Select("v.id_vendor, v.vendor_name, b.id_brand, b.brand_name").
-		Joins("JOIN product p ON p.vendor_id = v.id_vendor").
-		Joins("JOIN brand b ON b.id_brand = p.brand_id").
-		Joins("JOIN model m ON m.product_id = p.id_product").
-		Joins("JOIN inventory i ON i.model_id = m.id_model").
-		Distinct("v.id_vendor, v.vendor_name, b.id_brand, b.brand_name").
+		Joins("JOIN vendor v ON v.id_vendor = vb.id_vendor").
+		Joins("JOIN brand b ON b.id_brand = vb.id_brand").
 		Order("b.brand_name").
 		Scan(&rows).Error
 	if err != nil {
@@ -292,31 +290,44 @@ func (s *Service) CreateCustomGlasses(inventoryID int, employeeID int64, in Cust
 		newModel.Accessories = in.Accessories
 	}
 
-	// handle type change: find or create product with new type
+	// handle type/brand change: find or create product with new type and/or brand
 	targetProductID := oldProduct.IDProduct
 	linkedType := oldProduct.TypeProduct
+	targetBrandID := oldProduct.BrandID
+	targetType := oldProduct.TypeProduct
+
 	if requestedType != "" && requestedType != oldProduct.TypeProduct {
+		targetType = requestedType
+		linkedType = requestedType
+		sg := requestedType == "sunglasses"
+		newModel.Sunglass = &sg
+	}
+	if in.BrandID != nil {
+		targetBrandID = in.BrandID
+	}
+
+	brandChanged := in.BrandID != nil && (oldProduct.BrandID == nil || *in.BrandID != *oldProduct.BrandID)
+	typeChanged := targetType != oldProduct.TypeProduct
+
+	if brandChanged || typeChanged {
 		var existing frames.Product
 		err := s.db.Where("title_product = ? AND brand_id = ? AND vendor_id = ? AND type_product = ?",
-			oldProduct.TitleProduct, oldProduct.BrandID, oldProduct.VendorID, requestedType).
+			oldProduct.TitleProduct, targetBrandID, oldProduct.VendorID, targetType).
 			First(&existing).Error
 		if err == nil {
 			targetProductID = existing.IDProduct
 		} else {
 			np := frames.Product{
 				TitleProduct: oldProduct.TitleProduct,
-				BrandID:      oldProduct.BrandID,
+				BrandID:      targetBrandID,
 				VendorID:     oldProduct.VendorID,
-				TypeProduct:  requestedType,
+				TypeProduct:  targetType,
 			}
 			if err := s.db.Create(&np).Error; err != nil {
 				return 0, "", err
 			}
 			targetProductID = np.IDProduct
 		}
-		linkedType = requestedType
-		sg := requestedType == "sunglasses"
-		newModel.Sunglass = &sg
 	}
 	newModel.ProductID = int64(targetProductID)
 

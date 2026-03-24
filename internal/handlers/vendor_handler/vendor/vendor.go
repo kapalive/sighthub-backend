@@ -31,6 +31,21 @@ func (h *Handler) AddVendor(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, err.Error(), http.StatusBadRequest)
 		return
 	}
+
+	if req.VwAccount != nil {
+		var locID int64
+		username := pkgAuth.UsernameFromContext(r.Context())
+		if username != "" {
+			h.svc.DB().Table("employee e").
+				Select("e.location_id").
+				Joins("JOIN employee_login el ON el.id_employee_login = e.employee_login_id").
+				Where("el.employee_login = ?", username).Scan(&locID)
+		}
+		if locID > 0 {
+			h.svc.UpsertVWAccount(id, locID, req.VwAccount)
+		}
+	}
+
 	jsonResponse(w, map[string]interface{}{"message": "Vendor added successfully", "vendor_id": id}, http.StatusCreated)
 }
 
@@ -55,11 +70,34 @@ func (h *Handler) UpdateVendor(w http.ResponseWriter, r *http.Request) {
 	}
 	delete(body, "rep")
 
+	var vwAccount map[string]interface{}
+	if vwRaw, ok := body["vw_account"]; ok && vwRaw != nil {
+		if m, ok := vwRaw.(map[string]interface{}); ok {
+			vwAccount = m
+		}
+	}
+	delete(body, "vw_account")
+
 	if err := h.svc.UpdateVendor(vendorID, body, rep); err != nil {
 		status := errorStatus(err)
 		jsonError(w, err.Error(), status)
 		return
 	}
+
+	if vwAccount != nil {
+		var locID int64
+		username := pkgAuth.UsernameFromContext(r.Context())
+		if username != "" {
+			h.svc.DB().Table("employee e").
+				Select("e.location_id").
+				Joins("JOIN employee_login el ON el.id_employee_login = e.employee_login_id").
+				Where("el.employee_login = ?", username).Scan(&locID)
+		}
+		if locID > 0 {
+			h.svc.UpsertVWAccount(vendorID, locID, vwAccount)
+		}
+	}
+
 	jsonResponse(w, map[string]string{"message": "Vendor updated successfully"}, http.StatusOK)
 }
 

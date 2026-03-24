@@ -1575,7 +1575,90 @@ func (s *Service) DeleteInvoice(username string, invoiceID int64) error {
 		return errors.New("cannot delete invoice with associated lab tickets")
 	}
 
-	return s.db.Delete(&inv).Error
+	// Check for payments with actual amounts
+	var paymentSum float64
+	s.db.Table("payment_history").
+		Select("COALESCE(SUM(ABS(amount)), 0)").
+		Where("invoice_id = ?", invoiceID).
+		Scan(&paymentSum)
+	if paymentSum > 0 {
+		return errors.New("cannot delete invoice with payment history")
+	}
+
+	// Clean up dependent records with no real data
+	tx := s.db.Begin()
+	// Tables to DELETE dependent rows from
+	cleanupTables := []string{
+		"payment_history",
+		"invoice_services_item",
+		"invoice_insurance_policy",
+		"receipts_items",
+		"shipping_customer",
+		"missing_ar",
+		"temp_count_ar",
+		"transfer_credit",
+		"tasks_resource",
+	}
+	// Tables to SET NULL (have their own child records, FK is ON DELETE SET NULL)
+	nullifyTables := []string{
+		"super_eye_exam",
+	}
+	for _, table := range cleanupTables {
+		if err := tx.Exec("DELETE FROM "+table+" WHERE invoice_id = ?", invoiceID).Error; err != nil {
+			tx.Rollback()
+			return fmt.Errorf("cannot delete related records from %s: %v", table, err)
+		}
+	}
+	for _, table := range nullifyTables {
+		if err := tx.Exec("UPDATE "+table+" SET invoice_id = NULL WHERE invoice_id = ?", invoiceID).Error; err != nil {
+			tx.Rollback()
+			return fmt.Errorf("cannot unlink invoice from %s: %v", table, err)
+		}
+	}
+
+	// inventory_transaction: check if any active Sale/PreSold still references this invoice
+	var activeSaleCount int64
+	tx.Table("inventory_transaction it").
+		Joins("JOIN inventory inv ON inv.id_inventory = it.inventory_id").
+		Where("it.invoice_id = ? AND it.transaction_type IN ('Sale','PreSold') AND inv.invoice_id = ?",
+			invoiceID, invoiceID).
+		Count(&activeSaleCount)
+	if activeSaleCount > 0 {
+		tx.Rollback()
+		return errors.New("cannot delete invoice: there are active sold items still linked to this invoice — remove them from the invoice first")
+	}
+	// Safe to nullify old transaction history (returns, removed, etc.)
+	if err := tx.Exec("UPDATE inventory_transaction SET invoice_id = NULL WHERE invoice_id = ?", invoiceID).Error; err != nil {
+		tx.Rollback()
+		return fmt.Errorf("cannot unlink inventory transactions: %v", err)
+	}
+	if err := tx.Exec("UPDATE inventory_transaction SET old_invoice_id = NULL WHERE old_invoice_id = ?", invoiceID).Error; err != nil {
+		tx.Rollback()
+		return fmt.Errorf("cannot unlink old inventory transactions: %v", err)
+	}
+
+	// inventory: unlink any inventory still referencing this invoice
+	if err := tx.Exec("UPDATE inventory SET invoice_id = NULL WHERE invoice_id = ?", invoiceID).Error; err != nil {
+		tx.Rollback()
+		return fmt.Errorf("cannot unlink inventory: %v", err)
+	}
+
+	if err := tx.Delete(&inv).Error; err != nil {
+		tx.Rollback()
+		// Parse FK violation into readable message
+		errMsg := err.Error()
+		if strings.Contains(errMsg, "foreign key constraint") {
+			// Extract table name from "on table \"xxx\""
+			if idx := strings.Index(errMsg, "on table \""); idx >= 0 {
+				tablePart := errMsg[idx+10:]
+				if end := strings.Index(tablePart, "\""); end >= 0 {
+					return fmt.Errorf("cannot delete invoice: still referenced by table '%s' — clean up related data first", tablePart[:end])
+				}
+			}
+		}
+		return fmt.Errorf("cannot delete invoice: %v", err)
+	}
+	return tx.Commit().Error
 }
 
 // ─── PUT /invoice/finalize/{id} ───────────────────────────────────────────────

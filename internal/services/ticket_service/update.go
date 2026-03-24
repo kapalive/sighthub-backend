@@ -3,6 +3,7 @@ package ticket_service
 import (
 	"encoding/json"
 	"fmt"
+	"strconv"
 	"time"
 
 	"gorm.io/gorm"
@@ -85,12 +86,12 @@ type LensPayload struct {
 	CenterThickness       *string `json:"center_thickness"`
 	LensSafetyThicknessID *int    `json:"lens_safety_thickness_id"`
 	LensEdgeID            *int    `json:"lens_edge_id"`
-	LensTypeColor         *string `json:"lens_type_color"`
-	TintPercent           *int    `json:"tint_percent"`
-	NotesColor            *string `json:"notes_color"`
-	LensTintColorID       *int    `json:"lens_tint_color_id"`
 	LensStatus            *string `json:"lens_status"`
 	LensOrder             *string `json:"lens_order"`
+	LensType              *string `json:"lens_type"`
+	LensesMaterial        *string `json:"lenses_material"`
+	NotesColor            *string `json:"notes_color"`
+	LensesID              *int    `json:"lenses_id"`
 }
 
 type FramePayload struct {
@@ -100,31 +101,63 @@ type FramePayload struct {
 	SKU    *string `json:"sku"`
 
 	// Manual frame fields
-	FrameName           *string `json:"frame_name"`
-	BrandName           *string `json:"brand_name"`
-	MaterialsFrame      *string `json:"materials_frame"`
-	MaterialsTemple     *string `json:"materials_temple"`
-	Color               *string `json:"color"`
-	SizeLensWidth       *string `json:"size_lens_width"`
-	SizeBridgeWidth     *string `json:"size_bridge_width"`
-	SizeTempleLength    *string `json:"size_temple_length"`
-	ModelTitleVariant   *string `json:"model_title_variant"`
-	FrameTypeMaterialID *int    `json:"frame_type_material_id"`
-	FrameShapeID        *int    `json:"frame_shape_id"`
-	Status              *string `json:"status"`
+	FrameName           *string  `json:"frame_name"`
+	BrandName           *string  `json:"brand_name"`
+	VendorName          *string  `json:"vendor_name"`
+	ManufacturerName    *string  `json:"manufacturer_name"`
+	MaterialsFrame      *string  `json:"materials_frame"`
+	MaterialsTemple     *string  `json:"materials_temple"`
+	Color               *string  `json:"color"`
+	SizeLensWidth       *string  `json:"size_lens_width"`
+	SizeBridgeWidth     *string  `json:"size_bridge_width"`
+	SizeTempleLength    *string  `json:"size_temple_length"`
+	ModelTitleVariant   *string  `json:"model_title_variant"`
+	FrameTypeMaterialID *int     `json:"frame_type_material_id"`
+	FrameShapeID        *int     `json:"frame_shape_id"`
+	Status              *string  `json:"status"`
+	DropShip            *bool    `json:"drop_ship"`
+	ShipTo              *string  `json:"ship_to"`
 
-	// Measurements
-	BValue    *int `json:"b_value"`
-	EDValue   *int `json:"ed_value"`
-	CircValue *int `json:"circ_value"`
+	// Measurements (accept both string and number from frontend)
+	BValue    *json.Number `json:"b_value"`
+	EDValue   *json.Number `json:"ed_value"`
+	CircValue *json.Number `json:"circ_value"`
+	AValue    *json.Number `json:"a_value"`
+	BDim      *json.Number `json:"b_dim"`
+	Circum    *json.Number `json:"circum"`
+	ED        *json.Number `json:"ed"`
+
+	// Optical
+	Panto          *float64 `json:"panto"`
+	WrapAngle      *float64 `json:"wrap_angle"`
+	HeadEyeRatio   *float64 `json:"head_eye_ratio"`
+	StabilityCoeff *float64 `json:"stability_coeff"`
+	BC             *float64 `json:"bc"`
+	HeadCape       *string  `json:"head_cape"`
+	CorridorR      *string  `json:"corridor_r"`
+	CorridorL      *string  `json:"corridor_l"`
 
 	// Aliases
-	AValue *string `json:"a_value"`
 	DBL    *string `json:"dbl"`
 	Temple *string `json:"temple"`
-	BDim   *int    `json:"b_dim"`
-	Circum *int    `json:"circum"`
-	ED     *int    `json:"ed"`
+}
+
+// jsonNumToInt converts json.Number to *int, returns nil if nil or invalid
+func jsonNumToInt(n *json.Number) *int {
+	if n == nil {
+		return nil
+	}
+	s := n.String()
+	v, err := strconv.Atoi(s)
+	if err != nil {
+		// try parsing as float then truncate
+		if f, err2 := strconv.ParseFloat(s, 64); err2 == nil {
+			vi := int(f)
+			return &vi
+		}
+		return nil
+	}
+	return &v
 }
 
 // ── Update ───────────────────────────────────────────────────────────────────
@@ -394,17 +427,23 @@ func (s *Service) patchLens(lens *labTicketModel.LabTicketLens, pl *LensPayload,
 	if pl.NotesColor != nil {
 		lens.NotesColor = pl.NotesColor
 	}
-	// Tint fields only if allowed
-	if tintAllowed {
-		if pl.LensTypeColor != nil {
-			lens.LensTypeColor = pl.LensTypeColor
+	if tintAllowed && pl.NotesColor != nil {
+		lens.NotesColor = pl.NotesColor
+	}
+
+	// Lens catalog reference — auto-fill VW codes
+	if pl.LensesID != nil {
+		lens.LensesID = pl.LensesID
+		// Look up VW codes from lenses table
+		type vwRow struct {
+			VwDesignCode   *string
+			VwMaterialCode *string
 		}
-		if pl.TintPercent != nil {
-			lens.TintPercent = pl.TintPercent
-		}
-		if pl.LensTintColorID != nil {
-			lens.LensTintColorID = pl.LensTintColorID
-		}
+		var vw vwRow
+		s.db.Table("lenses").Select("vw_design_code, vw_material_code").
+			Where("id_lenses = ?", *pl.LensesID).Scan(&vw)
+		lens.VwDesignCode = vw.VwDesignCode
+		lens.VwMaterialCode = vw.VwMaterialCode
 	}
 }
 
@@ -413,11 +452,12 @@ func (s *Service) patchLens(lens *labTicketModel.LabTicketLens, pl *LensPayload,
 func (s *Service) applyFramePayload(tx *gorm.DB, ticket *labTicketModel.LabTicket, fp *FramePayload, emp *employees.Employee, loc *locationModel.Location) error {
 	frame := ticket.Frame
 
-	// Sizes with aliases
+	// Sizes with aliases (string fields on frame)
 	if fp.SizeLensWidth != nil {
 		frame.SizeLensWidth = fp.SizeLensWidth
 	} else if fp.AValue != nil {
-		frame.SizeLensWidth = fp.AValue
+		s := fp.AValue.String()
+		frame.SizeLensWidth = &s
 	}
 	if fp.SizeBridgeWidth != nil {
 		frame.SizeBridgeWidth = fp.SizeBridgeWidth
@@ -430,21 +470,21 @@ func (s *Service) applyFramePayload(tx *gorm.DB, ticket *labTicketModel.LabTicke
 		frame.SizeTempleLength = fp.Temple
 	}
 
-	// B, ED, Circ with aliases
+	// B, ED, Circ with aliases (int fields on frame)
 	if fp.BValue != nil {
-		frame.BValue = fp.BValue
+		frame.BValue = jsonNumToInt(fp.BValue)
 	} else if fp.BDim != nil {
-		frame.BValue = fp.BDim
+		frame.BValue = jsonNumToInt(fp.BDim)
 	}
 	if fp.EDValue != nil {
-		frame.EDValue = fp.EDValue
+		frame.EDValue = jsonNumToInt(fp.EDValue)
 	} else if fp.ED != nil {
-		frame.EDValue = fp.ED
+		frame.EDValue = jsonNumToInt(fp.ED)
 	}
 	if fp.CircValue != nil {
-		frame.CircValue = fp.CircValue
+		frame.CircValue = jsonNumToInt(fp.CircValue)
 	} else if fp.Circum != nil {
-		frame.CircValue = fp.Circum
+		frame.CircValue = jsonNumToInt(fp.Circum)
 	}
 
 	// Simple fields
@@ -474,6 +514,42 @@ func (s *Service) applyFramePayload(tx *gorm.DB, ticket *labTicketModel.LabTicke
 	}
 	if fp.Status != nil {
 		frame.Status = fp.Status
+	}
+	if fp.VendorName != nil {
+		frame.VendorName = fp.VendorName
+	}
+	if fp.ManufacturerName != nil {
+		frame.ManufacturerName = fp.ManufacturerName
+	}
+	if fp.DropShip != nil {
+		frame.DropShip = *fp.DropShip
+	}
+	if fp.ShipTo != nil {
+		frame.ShipTo = fp.ShipTo
+	}
+	if fp.Panto != nil {
+		frame.Panto = fp.Panto
+	}
+	if fp.WrapAngle != nil {
+		frame.WrapAngle = fp.WrapAngle
+	}
+	if fp.HeadEyeRatio != nil {
+		frame.HeadEyeRatio = fp.HeadEyeRatio
+	}
+	if fp.StabilityCoeff != nil {
+		frame.StabilityCoeff = fp.StabilityCoeff
+	}
+	if fp.BC != nil {
+		frame.BC = fp.BC
+	}
+	if fp.HeadCape != nil {
+		frame.HeadCape = fp.HeadCape
+	}
+	if fp.CorridorR != nil {
+		frame.CorridorR = fp.CorridorR
+	}
+	if fp.CorridorL != nil {
+		frame.CorridorL = fp.CorridorL
 	}
 
 	// Inventory assignment (item_id or sku)

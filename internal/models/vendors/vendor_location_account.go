@@ -13,6 +13,10 @@ type VendorLocationAccount struct {
 	Note                    *string    `gorm:"column:note;type:varchar(255)"                              json:"note,omitempty"`
 	IsActive                bool       `gorm:"column:is_active;not null;default:true"                     json:"is_active"`
 	Status                  *string    `gorm:"column:status;type:varchar(20)"                             json:"status,omitempty"`
+	VwSloID                 *int       `gorm:"column:vw_slo_id"                                           json:"vw_slo_id,omitempty"`
+	VwBill                  *string    `gorm:"column:vw_bill;type:varchar(50)"                             json:"vw_bill,omitempty"`
+	VwShip                  *string    `gorm:"column:vw_ship;type:varchar(50)"                             json:"vw_ship,omitempty"`
+	Source                  *string    `gorm:"column:source;type:varchar(20);default:'custom'"             json:"source,omitempty"`
 	CreatedAt               *time.Time `gorm:"column:created_at;type:timestamptz;default:now()"           json:"created_at,omitempty"`
 	UpdatedAt               *time.Time `gorm:"column:updated_at;type:timestamptz;default:now()"           json:"updated_at,omitempty"`
 }
@@ -29,6 +33,10 @@ func (v *VendorLocationAccount) ToMap() map[string]interface{} {
 		"note":                       v.Note,
 		"is_active":                  v.IsActive,
 		"status":                     v.Status,
+		"vw_slo_id":                  v.VwSloID,
+		"vw_bill":                    v.VwBill,
+		"vw_ship":                    v.VwShip,
+		"source":                     v.Source,
 	}
 	if v.CreatedAt != nil {
 		m["created_at"] = v.CreatedAt.Format(time.RFC3339)

@@ -714,7 +714,7 @@ func (h *Handler) countVendorTermsDue(loc *location.Location) int {
 
 	var count int64
 	h.db.Table("vendor_ap_invoice vai").
-		Joins("JOIN vendor_location_account vla ON vla.vendor_location_account_id = vai.vendor_location_account_id").
+		Joins("JOIN vendor_location_account vla ON vla.id_vendor_location_account = vai.vendor_location_account_id").
 		Where("vla.location_id = ? AND vai.due_date <= ? AND vai.status = 'open'",
 			loc.IDLocation, cutoff.Format("2006-01-02")).
 		Count(&count)
@@ -722,19 +722,13 @@ func (h *Handler) countVendorTermsDue(loc *location.Location) int {
 }
 
 func (h *Handler) countTasksTodoAssigned(employeeID int) int {
-	var count int64
-	h.db.Table("task").
-		Where("assigned_to_employee_id = ? AND status = 'new'", employeeID).
-		Count(&count)
-	return int(count)
+	// table "task" does not exist yet — return 0
+	return 0
 }
 
 func (h *Handler) countRequestAppointmentsUnprocessed(locationID int) int {
-	var count int64
-	h.db.Table("appointment_request").
-		Where("location_id = ? AND processed = false", locationID).
-		Count(&count)
-	return int(count)
+	// table "appointment_request" does not exist yet — return 0
+	return 0
 }
 
 func generateUniqueExpressLogin(db *gorm.DB, login *authModel.EmployeeLogin) (string, error) {

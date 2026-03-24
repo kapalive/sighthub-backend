@@ -33,8 +33,8 @@ type LabTicket struct {
 	LabInstructions               *string    `gorm:"column:lab_instructions;type:text"                               json:"lab_instructions,omitempty"`
 	EmployeeID                    int64      `gorm:"column:employee_id;not null"                                     json:"employee_id"`
 
-	// preload relations
-	Lab                  *vendors.Lab          `gorm:"foreignKey:LabID;references:IDLab"                                           json:"-"`
+	// preload relations (lab_id now references vendor where lab=true)
+	Lab                  *vendors.Vendor       `gorm:"foreignKey:LabID;references:IDVendor"                                        json:"-"`
 	LabTicketStatus      *LabTicketStatus      `gorm:"foreignKey:LabTicketStatusID;references:IDLabTicketStatus"                   json:"-"`
 	Powers               *LabTicketPowers      `gorm:"foreignKey:LabTicketPowersID;references:IDLabTicketPowers"                   json:"-"`
 	Lens                 *LabTicketLens        `gorm:"foreignKey:LabTicketLensID;references:IDLabTicketLens"                       json:"-"`

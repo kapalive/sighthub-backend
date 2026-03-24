@@ -206,11 +206,11 @@ func (s *Service) GetPendingItems(el *invoiceSvc.EmpLocation, vendorID int64) ([
 
 	var rows []row
 	s.db.Table("inventory").
-		Select("inventory.*, models.title_variant, products.title_product, brands.brand_name, products.product_id").
-		Joins("JOIN models ON models.id_model = inventory.model_id").
-		Joins("JOIN products ON products.id_product = models.product_id").
-		Joins("LEFT JOIN brands ON brands.id_brand = products.brand_id").
-		Where("inventory.status_items_inventory = ? AND inventory.location_id = ? AND products.vendor_id = ?",
+		Select("inventory.*, model.title_variant, product.title_product, brand.brand_name, product.id_product AS product_id").
+		Joins("JOIN model ON model.id_model = inventory.model_id").
+		Joins("JOIN product ON product.id_product = model.product_id").
+		Joins("LEFT JOIN brand ON brand.id_brand = product.brand_id").
+		Where("inventory.status_items_inventory = ? AND inventory.location_id = ? AND product.vendor_id = ?",
 			"Ordered", locID, vendorID).
 		Find(&rows)
 

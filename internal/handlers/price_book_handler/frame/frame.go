@@ -103,6 +103,7 @@ func (h *Handler) CreateCustomGlasses(w http.ResponseWriter, r *http.Request) {
 	} else if v, ok := body["type_frame"].(string); ok {
 		in.TypeProduct = &v
 	}
+	if v, ok := body["brand_id"].(float64); ok { id := int64(v); in.BrandID = &id }
 	if v, ok := body["item_list_cost"].(float64); ok { in.ItemListCost = &v }
 	if v, ok := body["item_discount"].(float64); ok { in.ItemDiscount = &v }
 	if v, ok := body["item_net"].(float64); ok { in.ItemNet = &v }

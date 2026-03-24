@@ -29,6 +29,9 @@ func RegisterFrameLibraryRoutes(db *gorm.DB, rdb *redis.Client, cfg *config.Conf
 	api.HandleFunc("/vendor-brand", h.GetVendorBrandCombinations).Methods("GET")
 	api.HandleFunc("/products", h.GetProducts).Methods("GET")
 	api.HandleFunc("/materials_frame", h.GetMaterialsFrame).Methods("GET")
+	api.HandleFunc("/frame-type-materials", h.GetFrameTypeMaterials).Methods("GET")
+	api.HandleFunc("/shapes", h.GetFrameShapes).Methods("GET")
+	api.HandleFunc("/lens/materials", h.GetLensMaterials).Methods("GET")
 	api.HandleFunc("/models_by_product/{product_id}", h.GetModelsByProduct).Methods("GET")
 	api.HandleFunc("/update_model/{id_model}", h.UpdateModel).Methods("PUT")
 

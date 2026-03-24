@@ -107,6 +107,34 @@ type UpdateRxInput struct {
 	Prescription *PrescriptionPayload `json:"prescription"`
 }
 
+// ─── GET /rx/doctors ──────────────────────────────────────────────────────────
+
+type DoctorItem struct {
+	DoctorID int    `json:"doctor_id"`
+	Doctor   string `json:"doctor"`
+}
+
+func (s *Service) GetDoctors(username string) ([]DoctorItem, error) {
+	_, loc, err := s.getEmployeeAndLocation(username)
+	if err != nil || loc == nil {
+		return nil, errors.New("employee or location not found")
+	}
+
+	var doctors []empModel.Employee
+	if err := s.db.Where("job_title_id = 1 AND store_payroll_id = ?", loc.IDLocation).Find(&doctors).Error; err != nil {
+		return nil, err
+	}
+
+	out := make([]DoctorItem, len(doctors))
+	for i, d := range doctors {
+		out[i] = DoctorItem{
+			DoctorID: d.IDEmployee,
+			Doctor:   "Dr. " + d.FirstName + " " + d.LastName,
+		}
+	}
+	return out, nil
+}
+
 // ─── Private helpers ──────────────────────────────────────────────────────────
 
 func (s *Service) getEmployeeAndLocation(username string) (*empModel.Employee, *locModel.Location, error) {
@@ -309,7 +337,7 @@ func (s *Service) GetLatestRx(patientID int64) (map[string]interface{}, error) {
 	if strings.Contains(gOrC, "G") {
 		var g presModel.GlassesPrescription
 		if s.db.Where("prescription_id = ?", prescription.IDPatientPrescription).First(&g).Error == nil {
-			resp["glasses_data"] = map[string]interface{}{
+			gd := map[string]interface{}{
 				"od_sph":    derefStr(g.OdSph),
 				"os_sph":    derefStr(g.OsSph),
 				"od_cyl":    derefStr(g.OdCyl),
@@ -323,11 +351,17 @@ func (s *Service) GetLatestRx(patientID int64) (map[string]interface{}, error) {
 				"od_v_prism": g.OdVPrism,
 				"os_v_prism": g.OsVPrism,
 			}
+			if g.ExpirationDate != nil {
+				gd["expiration_date"] = g.ExpirationDate.Format("2006-01-02")
+			} else {
+				gd["expiration_date"] = nil
+			}
+			resp["glasses_data"] = gd
 		}
 	} else if gOrC == "C" {
 		var c presModel.ContactLensPrescription
 		if s.db.Where("prescription_id = ?", prescription.IDPatientPrescription).First(&c).Error == nil {
-			resp["contacts_data"] = map[string]interface{}{
+			cd := map[string]interface{}{
 				"od_bc":   derefStr(c.OdBc),
 				"os_bc":   derefStr(c.OsBc),
 				"od_dia":  c.OdDia,
@@ -341,6 +375,12 @@ func (s *Service) GetLatestRx(patientID int64) (map[string]interface{}, error) {
 				"od_add":  derefStr(c.OdAdd),
 				"os_add":  derefStr(c.OsAdd),
 			}
+			if c.ExpirationDate != nil {
+				cd["expiration_date"] = c.ExpirationDate.Format("2006-01-02")
+			} else {
+				cd["expiration_date"] = nil
+			}
+			resp["contacts_data"] = cd
 		}
 	}
 
@@ -374,13 +414,28 @@ func (s *Service) GetRxList(patientID int64) ([]map[string]interface{}, error) {
 			date = p.PrescriptionDate.Format("2006-01-02")
 		}
 
+		var expDate interface{}
+		gOrC := derefStr(p.GOrC)
+		if strings.Contains(gOrC, "G") {
+			var g presModel.GlassesPrescription
+			if s.db.Where("prescription_id = ?", p.IDPatientPrescription).First(&g).Error == nil && g.ExpirationDate != nil {
+				expDate = g.ExpirationDate.Format("2006-01-02")
+			}
+		} else if gOrC == "C" {
+			var c presModel.ContactLensPrescription
+			if s.db.Where("prescription_id = ?", p.IDPatientPrescription).First(&c).Error == nil && c.ExpirationDate != nil {
+				expDate = c.ExpirationDate.Format("2006-01-02")
+			}
+		}
+
 		result = append(result, map[string]interface{}{
-			"id_rx":         p.IDPatientPrescription,
-			"date":          date,
-			"g_or_c":        derefStr(p.GOrC),
-			"location":      locShort,
-			"doctor":        p.Doctor,
-			"type_location": locFull,
+			"id_rx":           p.IDPatientPrescription,
+			"date":            date,
+			"g_or_c":          gOrC,
+			"location":        locShort,
+			"doctor":          p.Doctor,
+			"type_location":   locFull,
+			"expiration_date": expDate,
 		})
 	}
 	return result, nil

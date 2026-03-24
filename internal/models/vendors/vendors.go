@@ -24,6 +24,7 @@ type Vendor struct {
 	Frames        bool `gorm:"column:frames;not null;default:false"         json:"frames"`
 	Lenses        bool `gorm:"column:lenses;not null;default:false"         json:"lenses"`
 	ContactLenses bool `gorm:"column:contact_lenses;not null;default:false" json:"contact_lenses"`
+	Lab           bool `gorm:"column:lab;not null;default:false"            json:"lab"`
 
 	CountryID *int `gorm:"column:country_id"            json:"country_id,omitempty"`
 	StateID   *int `gorm:"column:state_id"              json:"state_id,omitempty"`
@@ -49,6 +50,7 @@ func (v *Vendor) ToMap() map[string]interface{} {
 		"frames":         v.Frames,
 		"lenses":         v.Lenses,
 		"contact_lenses": v.ContactLenses,
+		"lab":            v.Lab,
 	}
 }
 

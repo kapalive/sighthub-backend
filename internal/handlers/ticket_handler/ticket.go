@@ -10,11 +10,17 @@ import (
 
 	pkgAuth "sighthub-backend/pkg/auth"
 	ticketSvc "sighthub-backend/internal/services/ticket_service"
+	vwSvc "sighthub-backend/internal/services/visionweb_service"
 )
 
-type Handler struct{ svc *ticketSvc.Service }
+type Handler struct {
+	svc  *ticketSvc.Service
+	vwSvc *vwSvc.Service
+}
 
 func New(svc *ticketSvc.Service) *Handler { return &Handler{svc: svc} }
+
+func (h *Handler) SetVWService(s *vwSvc.Service) { h.vwSvc = s }
 
 func jsonResponse(w http.ResponseWriter, status int, v interface{}) {
 	w.Header().Set("Content-Type", "application/json")
@@ -74,8 +80,10 @@ func (h *Handler) UpdateTicket(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var req ticketSvc.UpdateTicketRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		jsonResponse(w, http.StatusBadRequest, map[string]string{"error": "invalid JSON"})
+	dec := json.NewDecoder(r.Body)
+	dec.UseNumber()
+	if err := dec.Decode(&req); err != nil {
+		jsonResponse(w, http.StatusBadRequest, map[string]string{"error": "invalid JSON: " + err.Error()})
 		return
 	}
 
@@ -201,7 +209,13 @@ func (h *Handler) GetLensStatuses(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) GetLabs(w http.ResponseWriter, r *http.Request) {
-	h.refData(w, h.svc.GetLabs)
+	username := pkgAuth.UsernameFromContext(r.Context())
+	data, err := h.svc.GetLabsForEmployee(username)
+	if err != nil {
+		jsonResponse(w, errorStatus(err), map[string]string{"error": err.Error()})
+		return
+	}
+	jsonResponse(w, 200, data)
 }
 
 func (h *Handler) GetFrameTypeMaterials(w http.ResponseWriter, r *http.Request) {
@@ -319,6 +333,48 @@ func (h *Handler) GetTicketLensOptions(w http.ResponseWriter, r *http.Request) {
 	}
 	result, err := h.svc.GetTicketLensOptions(ticketID)
 	if err != nil {
+		jsonResponse(w, errorStatus(err), map[string]string{"error": err.Error()})
+		return
+	}
+	jsonResponse(w, 200, result)
+}
+
+// GET /api/ticket/{ticket_id}/order-requirements
+func (h *Handler) GetOrderRequirements(w http.ResponseWriter, r *http.Request) {
+	ticketID, _ := strconv.ParseInt(mux.Vars(r)["ticket_id"], 10, 64)
+	if ticketID == 0 {
+		jsonResponse(w, 400, map[string]string{"error": "invalid ticket_id"})
+		return
+	}
+	if h.vwSvc == nil {
+		jsonResponse(w, 500, map[string]string{"error": "VisionWeb service not configured"})
+		return
+	}
+	result := h.vwSvc.CheckOrderRequirements(ticketID)
+	jsonResponse(w, 200, result)
+}
+
+// POST /api/ticket/{ticket_id}/order
+func (h *Handler) PlaceVWOrder(w http.ResponseWriter, r *http.Request) {
+	ticketID, _ := strconv.ParseInt(mux.Vars(r)["ticket_id"], 10, 64)
+	if ticketID == 0 {
+		jsonResponse(w, 400, map[string]string{"error": "invalid ticket_id"})
+		return
+	}
+	if h.vwSvc == nil {
+		jsonResponse(w, 500, map[string]string{"error": "VisionWeb service not configured"})
+		return
+	}
+
+	result, err := h.vwSvc.PlaceOrder(ticketID)
+	if err != nil {
+		if ve, ok := err.(*vwSvc.ValidationErrors); ok {
+			jsonResponse(w, 422, map[string]interface{}{
+				"error":  "validation failed",
+				"errors": ve.Errors,
+			})
+			return
+		}
 		jsonResponse(w, errorStatus(err), map[string]string{"error": err.Error()})
 		return
 	}

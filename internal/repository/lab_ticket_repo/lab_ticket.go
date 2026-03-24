@@ -226,10 +226,10 @@ func (r *LabTicketRepo) UpdateStatus(id, statusID int64) error {
 // REFERENCE: Labs
 // ─────────────────────────────────────────────
 
-// GetLabs возвращает список лабораторий.
-func (r *LabTicketRepo) GetLabs() ([]vendors.Lab, error) {
-	var rows []vendors.Lab
-	return rows, r.DB.Find(&rows).Error
+// GetLabs возвращает список лабораторий (vendors with lab=true).
+func (r *LabTicketRepo) GetLabs() ([]vendors.Vendor, error) {
+	var rows []vendors.Vendor
+	return rows, r.DB.Where("lab = true").Order("vendor_name").Find(&rows).Error
 }
 
 // ─────────────────────────────────────────────

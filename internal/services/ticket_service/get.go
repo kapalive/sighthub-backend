@@ -257,21 +257,13 @@ func (s *Service) GetTicketByID(ticketID int64) (map[string]interface{}, error) 
 				"lens_safety_thickness_id": lens.LensSafetyThicknessID,
 				"lens_edge_id":             lens.LensEdgeID,
 				"center_thickness":         lens.CenterThickness,
-				"lens_tint_color_id":       lens.LensTintColorID,
-				"lens_type_color":          lens.LensTypeColor,
-				"tint_percent":             lens.TintPercent,
-				"fade_color":               lens.FadeColor,
-				"solid_color":              lens.SolidColor,
-				"lens_sample_color_id":     lens.LensSampleColorID,
 				"notes_color":              lens.NotesColor,
+				"lenses_id":                lens.LensesID,
+				"vw_design_code":           lens.VwDesignCode,
+				"vw_material_code":         lens.VwMaterialCode,
 			}
 			if !tintAllowed {
-				for _, k := range []string{
-					"lens_tint_color_id", "lens_type_color", "tint_percent",
-					"fade_color", "solid_color", "lens_sample_color_id", "notes_color",
-				} {
-					li[k] = nil
-				}
+				li["notes_color"] = nil
 			}
 			lensInfo = li
 		}
@@ -283,7 +275,7 @@ func (s *Service) GetTicketByID(ticketID int64) (map[string]interface{}, error) 
 			f := ticket.Frame
 			isPOF := f.POF != nil && *f.POF == "true"
 			frameInfo = map[string]interface{}{
-				"pof":                isPOF,
+				"pof":                 isPOF,
 				"model_title_variant": f.ModelTitleVariant,
 				"materials_frame":     f.MaterialsFrame,
 				"materials_temple":    f.MaterialsTemple,
@@ -300,21 +292,15 @@ func (s *Service) GetTicketByID(ticketID int64) (map[string]interface{}, error) 
 				"wrap_angle":          f.WrapAngle,
 				"head_eye_ratio":      f.HeadEyeRatio,
 				"stability_coeff":     f.StabilityCoeff,
-				"erc_x":              f.ERCX,
-				"erc_y":              f.ERCY,
-				"erc_z":              f.ERCZ,
-				"read":               f.Read,
-				"bc":                 f.BC,
-				"frame_source":       f.FrameSource,
-				"item_type":          f.ItemType,
-				"status":             f.Status,
-				"frame_name":         f.FrameName,
-				"brand_name":         f.BrandName,
-				"vendor_name":        f.VendorName,
-				"head_cape":          f.HeadCape,
-				"corridor_r":         f.CorridorR,
-				"corridor_l":         f.CorridorL,
-				"vd_fit":             f.VDFit,
+				"bc":                  f.BC,
+				"status":              f.Status,
+				"frame_name":          f.FrameName,
+				"brand_name":          f.BrandName,
+				"vendor_name":         f.VendorName,
+				"manufacturer_name":   f.ManufacturerName,
+				"head_cape":           f.HeadCape,
+				"corridor_r":          f.CorridorR,
+				"corridor_l":          f.CorridorL,
 			}
 		}
 		resp["frame"] = frameInfo

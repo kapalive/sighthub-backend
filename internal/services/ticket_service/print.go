@@ -34,9 +34,9 @@ func (s *Service) PrintTicket(ticketID int64, includeInvoice bool) (map[string]i
 	// ── Lab name ──
 	var labName *string
 	if ticket.LabID != nil {
-		var lab vendorModel.Lab
+		var lab vendorModel.Vendor
 		if s.db.First(&lab, *ticket.LabID).Error == nil {
-			labName = &lab.TitleLab
+			labName = &lab.VendorName
 		}
 	}
 

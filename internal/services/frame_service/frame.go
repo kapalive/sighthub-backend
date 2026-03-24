@@ -8,6 +8,7 @@ import (
 	"gorm.io/gorm"
 
 	"sighthub-backend/internal/models/frames"
+	"sighthub-backend/internal/models/lenses"
 	"sighthub-backend/internal/models/types"
 	"sighthub-backend/internal/models/vendors"
 )
@@ -96,22 +97,27 @@ type SearchFilters struct {
 }
 
 type UpdateModelInput struct {
-	TitleVariant    *string
-	LensColor       *string
-	SizeLensWidth   *string
-	SizeBridgeWidth *string
+	TitleVariant     *string
+	LensColor        *string
+	SizeLensWidth    *string
+	SizeBridgeWidth  *string
 	SizeTempleLength *string
-	Sunglass        *bool
-	Photo           *bool
-	Polor           *bool
-	Mirror          *bool
-	BacksideAR      *bool
-	LensMaterial    *string
-	UPC             *string
-	EAN             *string
-	MfgNumber       *string
-	MfrSerialNumber *string
-	Accessories     *string
+	Sunglass         *bool
+	Photo            *bool
+	Polor            *bool
+	Mirror           *bool
+	BacksideAR       *bool
+	LensMaterial     *string
+	UPC              *string
+	EAN              *string
+	MfgNumber        *string
+	MfrSerialNumber  *string
+	Accessories      *string
+	MaterialsFrame   *string
+	MaterialsTemple  *string
+	Color            *string
+	ColorTemplate    *string
+	Shape            *string
 }
 
 type AddProductInput struct {
@@ -155,6 +161,7 @@ type CustomGlassesInput struct {
 	BacksideAR       *bool
 	UPC              *string
 	Accessories      *string
+	BrandID          *int64
 }
 
 // ─── Methods ──────────────────────────────────────────────────────────────────
@@ -475,6 +482,21 @@ func (s *Service) UpdateModel(id int, in UpdateModelInput) (*frames.Model, error
 	if in.Accessories != nil {
 		updates["accessories"] = *in.Accessories
 	}
+	if in.MaterialsFrame != nil {
+		updates["materials_frame"] = *in.MaterialsFrame
+	}
+	if in.MaterialsTemple != nil {
+		updates["materials_temple"] = *in.MaterialsTemple
+	}
+	if in.Color != nil {
+		updates["color"] = *in.Color
+	}
+	if in.ColorTemplate != nil {
+		updates["color_template"] = *in.ColorTemplate
+	}
+	if in.Shape != nil {
+		updates["shape"] = *in.Shape
+	}
 
 	if len(updates) > 0 {
 		if err := s.db.Model(&m).Updates(updates).Error; err != nil {
@@ -578,8 +600,37 @@ func (s *Service) CreateCustomGlasses(id int, in CustomGlassesInput) (*frames.Mo
 		return nil, fmt.Errorf("model not found")
 	}
 
+	// handle brand change: find or create product with new brand_id
+	targetProductID := existing.ProductID
+	if in.BrandID != nil {
+		var oldProduct frames.Product
+		if err := s.db.First(&oldProduct, existing.ProductID).Error; err != nil {
+			return nil, fmt.Errorf("source product not found")
+		}
+		if oldProduct.BrandID == nil || *in.BrandID != *oldProduct.BrandID {
+			var existingProd frames.Product
+			err := s.db.Where("title_product = ? AND brand_id = ? AND vendor_id = ? AND type_product = ?",
+				oldProduct.TitleProduct, *in.BrandID, oldProduct.VendorID, oldProduct.TypeProduct).
+				First(&existingProd).Error
+			if err == nil {
+				targetProductID = existingProd.IDProduct
+			} else {
+				np := frames.Product{
+					TitleProduct: oldProduct.TitleProduct,
+					BrandID:      in.BrandID,
+					VendorID:     oldProduct.VendorID,
+					TypeProduct:  oldProduct.TypeProduct,
+				}
+				if err := s.db.Create(&np).Error; err != nil {
+					return nil, err
+				}
+				targetProductID = np.IDProduct
+			}
+		}
+	}
+
 	newModel := frames.Model{
-		ProductID:        existing.ProductID,
+		ProductID:        targetProductID,
 		TitleVariant:     existing.TitleVariant,
 		LensColor:        existing.LensColor,
 		LensMaterial:     existing.LensMaterial,
@@ -653,4 +704,45 @@ func (s *Service) CreateCustomGlasses(id int, in CustomGlassesInput) (*frames.Mo
 		return nil, err
 	}
 	return &newModel, nil
+}
+
+func (s *Service) GetFrameTypeMaterials() ([]map[string]interface{}, error) {
+	var items []frames.FrameTypeMaterial
+	if err := s.db.Find(&items).Error; err != nil {
+		return nil, err
+	}
+	out := make([]map[string]interface{}, len(items))
+	for i, it := range items {
+		out[i] = it.ToMap()
+	}
+	return out, nil
+}
+
+func (s *Service) GetFrameShapes() ([]map[string]interface{}, error) {
+	var items []frames.FrameShape
+	if err := s.db.Order("title_frame_shape").Find(&items).Error; err != nil {
+		return nil, err
+	}
+	out := make([]map[string]interface{}, len(items))
+	for i, it := range items {
+		out[i] = it.ToMap()
+	}
+	return out, nil
+}
+
+func (s *Service) GetLensMaterials() ([]map[string]interface{}, error) {
+	var items []lenses.LensesMaterial
+	if err := s.db.Order("material_name").Find(&items).Error; err != nil {
+		return nil, err
+	}
+	out := make([]map[string]interface{}, len(items))
+	for i, it := range items {
+		out[i] = map[string]interface{}{
+			"id_lenses_materials": it.IDLensesMaterials,
+			"material_name":       it.MaterialName,
+			"index":               it.Index,
+			"description":         it.Description,
+		}
+	}
+	return out, nil
 }

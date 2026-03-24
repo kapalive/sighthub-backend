@@ -30,6 +30,11 @@ type LabTicketLens struct {
 	LensSampleColorID     *int    `gorm:"column:lens_sample_color_id"          json:"lens_sample_color_id,omitempty"`
 	NotesColor            *string `gorm:"column:notes_color"                   json:"notes_color,omitempty"`
 
+	// VisionWeb lens reference
+	LensesID              *int    `gorm:"column:lenses_id"                     json:"lenses_id,omitempty"`
+	VwDesignCode          *string `gorm:"column:vw_design_code;type:varchar(100)" json:"vw_design_code,omitempty"`
+	VwMaterialCode        *string `gorm:"column:vw_material_code;type:varchar(100)" json:"vw_material_code,omitempty"`
+
 	// Optional preload relations (импортируем пакет lenses прямо)
 	LensType            *lensmodel.LensType            `gorm:"foreignKey:LensTypesID;references:IDLensType"                   json:"-"`
 	LensesMaterial      *lensmodel.LensesMaterial      `gorm:"foreignKey:LensesMaterialsID;references:IDLensesMaterials"      json:"-"`
@@ -52,13 +57,10 @@ func (l *LabTicketLens) ToMap() map[string]interface{} {
 		"center_thickness":         l.CenterThickness,
 		"lens_safety_thickness_id": l.LensSafetyThicknessID,
 		"lens_edge_id":             l.LensEdgeID,
-		"lens_tint_color_id":       l.LensTintColorID,
-		"lens_type_color":          l.LensTypeColor,
-		"tint_percent":             l.TintPercent,
-		"fade_color":               l.FadeColor,
-		"solid_color":              l.SolidColor,
-		"lens_sample_color_id":     l.LensSampleColorID,
 		"notes_color":              l.NotesColor,
+		"lenses_id":                l.LensesID,
+		"vw_design_code":           l.VwDesignCode,
+		"vw_material_code":         l.VwMaterialCode,
 	}
 }
 

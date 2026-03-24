@@ -87,14 +87,9 @@ func (l *LabTicketFrame) ToMap() map[string]interface{} {
 		"wrap_angle":      l.WrapAngle,
 		"head_eye_ratio":  l.HeadEyeRatio,
 		"stability_coeff": l.StabilityCoeff,
-		"erc_x":           l.ERCX,
-		"erc_y":           l.ERCY,
-		"erc_z":           l.ERCZ,
 
 		"bc":             l.BC,
 		"frame_shape_id": l.FrameShapeID,
-		"frame_source":   l.FrameSource,
-		"item_type":      l.ItemType,
 		"status":         l.Status,
 
 		"drop_ship": l.DropShip,
@@ -108,9 +103,6 @@ func (l *LabTicketFrame) ToMap() map[string]interface{} {
 		"head_cape":  l.HeadCape,
 		"corridor_r": l.CorridorR,
 		"corridor_l": l.CorridorL,
-
-		"vd_fit": l.VDFit,
-		"read":   l.Read,
 	}
 
 	// вложенные справочники — если прелоадили

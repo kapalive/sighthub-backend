@@ -33,6 +33,22 @@ func jsonError(w http.ResponseWriter, msg string, status int) {
 	json.NewEncoder(w).Encode(map[string]string{"error": msg}) //nolint:errcheck
 }
 
+// ─── GET /rx/doctors ──────────────────────────────────────────────────────────
+
+func (h *Handler) GetDoctors(w http.ResponseWriter, r *http.Request) {
+	username := pkgAuth.UsernameFromContext(r.Context())
+	if username == "" {
+		jsonError(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+	doctors, err := h.svc.GetDoctors(username)
+	if err != nil {
+		jsonError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	jsonResponse(w, doctors, http.StatusOK)
+}
+
 // ─── GET /latest-rx ───────────────────────────────────────────────────────────
 
 func (h *Handler) GetLatestRx(w http.ResponseWriter, r *http.Request) {

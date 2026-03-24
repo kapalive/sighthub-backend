@@ -79,7 +79,7 @@ func terminalDict(t *general.PaymentTerminal) map[string]interface{} {
 func (s *Service) ListTerminals(el *EmpLocation) ([]map[string]interface{}, error) {
 	locID := int64(el.Location.IDLocation)
 	var terms []general.PaymentTerminal
-	s.db.Where("location_id = ? AND (active IS NULL OR active = true)", locID).Find(&terms)
+	s.db.Where("location_id = ?", locID).Find(&terms)
 
 	result := make([]map[string]interface{}, len(terms))
 	for i, t := range terms {

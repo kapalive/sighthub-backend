@@ -47,16 +47,59 @@ func (s *Service) GetLensStatuses() ([]map[string]interface{}, error) {
 
 // GET /labs
 func (s *Service) GetLabs() ([]map[string]interface{}, error) {
-	var rows []vendorModel.Lab
-	if err := s.db.Find(&rows).Error; err != nil {
+	var rows []vendorModel.Vendor
+	if err := s.db.Where("lab = true").Order("vendor_name").Find(&rows).Error; err != nil {
 		return nil, err
 	}
 	result := make([]map[string]interface{}, 0, len(rows))
 	for _, r := range rows {
 		result = append(result, map[string]interface{}{
-			"lab_id":    r.IDLab,
-			"title_lab": r.TitleLab,
+			"lab_id":    r.IDVendor,
+			"title_lab": r.VendorName,
 		})
+	}
+	return result, nil
+}
+
+func (s *Service) GetLabsForEmployee(username string) ([]map[string]interface{}, error) {
+	_, loc, err := s.empLocation(username)
+	if err != nil || loc == nil {
+		// fallback: return labs without account info
+		return s.GetLabs()
+	}
+	locationID := loc.IDLocation
+
+	var rows []vendorModel.Vendor
+	if err := s.db.Where("lab = true").Order("vendor_name").Find(&rows).Error; err != nil {
+		return nil, err
+	}
+
+	result := make([]map[string]interface{}, 0, len(rows))
+	for _, r := range rows {
+		entry := map[string]interface{}{
+			"lab_id":    r.IDVendor,
+			"title_lab": r.VendorName,
+		}
+
+		type vlaRow struct {
+			AccountNumber *string `gorm:"column:account_number"`
+			VwSloID       *int    `gorm:"column:vw_slo_id"`
+			VwBill        *string `gorm:"column:vw_bill"`
+			VwShip        *string `gorm:"column:vw_ship"`
+			Source        *string `gorm:"column:source"`
+		}
+		var vla vlaRow
+		s.db.Table("vendor_location_account").
+			Where("vendor_id = ? AND location_id = ?", r.IDVendor, locationID).
+			Order("created_at DESC").
+			First(&vla)
+		entry["account_number"] = vla.AccountNumber
+		entry["vw_slo_id"] = vla.VwSloID
+		entry["vw_bill"] = vla.VwBill
+		entry["vw_ship"] = vla.VwShip
+		entry["source"] = vla.Source
+
+		result = append(result, entry)
 	}
 	return result, nil
 }
