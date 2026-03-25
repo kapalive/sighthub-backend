@@ -118,6 +118,7 @@ func (s *Service) GetLensBrandsVendors() ([]LensBrandVendorResult, error) {
 		Select("DISTINCT bl.id_brand_lens, bl.brand_name, v.id_vendor, v.vendor_name").
 		Joins("LEFT JOIN lenses l ON l.brand_lens_id = bl.id_brand_lens").
 		Joins("LEFT JOIN vendor v ON v.id_vendor = l.vendor_id").
+		Where("v.visible = true OR v.id_vendor IS NULL").
 		Scan(&rows).Error
 	if err != nil {
 		return nil, err
@@ -125,6 +126,58 @@ func (s *Service) GetLensBrandsVendors() ([]LensBrandVendorResult, error) {
 	result := make([]LensBrandVendorResult, len(rows))
 	for i, r := range rows {
 		result[i] = LensBrandVendorResult{r.IDBrandLens, r.BrandName, r.IDVendor, r.VendorName}
+	}
+	return result, nil
+}
+
+// GetLensVendors returns unique vendors that have lenses (visible only)
+func (s *Service) GetLensVendors() ([]map[string]interface{}, error) {
+	type row struct {
+		IDVendor   int
+		VendorName string
+	}
+	var rows []row
+	err := s.db.Table("vendor v").
+		Select("DISTINCT v.id_vendor, v.vendor_name").
+		Joins("JOIN lenses l ON l.vendor_id = v.id_vendor").
+		Where("v.visible = true").
+		Order("v.vendor_name").
+		Scan(&rows).Error
+	if err != nil {
+		return nil, err
+	}
+	result := make([]map[string]interface{}, len(rows))
+	for i, r := range rows {
+		result[i] = map[string]interface{}{
+			"vendor_id":   r.IDVendor,
+			"vendor_name": r.VendorName,
+		}
+	}
+	return result, nil
+}
+
+// GetLensBrandsByVendor returns brands for a specific lens vendor
+func (s *Service) GetLensBrandsByVendor(vendorID int) ([]map[string]interface{}, error) {
+	type row struct {
+		IDBrandLens int
+		BrandName   string
+	}
+	var rows []row
+	err := s.db.Table("brand_lens bl").
+		Select("DISTINCT bl.id_brand_lens, bl.brand_name").
+		Joins("JOIN lenses l ON l.brand_lens_id = bl.id_brand_lens").
+		Where("l.vendor_id = ?", vendorID).
+		Order("bl.brand_name").
+		Scan(&rows).Error
+	if err != nil {
+		return nil, err
+	}
+	result := make([]map[string]interface{}, len(rows))
+	for i, r := range rows {
+		result[i] = map[string]interface{}{
+			"brand_id":   r.IDBrandLens,
+			"brand_name": r.BrandName,
+		}
 	}
 	return result, nil
 }
@@ -251,6 +304,11 @@ func (s *Service) GetLensList(f LensFilters) (*LensListResponse, error) {
 	}
 
 	q := s.db.Model(&lenses.Lenses{})
+
+	// Hide lenses from non-visible vendors unless explicitly filtered
+	if f.VendorID == nil {
+		q = q.Where("vendor_id IS NULL OR vendor_id IN (SELECT id_vendor FROM vendor WHERE visible = true)")
+	}
 
 	if f.BrandID != nil {
 		q = q.Where("brand_lens_id = ?", *f.BrandID)

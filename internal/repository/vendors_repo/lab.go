@@ -12,7 +12,7 @@ func NewLabRepo(db *gorm.DB) *LabRepo { return &LabRepo{DB: db} }
 
 func (r *LabRepo) GetAll() ([]vendors.Vendor, error) {
 	var items []vendors.Vendor
-	return items, r.DB.Where("lab = true").Order("vendor_name").Find(&items).Error
+	return items, r.DB.Where("lab = true AND visible = true").Order("vendor_name").Find(&items).Error
 }
 
 func (r *LabRepo) GetByID(id int) (*vendors.Vendor, error) {

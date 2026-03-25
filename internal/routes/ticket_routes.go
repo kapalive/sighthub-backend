@@ -7,8 +7,10 @@ import (
 
 	"sighthub-backend/config"
 	ticketHandler "sighthub-backend/internal/handlers/ticket_handler"
+	zeisshandler "sighthub-backend/internal/handlers/zeiss_handler"
 	ticketSvc "sighthub-backend/internal/services/ticket_service"
 	vwSvc "sighthub-backend/internal/services/visionweb_service"
+	"sighthub-backend/internal/services/zeiss_service"
 	pkgAuth "sighthub-backend/pkg/auth"
 	"sighthub-backend/pkg/scheduler"
 )
@@ -17,6 +19,9 @@ func RegisterTicketRoutes(db *gorm.DB, rdb *redis.Client, cfg *config.Config, sc
 	svc := ticketSvc.New(db, sched)
 	h := ticketHandler.New(svc)
 	h.SetVWService(vwSvc.New(db))
+
+	zeissAuth := zeiss_service.NewAuthService(db, rdb)
+	h.SetZeissService(zeiss_service.NewCatalogService(db, zeissAuth))
 
 	jwtMW := pkgAuth.JWTMiddleware(cfg.JWTSecretKey, rdb)
 
@@ -56,4 +61,10 @@ func RegisterTicketRoutes(db *gorm.DB, rdb *redis.Client, cfg *config.Config, sc
 	api.HandleFunc("/{ticket_id:[0-9]+}/notify-patient", h.NotifyPatient).Methods("POST")
 	api.HandleFunc("/{ticket_id:[0-9]+}/order-requirements", h.GetOrderRequirements).Methods("GET")
 	api.HandleFunc("/{ticket_id:[0-9]+}/order", h.PlaceVWOrder).Methods("POST")
+
+	// ── Zeiss Auth (also available from ticket context) ──────────────
+	hZeiss := zeisshandler.New(zeissAuth, db)
+	api.HandleFunc("/zeiss/auth/status", hZeiss.AuthStatus).Methods("GET")
+	api.HandleFunc("/zeiss/auth/url", hZeiss.AuthURL).Methods("GET")
+	api.HandleFunc("/zeiss/auth/callback", hZeiss.AuthCallback).Methods("POST")
 }

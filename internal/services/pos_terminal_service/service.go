@@ -1,6 +1,7 @@
 package pos_terminal_service
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"math"
@@ -281,9 +282,9 @@ func (s *Service) setDefaultTerminal(locationID int64, t *general.PaymentTermina
 // ─── POS Start ───────────────────────────────────────────────────────────────
 
 type PosStartRequest struct {
-	Amount          float64 `json:"amount"`
-	PaymentMethodID int64   `json:"payment_method_id"`
-	TerminalID      *int    `json:"terminal_id"`
+	Amount          json.Number `json:"amount"`
+	PaymentMethodID int64       `json:"payment_method_id"`
+	TerminalID      *int        `json:"terminal_id"`
 }
 
 func (s *Service) PosStart(el *EmpLocation, invoiceID int64, req PosStartRequest) (map[string]interface{}, error) {
@@ -299,7 +300,8 @@ func (s *Service) PosStart(el *EmpLocation, invoiceID int64, req PosStartRequest
 		return nil, fmt.Errorf("%w: POS payments can only be started at invoice location", ErrForbidden)
 	}
 
-	if req.Amount <= 0 {
+	amount, err := req.Amount.Float64()
+	if err != nil || amount <= 0 {
 		return nil, fmt.Errorf("%w: amount must be > 0", ErrBadRequest)
 	}
 	if req.PaymentMethodID == 0 {
@@ -331,7 +333,7 @@ func (s *Service) PosStart(el *EmpLocation, invoiceID int64, req PosStartRequest
 		PaymentMethodID:   &pmID,
 		TransactionDate:   now,
 		CreatedAt:         now,
-		Amount:            dec2(req.Amount),
+		Amount:            dec2(amount),
 		Currency:          "USD",
 		Status:            "pending",
 		SpinRefID:         refID,
@@ -349,7 +351,7 @@ func (s *Service) PosStart(el *EmpLocation, invoiceID int64, req PosStartRequest
 	pkgActivity.Log(s.db, "pos", "payment_start",
 		pkgActivity.WithEntity(invoiceID),
 		pkgActivity.WithDetails(map[string]interface{}{
-			"amount":      fmt.Sprintf("%.2f", req.Amount),
+			"amount":      fmt.Sprintf("%.2f", amount),
 			"terminal_id": terminal.IDPaymentTerminal,
 		}),
 	)

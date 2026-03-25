@@ -1217,8 +1217,6 @@ func (s *Service) UpsertNotifySetting(actionName string, data map[string]interfa
 //  PAYMENT METHODS
 // ══════════════════════════════════════════════════════════════════════════════
 
-var ProtectedPaymentMethodIDs = map[int]bool{1: true, 4: true, 14: true, 20: true, 22: true, 23: true}
-
 var ValidCategories = map[string]bool{
 	"card": true, "installment": true, "fintech": true, "cash": true, "check": true,
 	"gift": true, "insurance": true, "credit": true, "internal": true, "other": true,
@@ -1248,12 +1246,12 @@ func (s *Service) CreatePaymentMethod(methodName, category string, shortName *st
 }
 
 func (s *Service) UpdatePaymentMethod(id int, data map[string]interface{}) (map[string]interface{}, error) {
-	if ProtectedPaymentMethodIDs[id] {
-		return nil, fmt.Errorf("This payment method cannot be modified")
-	}
 	var it general.PaymentMethod
 	if err := s.DB.First(&it, id).Error; err != nil {
 		return nil, err
+	}
+	if it.IsSystem {
+		return nil, fmt.Errorf("This payment method is system-level and cannot be modified")
 	}
 	if v, ok := data["method_name"]; ok {
 		n := strings.TrimSpace(fmt.Sprintf("%v", v))
@@ -1286,8 +1284,12 @@ func (s *Service) UpdatePaymentMethod(id int, data map[string]interface{}) (map[
 }
 
 func (s *Service) DeletePaymentMethod(id int) error {
-	if ProtectedPaymentMethodIDs[id] {
-		return fmt.Errorf("This payment method cannot be deleted")
+	var it general.PaymentMethod
+	if err := s.DB.First(&it, id).Error; err != nil {
+		return err
+	}
+	if it.IsSystem {
+		return fmt.Errorf("This payment method is system-level and cannot be deleted")
 	}
 	return s.DB.Delete(&general.PaymentMethod{}, id).Error
 }

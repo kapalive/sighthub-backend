@@ -21,6 +21,8 @@ type Lenses struct {
 	MFRNumber         *string  `gorm:"column:mfr_number;type:varchar(255)"                  json:"mfr_number,omitempty"`
 	CanLookup         bool     `gorm:"column:can_lookup;not null;default:true"              json:"can_lookup"`
 	Source            *string  `gorm:"column:source;type:varchar(50)"                      json:"source,omitempty"`
+	VwDesignCode      *string  `gorm:"column:vw_design_code;type:varchar(100)"             json:"vw_design_code,omitempty"`
+	VwMaterialCode    *string  `gorm:"column:vw_material_code;type:varchar(100)"           json:"vw_material_code,omitempty"`
 
 	// --- relations (load via Preload when нужно) ---
 	LensSeries     *LensSeries            `gorm:"foreignKey:LensSeriesID;references:IDLensSeries"               json:"-"`

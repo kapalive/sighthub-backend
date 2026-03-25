@@ -36,7 +36,11 @@ func (h *Handler) GetTreatments(w http.ResponseWriter, r *http.Request) {
 	if v := r.URL.Query().Get("vendor_id"); v != "" {
 		if id, err := strconv.Atoi(v); err == nil { vendorID = &id }
 	}
-	results, err := h.svc.GetTreatments(vendorID)
+	var source *string
+	if v := r.URL.Query().Get("source"); v != "" {
+		source = &v
+	}
+	results, err := h.svc.GetTreatments(vendorID, source)
 	if err != nil {
 		jsonError(w, "Query failed", http.StatusInternalServerError)
 		return

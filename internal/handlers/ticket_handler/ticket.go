@@ -11,16 +11,19 @@ import (
 	pkgAuth "sighthub-backend/pkg/auth"
 	ticketSvc "sighthub-backend/internal/services/ticket_service"
 	vwSvc "sighthub-backend/internal/services/visionweb_service"
+	zeissSvc "sighthub-backend/internal/services/zeiss_service"
 )
 
 type Handler struct {
-	svc  *ticketSvc.Service
-	vwSvc *vwSvc.Service
+	svc      *ticketSvc.Service
+	vwSvc    *vwSvc.Service
+	zeissSvc *zeissSvc.CatalogService
 }
 
 func New(svc *ticketSvc.Service) *Handler { return &Handler{svc: svc} }
 
-func (h *Handler) SetVWService(s *vwSvc.Service) { h.vwSvc = s }
+func (h *Handler) SetVWService(s *vwSvc.Service)            { h.vwSvc = s }
+func (h *Handler) SetZeissService(s *zeissSvc.CatalogService) { h.zeissSvc = s }
 
 func jsonResponse(w http.ResponseWriter, status int, v interface{}) {
 	w.Header().Set("Content-Type", "application/json")
@@ -352,18 +355,71 @@ func (h *Handler) GetTicketLensOptions(w http.ResponseWriter, r *http.Request) {
 }
 
 // GET /api/ticket/{ticket_id}/order-requirements
+// Unified endpoint: delegates to Zeiss or VisionWeb based on ticket lab_id.
+// Returns lens_source so frontend knows whether to show Order button.
 func (h *Handler) GetOrderRequirements(w http.ResponseWriter, r *http.Request) {
 	ticketID, _ := strconv.ParseInt(mux.Vars(r)["ticket_id"], 10, 64)
 	if ticketID == 0 {
 		jsonResponse(w, 400, map[string]string{"error": "invalid ticket_id"})
 		return
 	}
+
+	lensSource := h.svc.GetTicketLensSource(ticketID)
+
+	// Custom or no lens — no electronic order possible
+	if lensSource == "" || lensSource == "custom" {
+		jsonResponse(w, 200, map[string]interface{}{
+			"ready":       false,
+			"lens_source": lensSource,
+			"can_order":   false,
+			"message":     "Manual order — electronic submission not available for custom lenses",
+		})
+		return
+	}
+
+	// Check lab_id to determine vendor
+	labID, err := h.svc.GetTicketLabID(ticketID)
+	if err != nil {
+		jsonResponse(w, errorStatus(err), map[string]string{"error": err.Error()})
+		return
+	}
+
+	if labID != nil && *labID == zeissSvc.ZeissVendorID {
+		// ── Zeiss path ──
+		if h.zeissSvc == nil {
+			jsonResponse(w, 500, map[string]string{"error": "Zeiss service not configured"})
+			return
+		}
+		username := pkgAuth.UsernameFromContext(r.Context())
+		empID, err := h.svc.EmployeeIDByUsername(username)
+		if err != nil {
+			jsonResponse(w, 401, map[string]string{"error": "unauthorized"})
+			return
+		}
+		result := h.zeissSvc.CheckZeissOrderRequirements(ticketID, empID)
+		jsonResponse(w, 200, map[string]interface{}{
+			"ready":       result.Ready,
+			"lens_source": lensSource,
+			"can_order":   true,
+			"provider":    "zeiss",
+			"fields":      result.Fields,
+		})
+		return
+	}
+
+	// ── VisionWeb path ──
 	if h.vwSvc == nil {
 		jsonResponse(w, 500, map[string]string{"error": "VisionWeb service not configured"})
 		return
 	}
 	result := h.vwSvc.CheckOrderRequirements(ticketID)
-	jsonResponse(w, 200, result)
+	jsonResponse(w, 200, map[string]interface{}{
+		"ready":       result.Ready,
+		"lens_source": lensSource,
+		"can_order":   true,
+		"provider":    "vision_web",
+		"fields":      result.Fields,
+	})
 }
 
 // POST /api/ticket/{ticket_id}/order
@@ -373,6 +429,25 @@ func (h *Handler) PlaceVWOrder(w http.ResponseWriter, r *http.Request) {
 		jsonResponse(w, 400, map[string]string{"error": "invalid ticket_id"})
 		return
 	}
+
+	// Check lens source — custom lenses cannot be ordered electronically
+	lensSource := h.svc.GetTicketLensSource(ticketID)
+	if lensSource == "" || lensSource == "custom" {
+		jsonResponse(w, 400, map[string]string{"error": "manual orders cannot be submitted electronically"})
+		return
+	}
+
+	// Check lab_id — route to correct provider
+	labID, err := h.svc.GetTicketLabID(ticketID)
+	if err != nil {
+		jsonResponse(w, errorStatus(err), map[string]string{"error": err.Error()})
+		return
+	}
+	if labID != nil && *labID == zeissSvc.ZeissVendorID {
+		jsonResponse(w, 501, map[string]string{"error": "Zeiss order submission not yet implemented"})
+		return
+	}
+
 	if h.vwSvc == nil {
 		jsonResponse(w, 500, map[string]string{"error": "VisionWeb service not configured"})
 		return
@@ -384,6 +459,15 @@ func (h *Handler) PlaceVWOrder(w http.ResponseWriter, r *http.Request) {
 			jsonResponse(w, 422, map[string]interface{}{
 				"error":  "validation failed",
 				"errors": ve.Errors,
+			})
+			return
+		}
+		// Already submitted — return 409 with order info
+		if result != nil && result.VWOrderID != "" {
+			jsonResponse(w, 409, map[string]interface{}{
+				"error":       err.Error(),
+				"vw_order_id": result.VWOrderID,
+				"status":      result.Status,
 			})
 			return
 		}

@@ -45,6 +45,9 @@ type LabTicketPowers struct {
 
 	ODBC *string `gorm:"column:od_bc;type:varchar(6)" json:"od_bc,omitempty"`
 	OSBC *string `gorm:"column:os_bc;type:varchar(6)" json:"os_bc,omitempty"`
+
+	ODBVD *string `gorm:"column:od_bvd;type:varchar(10)" json:"od_bvd,omitempty"`
+	OSBVD *string `gorm:"column:os_bvd;type:varchar(10)" json:"os_bvd,omitempty"`
 }
 
 func (LabTicketPowers) TableName() string { return "lab_ticket_powers" }
@@ -85,6 +88,9 @@ func (l *LabTicketPowers) ToMap() map[string]interface{} {
 
 		"od_bc": l.ODBC,
 		"os_bc": l.OSBC,
+
+		"od_bvd": l.ODBVD,
+		"os_bvd": l.OSBVD,
 	}
 }
 

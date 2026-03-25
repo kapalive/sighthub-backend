@@ -425,11 +425,12 @@ func (s *Service) ImportFromVisionWeb(sloID, vendorID, brandLensID int) (*Import
 
 	// ─── Import Lenses ───────────────────────────────────────────────────
 	for _, l := range catalog.Lenses {
-		// Check duplicate
-		var exists int64
-		s.db.Table("lenses").Where("vw_design_code = ? AND vw_material_code = ? AND vendor_id = ?",
-			l.DesignCode, l.MaterialCode, vendorID).Count(&exists)
-		if exists > 0 {
+		// Check if already exists
+		var existingID int
+		s.db.Table("lenses").Select("id_lenses").
+			Where("vw_design_code = ? AND vw_material_code = ? AND vendor_id = ?",
+				l.DesignCode, l.MaterialCode, vendorID).Scan(&existingID)
+		if existingID > 0 {
 			result.LensesSkipped++
 			continue
 		}
@@ -489,7 +490,7 @@ func (s *Service) ImportFromVisionWeb(sloID, vendorID, brandLensID int) (*Import
 
 		itemNbr := fmt.Sprintf("A%d", nextACode)
 		nextACode++
-		desc := vendorName + " " + t.Description
+		desc := t.Description
 
 		s.db.Exec(`
 			INSERT INTO lens_treatments (item_nbr, description, vendor_id, source, can_lookup, vw_code, vw_adt_id)

@@ -71,6 +71,7 @@ func (s *Service) GetTreatmentVendors() ([]TreatmentVendorResult, error) {
 	err := s.db.Table("vendor v").
 		Select("DISTINCT v.id_vendor, v.vendor_name").
 		Joins("JOIN lens_treatments lt ON lt.vendor_id = v.id_vendor").
+		Where("v.visible = true").
 		Scan(&rows).Error
 	if err != nil {
 		return nil, err
@@ -82,13 +83,18 @@ func (s *Service) GetTreatmentVendors() ([]TreatmentVendorResult, error) {
 	return result, nil
 }
 
-func (s *Service) GetTreatments(vendorID *int) ([]TreatmentListItem, error) {
+func (s *Service) GetTreatments(vendorID *int, source *string) ([]TreatmentListItem, error) {
 	q := s.db.Table("lens_treatments lt").
 		Select("lt.id_lens_treatments, lt.item_nbr, lt.description, lt.price, vc.code AS v_code").
 		Joins("LEFT JOIN v_codes_lens vc ON vc.id_v_codes_lens = lt.v_codes_lens_id")
 
 	if vendorID != nil {
 		q = q.Where("lt.vendor_id = ?", *vendorID)
+	} else {
+		q = q.Where("lt.vendor_id IS NULL OR lt.vendor_id IN (SELECT id_vendor FROM vendor WHERE visible = true)")
+	}
+	if source != nil && *source != "" {
+		q = q.Where("lt.source = ?", *source)
 	}
 
 	type row struct {

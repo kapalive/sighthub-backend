@@ -18,9 +18,34 @@ func New(svc *price_book_service.Service) *Handler {
 	return &Handler{svc: svc}
 }
 
-// GET /api/price-book/lens/brand_vendor
+// GET /api/price-book/lens/brand_vendor (legacy — returns all)
 func (h *Handler) GetLensBrandsVendors(w http.ResponseWriter, r *http.Request) {
 	results, err := h.svc.GetLensBrandsVendors()
+	if err != nil {
+		jsonError(w, "Query failed", http.StatusInternalServerError)
+		return
+	}
+	jsonResponse(w, results, http.StatusOK)
+}
+
+// GET /api/price_book/lens/vendors
+func (h *Handler) GetLensVendors(w http.ResponseWriter, r *http.Request) {
+	results, err := h.svc.GetLensVendors()
+	if err != nil {
+		jsonError(w, "Query failed", http.StatusInternalServerError)
+		return
+	}
+	jsonResponse(w, results, http.StatusOK)
+}
+
+// GET /api/price_book/lens/brands/{vendor_id}
+func (h *Handler) GetLensBrandsByVendor(w http.ResponseWriter, r *http.Request) {
+	vendorID, err := strconv.Atoi(mux.Vars(r)["vendor_id"])
+	if err != nil || vendorID == 0 {
+		jsonError(w, "invalid vendor_id", http.StatusBadRequest)
+		return
+	}
+	results, err := h.svc.GetLensBrandsByVendor(vendorID)
 	if err != nil {
 		jsonError(w, "Query failed", http.StatusInternalServerError)
 		return

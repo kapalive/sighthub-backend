@@ -29,6 +29,45 @@ func New(db *gorm.DB, sched *scheduler.Scheduler) *Service {
 	return &Service{db: db, sched: sched}
 }
 
+// GetTicketLabID returns the lab_id for a ticket (nil if not set).
+func (s *Service) GetTicketLabID(ticketID int64) (*int64, error) {
+	var labID *int64
+	err := s.db.Raw(`SELECT lab_id FROM lab_ticket WHERE id_lab_ticket = ?`, ticketID).Scan(&labID).Error
+	return labID, err
+}
+
+// GetTicketLensSource returns the source of the lens in the ticket's invoice ("vision_web", "zeiss_only", "custom", "")
+func (s *Service) GetTicketLensSource(ticketID int64) string {
+	var source string
+	s.db.Raw(`
+		SELECT COALESCE(l.source, 'custom')
+		FROM lab_ticket lt
+		JOIN invoice_item_sale iis ON iis.invoice_id = lt.invoice_id AND iis.item_type = 'Lens'
+		JOIN lenses l ON l.id_lenses = iis.item_id
+		WHERE lt.id_lab_ticket = ?
+		LIMIT 1
+	`, ticketID).Scan(&source)
+	return source
+}
+
+// EmployeeIDByUsername resolves username → employee.id_employee.
+func (s *Service) EmployeeIDByUsername(username string) (int64, error) {
+	var result struct{ IDEmployee int64 }
+	err := s.db.Raw(`
+		SELECT e.id_employee
+		FROM employee_login el
+		JOIN employee e ON e.employee_login_id = el.id_employee_login
+		WHERE el.employee_login = ?
+	`, username).Scan(&result).Error
+	if err != nil {
+		return 0, err
+	}
+	if result.IDEmployee == 0 {
+		return 0, fmt.Errorf("employee not found for username %s", username)
+	}
+	return result.IDEmployee, nil
+}
+
 type NotifyResult struct {
 	Message   string  `json:"message"`
 	Ticket    string  `json:"ticket"`

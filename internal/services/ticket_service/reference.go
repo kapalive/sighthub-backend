@@ -48,7 +48,7 @@ func (s *Service) GetLensStatuses() ([]map[string]interface{}, error) {
 // GET /labs
 func (s *Service) GetLabs() ([]map[string]interface{}, error) {
 	var rows []vendorModel.Vendor
-	if err := s.db.Where("lab = true").Order("vendor_name").Find(&rows).Error; err != nil {
+	if err := s.db.Where("lab = true AND visible = true").Order("vendor_name").Find(&rows).Error; err != nil {
 		return nil, err
 	}
 	result := make([]map[string]interface{}, 0, len(rows))
@@ -70,7 +70,7 @@ func (s *Service) GetLabsForEmployee(username string) ([]map[string]interface{},
 	locationID := loc.IDLocation
 
 	var rows []vendorModel.Vendor
-	if err := s.db.Where("lab = true").Order("vendor_name").Find(&rows).Error; err != nil {
+	if err := s.db.Where("lab = true AND visible = true").Order("vendor_name").Find(&rows).Error; err != nil {
 		return nil, err
 	}
 

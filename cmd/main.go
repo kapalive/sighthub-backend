@@ -9,7 +9,6 @@ import (
 
 	"sighthub-backend/internal/routes"
 	exameye "sighthub-backend/internal/routes/exam_eye"
-	integrations "sighthub-backend/internal/routes/integrations"
 	"os"
 	"sighthub-backend/pkg/cache"
 	"sighthub-backend/pkg/scheduler"
@@ -145,7 +144,7 @@ func main() {
 	routes.RegisterVendorRoutes(db, cache.RDB, cfg, router)
 
 	// Integrations (domain routes)
-	integrations.RegisterZeissRoutes(db, cache.RDB, cfg, router)
+	// Zeiss auth is now in price_book and ticket routes
 
 	// favicon
 	router.HandleFunc("/favicon.ico", func(w http.ResponseWriter, r *http.Request) {

@@ -11,7 +11,7 @@ import (
 
 // ─── Invoice-scoped Price Book ───────────────────────────────────────────────
 
-// getInvoiceLensSource returns the source of lenses in the invoice ("custom", "vision_web", "zeiss")
+// getInvoiceLensSource returns the source of lenses in the invoice ("custom", "vision_web", "zeiss_only")
 // or "" if no lenses.
 func (s *Service) getInvoiceLensSource(invoiceID int64) string {
 	var items []invoices.InvoiceItemSale
@@ -313,7 +313,7 @@ func (s *Service) InvoicePBAddServices(invoiceID int64, typeID *int, search *str
 	source := s.getInvoiceLensSource(invoiceID)
 
 	// Additional services only when no lenses or custom lenses
-	if source == "vision_web" || source == "zeiss" {
+	if source == "vision_web" || source == "zeiss_only" {
 		return []InvPBAddServiceItem{}, nil
 	}
 

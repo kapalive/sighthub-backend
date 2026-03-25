@@ -86,6 +86,8 @@ type CreateTicketRequest struct {
 	OSOC             *string  `json:"os_oc"`
 	ODBC             *string  `json:"od_bc"`
 	OSBC             *string  `json:"os_bc"`
+	ODBVD            *string  `json:"od_bvd"`
+	OSBVD            *string  `json:"os_bvd"`
 	ODDT             *string  `json:"od_dt"`
 	OSDT             *string  `json:"os_dt"`
 	ODNR             *string  `json:"od_nr"`
@@ -296,6 +298,8 @@ func (s *Service) CreateTicket(username string, invoiceID int64, req *CreateTick
 		overrideStrPtr(&powers.OSOC, req.OSOC)
 		overrideStrPtr(&powers.ODBC, req.ODBC)
 		overrideStrPtr(&powers.OSBC, req.OSBC)
+		overrideStrPtr(&powers.ODBVD, req.ODBVD)
+		overrideStrPtr(&powers.OSBVD, req.OSBVD)
 		overrideStrPtr(&powers.ODDT, req.ODDT)
 		overrideStrPtr(&powers.OSDT, req.OSDT)
 		overrideStrPtr(&powers.ODNR, req.ODNR)
@@ -339,6 +343,9 @@ func (s *Service) CreateTicket(username string, invoiceID int64, req *CreateTick
 			if err := tx.First(&ln, *lensItem.ItemID).Error; err == nil {
 				ticketLens.LensesMaterialsID = ln.LensesMaterialsID
 				ticketLens.LensTypesID = ln.LensTypeID
+				ticketLens.LensesID = &ln.IDLenses
+				ticketLens.VwDesignCode = ln.VwDesignCode
+				ticketLens.VwMaterialCode = ln.VwMaterialCode
 			}
 		}
 

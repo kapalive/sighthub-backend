@@ -73,6 +73,8 @@ type PowersPayload struct {
 	OSOC        *string  `json:"os_oc"`
 	ODBC        *string  `json:"od_bc"`
 	OSBC        *string  `json:"os_bc"`
+	ODBVD       *string  `json:"od_bvd"`
+	OSBVD       *string  `json:"os_bvd"`
 	ODDT        *string  `json:"od_dt"`
 	OSDT        *string  `json:"os_dt"`
 	ODNR        *string  `json:"od_nr"`
@@ -394,6 +396,8 @@ func (s *Service) patchPowers(p *labTicketModel.LabTicketPowers, pl *PowersPaylo
 	overrideStrPtr(&p.OSOC, pl.OSOC)
 	overrideStrPtr(&p.ODBC, pl.ODBC)
 	overrideStrPtr(&p.OSBC, pl.OSBC)
+	overrideStrPtr(&p.ODBVD, pl.ODBVD)
+	overrideStrPtr(&p.OSBVD, pl.OSBVD)
 	overrideStrPtr(&p.ODDT, pl.ODDT)
 	overrideStrPtr(&p.OSDT, pl.OSDT)
 	overrideStrPtr(&p.ODNR, pl.ODNR)

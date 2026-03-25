@@ -518,7 +518,7 @@ func (s *Service) CreateRemakeInvoice(username string, invoiceID int64) (map[str
 
 func (s *Service) GetPaymentMethods() ([]map[string]interface{}, error) {
 	var methods []generalModel.PaymentMethod
-	if err := s.db.Find(&methods).Error; err != nil {
+	if err := s.db.Where("patient_balance IS NULL").Find(&methods).Error; err != nil {
 		return nil, err
 	}
 	result := make([]map[string]interface{}, len(methods))
@@ -1057,7 +1057,7 @@ func (s *Service) AddItemsToInvoice(username string, invoiceID int64, input AddI
 					if pbKey == "Treatment" {
 						return errors.New("cannot add treatments to custom lenses")
 					}
-				case "vision_web", "zeiss":
+				case "vision_web", "zeiss_only":
 					if pbKey == "Add service" {
 						return fmt.Errorf("cannot add additional services to %s lenses", invoiceLensSource)
 					}
@@ -1159,7 +1159,7 @@ func (s *Service) AddItemsToInvoice(username string, invoiceID int64, input AddI
 				}
 
 			case "Lens":
-				lineSaleKey = ptrStr("Lens Options")
+				lineSaleKey = ptrStr("Lens")
 				rawID, ok := parseInt64(itemData.ItemID)
 				if !ok {
 					continue

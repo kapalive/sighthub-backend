@@ -75,6 +75,7 @@ type VendorInput struct {
 	Fax           *string `json:"fax"`
 	Email         *string `json:"email"`
 	Lab           *bool   `json:"lab"`
+	Visible       *bool   `json:"visible"`
 }
 
 type RepInput struct {
@@ -118,6 +119,10 @@ func (s *Service) AddVendor(req AddVendorRequest) (int, error) {
 	}
 	if req.Vendor.Lab != nil && *req.Vendor.Lab {
 		v.Lab = true
+	}
+	v.Visible = true // default visible
+	if req.Vendor.Visible != nil {
+		v.Visible = *req.Vendor.Visible
 	}
 
 	err := s.db.Transaction(func(tx *gorm.DB) error {
@@ -189,6 +194,9 @@ func (s *Service) UpdateVendor(vendorID int, data map[string]interface{}, rep *R
 	}
 	if val, ok := data["lab"]; ok {
 		updates["lab"] = val
+	}
+	if val, ok := data["visible"]; ok {
+		updates["visible"] = val
 	}
 
 	return s.db.Transaction(func(tx *gorm.DB) error {
@@ -327,15 +335,20 @@ func (s *Service) GetVendor(vendorID int, locationIDs ...int64) (map[string]inte
 		framesList = append(framesList, item)
 	}
 
-	// Lens brands
+	// Lens brands (deduplicated by brand_id)
 	var lensBrands []vModel.VendorBrandLens
 	s.db.Preload("BrandLens").Where("id_vendor = ?", vendorID).Find(&lensBrands)
 	lensList := make([]map[string]interface{}, 0, len(lensBrands))
+	seenLensBrand := make(map[int]bool)
 	for _, lb := range lensBrands {
 		if lb.BrandLens == nil {
 			continue
 		}
 		b := lb.BrandLens
+		if seenLensBrand[b.IDBrandLens] {
+			continue
+		}
+		seenLensBrand[b.IDBrandLens] = true
 		lensList = append(lensList, map[string]interface{}{
 			"brand_id":           b.IDBrandLens,
 			"brand_name":         b.BrandName,
@@ -449,6 +462,7 @@ func (s *Service) GetVendor(vendorID int, locationIDs ...int64) (map[string]inte
 		"email":          v.Email,
 		"country_id":     v.CountryID,
 		"lab":            v.Lab,
+		"visible":        v.Visible,
 		"rep":            repData,
 		"brands": map[string]interface{}{
 			"frames":      framesList,
@@ -499,12 +513,14 @@ func (s *Service) ListVendors(page int, includeDetails bool) (*VendorListResult,
 				"fax":            v.Fax,
 				"email":          v.Email,
 				"lab":            v.Lab,
+				"visible":        v.Visible,
 			})
 		} else {
 			list = append(list, map[string]interface{}{
 				"vendor_id":   v.IDVendor,
 				"vendor_name": v.VendorName,
 				"lab":         v.Lab,
+				"visible":     v.Visible,
 			})
 		}
 	}
@@ -771,6 +787,11 @@ func (s *Service) AddVendorBrand(vendorID int, input AddBrandInput) (map[string]
 			if err := tx.Create(&brand).Error; err != nil {
 				return err
 			}
+			var existingLink int64
+			tx.Model(&vModel.VendorBrand{}).Where("id_vendor = ? AND brand_id = ?", vendorID, brand.IDBrand).Count(&existingLink)
+			if existingLink > 0 {
+				return fmt.Errorf("this brand is already linked to this vendor")
+			}
 			link := vModel.VendorBrand{IDVendor: vendorID, IDBrand: brand.IDBrand}
 			if err := tx.Create(&link).Error; err != nil {
 				return err
@@ -792,6 +813,11 @@ func (s *Service) AddVendorBrand(vendorID int, input AddBrandInput) (map[string]
 			if err := tx.Create(&brand).Error; err != nil {
 				return err
 			}
+			var existingLink int64
+			tx.Model(&vModel.VendorBrandLens{}).Where("id_vendor = ? AND id_brand_lens = ?", vendorID, brand.IDBrandLens).Count(&existingLink)
+			if existingLink > 0 {
+				return fmt.Errorf("this lens brand is already linked to this vendor")
+			}
 			link := vModel.VendorBrandLens{IDVendor: vendorID, IDBrandLens: brand.IDBrandLens}
 			if err := tx.Create(&link).Error; err != nil {
 				return err
@@ -812,6 +838,11 @@ func (s *Service) AddVendorBrand(vendorID int, input AddBrandInput) (map[string]
 			}
 			if err := tx.Create(&brand).Error; err != nil {
 				return err
+			}
+			var existingLink int64
+			tx.Model(&vModel.VendorBrandContactLens{}).Where("id_vendor = ? AND id_brand_contact_lens = ?", vendorID, brand.IDBrandContactLens).Count(&existingLink)
+			if existingLink > 0 {
+				return fmt.Errorf("this contact lens brand is already linked to this vendor")
 			}
 			link := vModel.VendorBrandContactLens{IDVendor: vendorID, IDBrandContactLens: brand.IDBrandContactLens}
 			if err := tx.Create(&link).Error; err != nil {
@@ -1009,7 +1040,7 @@ type LabInput struct {
 
 func (s *Service) ListLabs(locationID *int64) ([]map[string]interface{}, error) {
 	var labs []vModel.Vendor
-	s.db.Where("lab = true").Order("vendor_name ASC").Find(&labs)
+	s.db.Where("lab = true AND visible = true").Order("vendor_name ASC").Find(&labs)
 	result := make([]map[string]interface{}, 0, len(labs))
 	for _, l := range labs {
 		entry := map[string]interface{}{

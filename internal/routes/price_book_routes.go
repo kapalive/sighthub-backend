@@ -11,9 +11,11 @@ import (
 	pbcl "sighthub-backend/internal/handlers/price_book_handler/contact_lens"
 	pbother "sighthub-backend/internal/handlers/price_book_handler/other"
 	vwhandler "sighthub-backend/internal/handlers/visionweb_handler"
+	zeisshandler "sighthub-backend/internal/handlers/zeiss_handler"
 	"sighthub-backend/internal/middleware"
 	"sighthub-backend/internal/services/price_book_service"
 	"sighthub-backend/internal/services/visionweb_service"
+	"sighthub-backend/internal/services/zeiss_service"
 	pkgAuth "sighthub-backend/pkg/auth"
 )
 
@@ -25,6 +27,7 @@ func RegisterPriceBookRoutes(db *gorm.DB, rdb *redis.Client, cfg *config.Config,
 	hCL := pbcl.New(svc)
 	hOther := pbother.New(svc)
 	hVW := vwhandler.NewHandler(visionweb_service.New(db))
+	hZeiss := zeisshandler.New(zeiss_service.NewAuthService(db, rdb), db)
 
 	jwtMW := pkgAuth.JWTMiddleware(cfg.JWTSecretKey, rdb)
 	// permission 26 = price-book read, 28 = create, 29 = update, 30 = delete
@@ -51,9 +54,18 @@ func RegisterPriceBookRoutes(db *gorm.DB, rdb *redis.Client, cfg *config.Config,
 	vwWrite := api.NewRoute().Subrouter()
 	vwWrite.Use(writeMW)
 	vwWrite.HandleFunc("/import-vw", hVW.ImportFromVisionWeb).Methods("POST")
+	api.HandleFunc("/import-vw/status", hVW.ImportStatus).Methods("GET")
+
+	// ─── Zeiss Catalog Import (requires write permission) ─────────────────
+	zeissWrite := api.NewRoute().Subrouter()
+	zeissWrite.Use(writeMW)
+	zeissWrite.HandleFunc("/zeiss/import-catalog", hZeiss.ImportCatalog).Methods("POST")
+	api.HandleFunc("/zeiss/import-catalog/status", hZeiss.ImportCatalogStatus).Methods("GET")
 
 	// ─── Lenses ───────────────────────────────────────────────────────────────
-	api.HandleFunc("/lens/brand_vendor", hLens.GetLensBrandsVendors).Methods("GET")
+	api.HandleFunc("/lens/brand_vendor", hLens.GetLensBrandsVendors).Methods("GET") // legacy
+	api.HandleFunc("/lens/vendors", hLens.GetLensVendors).Methods("GET")
+	api.HandleFunc("/lens/brands/{vendor_id:[0-9]+}", hLens.GetLensBrandsByVendor).Methods("GET")
 	api.HandleFunc("/lens/type", hLens.GetLensTypes).Methods("GET")
 	api.HandleFunc("/lens/materials", hLens.GetLensMaterials).Methods("GET")
 	api.HandleFunc("/lens/special", hLens.GetLensSpecialFeatures).Methods("GET")
@@ -145,6 +157,12 @@ func RegisterPriceBookRoutes(db *gorm.DB, rdb *redis.Client, cfg *config.Config,
 	asDelete := api.NewRoute().Subrouter()
 	asDelete.Use(deleteMW)
 	asDelete.HandleFunc("/additional_service/{id}", hOther.DeleteAdditionalService).Methods("DELETE")
+
+	// ─── Zeiss Auth ──────────────────────────────────────────────────────────
+	api.HandleFunc("/zeiss/auth/status", hZeiss.AuthStatus).Methods("GET")
+	api.HandleFunc("/zeiss/auth/url", hZeiss.AuthURL).Methods("GET")
+	api.HandleFunc("/zeiss/auth/callback", hZeiss.AuthCallback).Methods("POST")
+	api.HandleFunc("/zeiss/auth/logout", hZeiss.AuthLogout).Methods("POST")
 
 	// ─── Misc Items ───────────────────────────────────────────────────────────
 	api.HandleFunc("/misc_items", hOther.GetMiscItems).Methods("GET")

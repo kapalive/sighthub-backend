@@ -153,9 +153,38 @@ func (s *Service) CheckOrderRequirements(ticketID int64) *OrderRequirements {
 		add("vw_account", "VisionWeb Account (ship#/bill#)", "vendor_location_account", true, false, nil)
 	}
 
-	// Lens VW codes — from lab_ticket_lens directly
+	// Lens VW codes — from lab_ticket_lens, auto-sync from invoice if missing
 	lens := ticket.Lens
 	hasLens := lens != nil
+	if hasLens && (lens.LensesID == nil || lens.VwDesignCode == nil || lens.VwMaterialCode == nil) {
+		// Try to find lens in invoice_item_sale and auto-fill
+		type lensRow struct {
+			ItemID int64
+		}
+		var lr lensRow
+		s.db.Table("invoice_item_sale").Select("item_id").
+			Where("invoice_id = ? AND item_type IN ? AND item_id IS NOT NULL", ticket.InvoiceID, []string{"Lens", "Lenses"}).
+			Limit(1).Scan(&lr)
+		if lr.ItemID > 0 {
+			var ln struct {
+				IDLenses       int64
+				VWDesignCode   *string `gorm:"column:vw_design_code"`
+				VWMaterialCode *string `gorm:"column:vw_material_code"`
+			}
+			if s.db.Table("lenses").Where("id_lenses = ?", lr.ItemID).Scan(&ln).Error == nil && ln.IDLenses > 0 {
+				lid := int(ln.IDLenses)
+				lens.LensesID = &lid
+				lens.VwDesignCode = ln.VWDesignCode
+				lens.VwMaterialCode = ln.VWMaterialCode
+				// Persist to lab_ticket_lens so it's saved for future
+				s.db.Model(lens).Updates(map[string]interface{}{
+					"lenses_id":        ln.IDLenses,
+					"vw_design_code":   ln.VWDesignCode,
+					"vw_material_code": ln.VWMaterialCode,
+				})
+			}
+		}
+	}
 	designOK := hasLens && lens.VwDesignCode != nil && *lens.VwDesignCode != ""
 	materialOK := hasLens && lens.VwMaterialCode != nil && *lens.VwMaterialCode != ""
 	add("lenses_id", "Lens (from VW catalog)", "lab_ticket_lens.lenses_id", true, hasLens && lens.LensesID != nil, valStr(hasLens, func() interface{} { return lens.LensesID }))
@@ -240,6 +269,17 @@ func (s *Service) PlaceOrder(ticketID int64) (*OrderResult, error) {
 		First(&ticket, ticketID).Error
 	if err != nil {
 		return nil, fmt.Errorf("ticket not found")
+	}
+
+	// Check if order was already placed
+	if ticket.VwOrderID != nil && *ticket.VwOrderID != "" {
+		// Fetch current status from VisionWeb
+		status, statusErr := s.GetOrderStatus(*ticket.VwOrderID)
+		return &OrderResult{
+			VWOrderID: *ticket.VwOrderID,
+			Status:    statusString(status, statusErr),
+			ErrorList: fmt.Sprintf("Order already submitted (vw_order_id: %s). Cannot submit again.", *ticket.VwOrderID),
+		}, fmt.Errorf("order already submitted for this ticket (vw_order_id: %s)", *ticket.VwOrderID)
 	}
 
 	// 2-9. Collect ALL validation issues at once
@@ -744,6 +784,16 @@ func statusDescription(code int) string {
 	default:
 		return fmt.Sprintf("Status %d", code)
 	}
+}
+
+func statusString(status *VWOrderStatus, err error) string {
+	if err != nil || status == nil {
+		return "unknown"
+	}
+	if status.Status != "" {
+		return status.Status
+	}
+	return "unknown"
 }
 
 // ─── XML helpers ────────────────────────────────────────────────────────────
