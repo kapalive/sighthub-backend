@@ -21,6 +21,7 @@ import (
 	invSvc "sighthub-backend/internal/services/patient_service/invoice"
 	recallSvc "sighthub-backend/internal/services/patient_service/recall"
 	rxSvc "sighthub-backend/internal/services/patient_service/rx"
+	"sighthub-backend/internal/services/zeiss_service"
 	pkgAuth "sighthub-backend/pkg/auth"
 )
 
@@ -29,6 +30,22 @@ func RegisterPatientRoutes(db *gorm.DB, rdb *redis.Client, cfg *config.Config, r
 	infoService := infoSvc.New(db, cfg.DBName)
 	rxService   := rxSvc.New(db)
 	invoiceService := invSvc.New(db)
+
+	// Wire Zeiss allowed treatments filter
+	zeissAuth := zeiss_service.NewAuthService(db, rdb)
+	zeissCatalog := zeiss_service.NewCatalogService(db, zeissAuth)
+	invoiceService.SetZeissAllowedTreatments(func(empID int64, lensCode, custNum string) ([]string, error) {
+		treats, err := zeissCatalog.GetAllowedTreatments(empID, lensCode, custNum)
+		if err != nil {
+			return nil, err
+		}
+		codes := make([]string, len(treats))
+		for i, t := range treats {
+			codes[i] = t.VwCode
+		}
+		return codes, nil
+	})
+
 	recallService := recallSvc.New(db)
 
 	// ─── Handlers ──────────────────────────────────────────────────────────────

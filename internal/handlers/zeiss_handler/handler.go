@@ -214,6 +214,31 @@ func (h *Handler) ImportCatalogStatus(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(map[string]interface{}{"status": "idle"})
 }
 
+// GET /zeiss/allowed-treatments?lens_code=59752
+func (h *Handler) GetAllowedTreatments(w http.ResponseWriter, r *http.Request) {
+	empID, ok := h.employeeID(r)
+	if !ok {
+		jsonError(w, "unauthorized", 401)
+		return
+	}
+	lensCode := r.URL.Query().Get("lens_code")
+	if lensCode == "" {
+		jsonError(w, "lens_code is required", 400)
+		return
+	}
+	status := h.auth.GetAuthStatus(empID)
+	if status.CustomerNumber == nil || *status.CustomerNumber == "" {
+		jsonError(w, "zeiss auth required", 401)
+		return
+	}
+	result, err := h.catalog.GetAllowedTreatments(empID, lensCode, *status.CustomerNumber)
+	if err != nil {
+		jsonError(w, err.Error(), 400)
+		return
+	}
+	jsonOK(w, result)
+}
+
 // GET /zeiss/order-requirements/{ticket_id}
 func (h *Handler) ZeissOrderRequirements(w http.ResponseWriter, r *http.Request) {
 	empID, ok := h.employeeID(r)

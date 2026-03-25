@@ -402,7 +402,15 @@ func (h *Handler) InvPBTreatmentList(w http.ResponseWriter, r *http.Request) {
 	if v := r.URL.Query().Get("search"); v != "" {
 		search = &v
 	}
-	result, err := h.svc.InvoicePBTreatments(invoiceID, search)
+	var empID int64
+	username := pkgAuth.UsernameFromContext(r.Context())
+	if username != "" {
+		h.svc.DB().Raw(`
+			SELECT e.id_employee FROM employee_login el
+			JOIN employee e ON e.employee_login_id = el.id_employee_login
+			WHERE el.employee_login = ?`, username).Scan(&empID)
+	}
+	result, err := h.svc.InvoicePBTreatments(invoiceID, search, empID)
 	if err != nil {
 		jsonError(w, err.Error(), http.StatusInternalServerError)
 		return

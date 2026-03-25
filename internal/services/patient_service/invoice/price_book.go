@@ -228,7 +228,7 @@ type InvPBTreatmentItem struct {
 	PbKey       string  `json:"pb_key"`
 }
 
-func (s *Service) InvoicePBTreatments(invoiceID int64, search *string) ([]InvPBTreatmentItem, error) {
+func (s *Service) InvoicePBTreatments(invoiceID int64, search *string, employeeID int64) ([]InvPBTreatmentItem, error) {
 	source := s.getInvoiceLensSource(invoiceID)
 
 	// No lenses or custom lenses → no treatments available
@@ -249,6 +249,18 @@ func (s *Service) InvoicePBTreatments(invoiceID int64, search *string) ([]InvPBT
 		Select("lt.id_lens_treatments, lt.item_nbr, lt.description, lt.price, lt.source, vc.code AS v_code").
 		Joins("LEFT JOIN v_codes_lens vc ON vc.id_v_codes_lens = lt.v_codes_lens_id").
 		Where("lt.source = ?", source)
+
+	// For zeiss_only — filter by PCAT allowed treatments for the specific lens
+	if source == "zeiss_only" && s.zeissAllowedTreatments != nil && employeeID > 0 {
+		lensCode := s.getInvoiceZeissLensCode(invoiceID)
+		custNum := s.getZeissCustomerNumber(employeeID)
+		if lensCode != "" && custNum != "" {
+			allowedCodes, err := s.zeissAllowedTreatments(employeeID, lensCode, custNum)
+			if err == nil && len(allowedCodes) > 0 {
+				q = q.Where("lt.vw_code IN ?", allowedCodes)
+			}
+		}
+	}
 
 	if search != nil && *search != "" {
 		words := strings.Fields(strings.TrimSpace(*search))
@@ -289,6 +301,26 @@ func (s *Service) InvoicePBTreatments(invoiceID int64, search *string) ([]InvPBT
 		}
 	}
 	return result, nil
+}
+
+// getInvoiceZeissLensCode returns the Zeiss commercial code (lens_name) for the lens in invoice
+func (s *Service) getInvoiceZeissLensCode(invoiceID int64) string {
+	var code string
+	s.db.Raw(`
+		SELECT l.lens_name
+		FROM invoice_item_sale iis
+		JOIN lenses l ON l.id_lenses = iis.item_id
+		WHERE iis.invoice_id = ? AND iis.item_type = 'Lens' AND l.source = 'zeiss_only'
+		LIMIT 1
+	`, invoiceID).Scan(&code)
+	return code
+}
+
+// getZeissCustomerNumber returns zeiss customer_number from zeiss_token for employee
+func (s *Service) getZeissCustomerNumber(employeeID int64) string {
+	var num string
+	s.db.Raw("SELECT customer_number FROM zeiss_token WHERE employee_id = ?", employeeID).Scan(&num)
+	return num
 }
 
 // ─── Additional service list ─────────────────────────────────────────────────

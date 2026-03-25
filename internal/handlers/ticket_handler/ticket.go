@@ -167,13 +167,29 @@ func (h *Handler) GetTicketByID(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// If ticket has VW order, fetch status from VisionWeb
-	if h.vwSvc != nil {
-		if vwID, ok := result["vw_order_id"].(*string); ok && vwID != nil && *vwID != "" {
+	// Fetch order status from appropriate provider
+	if vwID, ok := result["order_id"].(*string); ok && vwID != nil && *vwID != "" {
+		labIDVal, _ := result["lab_id"].(*int)
+		if labIDVal != nil && *labIDVal == zeissSvc.ZeissVendorID && h.zeissSvc != nil {
+			// Zeiss order status
+			username := pkgAuth.UsernameFromContext(r.Context())
+			empID, err := h.svc.EmployeeIDByUsername(username)
+			if err == nil {
+				authStatus := h.zeissSvc.GetZeissAuthStatus(empID)
+				if authStatus.CustomerNumber != nil {
+					if status, err := h.zeissSvc.GetZeissOrderStatus(empID, *vwID, *authStatus.CustomerNumber); err == nil {
+						result["order_status"] = status
+					} else {
+						result["order_status"] = map[string]string{"error": err.Error()}
+					}
+				}
+			}
+		} else if h.vwSvc != nil {
+			// VisionWeb order status
 			if status, err := h.vwSvc.GetOrderStatus(*vwID); err == nil {
-				result["vw_order_status"] = status
+				result["order_status"] = status
 			} else {
-				result["vw_order_status"] = map[string]string{"error": err.Error()}
+				result["order_status"] = map[string]string{"error": err.Error()}
 			}
 		}
 	}
@@ -225,7 +241,21 @@ func (h *Handler) GetLensStatuses(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) GetLabs(w http.ResponseWriter, r *http.Request) {
 	username := pkgAuth.UsernameFromContext(r.Context())
-	data, err := h.svc.GetLabsForEmployee(username)
+	var invoiceID *int64
+	if v := r.URL.Query().Get("invoice_id"); v != "" {
+		if id, err := strconv.ParseInt(v, 10, 64); err == nil {
+			invoiceID = &id
+		}
+	}
+	// lab-ticket param → resolve invoice_id from ticket
+	if v := r.URL.Query().Get("lab-ticket"); v != "" {
+		if ticketID, err := strconv.ParseInt(v, 10, 64); err == nil {
+			if invID := h.svc.GetInvoiceIDByTicket(ticketID); invID > 0 {
+				invoiceID = &invID
+			}
+		}
+	}
+	data, err := h.svc.GetLabsForEmployee(username, invoiceID)
 	if err != nil {
 		jsonResponse(w, errorStatus(err), map[string]string{"error": err.Error()})
 		return
@@ -444,7 +474,30 @@ func (h *Handler) PlaceVWOrder(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if labID != nil && *labID == zeissSvc.ZeissVendorID {
-		jsonResponse(w, 501, map[string]string{"error": "Zeiss order submission not yet implemented"})
+		if h.zeissSvc == nil {
+			jsonResponse(w, 500, map[string]string{"error": "Zeiss service not configured"})
+			return
+		}
+		username := pkgAuth.UsernameFromContext(r.Context())
+		empID, err := h.svc.EmployeeIDByUsername(username)
+		if err != nil {
+			jsonResponse(w, 401, map[string]string{"error": "unauthorized"})
+			return
+		}
+		result, err := h.zeissSvc.PlaceZeissOrder(empID, ticketID)
+		if err != nil {
+			if result != nil && result.OrderID != "" {
+				jsonResponse(w, 409, map[string]interface{}{
+					"error":       err.Error(),
+					"vw_order_id": result.OrderID,
+					"status":      result.Status,
+				})
+				return
+			}
+			jsonResponse(w, errorStatus(err), map[string]string{"error": err.Error()})
+			return
+		}
+		jsonResponse(w, 200, result)
 		return
 	}
 

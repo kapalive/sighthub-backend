@@ -61,6 +61,7 @@ func RegisterPriceBookRoutes(db *gorm.DB, rdb *redis.Client, cfg *config.Config,
 	zeissWrite.Use(writeMW)
 	zeissWrite.HandleFunc("/zeiss/import-catalog", hZeiss.ImportCatalog).Methods("POST")
 	api.HandleFunc("/zeiss/import-catalog/status", hZeiss.ImportCatalogStatus).Methods("GET")
+	api.HandleFunc("/zeiss/allowed-treatments", hZeiss.GetAllowedTreatments).Methods("GET")
 
 	// ─── Lenses ───────────────────────────────────────────────────────────────
 	api.HandleFunc("/lens/brand_vendor", hLens.GetLensBrandsVendors).Methods("GET") // legacy

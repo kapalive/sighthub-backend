@@ -61,16 +61,28 @@ func (s *Service) GetLabs() ([]map[string]interface{}, error) {
 	return result, nil
 }
 
-func (s *Service) GetLabsForEmployee(username string) ([]map[string]interface{}, error) {
+func (s *Service) GetLabsForEmployee(username string, invoiceID *int64) ([]map[string]interface{}, error) {
 	_, loc, err := s.empLocation(username)
 	if err != nil || loc == nil {
-		// fallback: return labs without account info
 		return s.GetLabs()
 	}
 	locationID := loc.IDLocation
 
+	// If invoice_id provided, filter labs by lens source
+	q := s.db.Where("lab = true AND visible = true")
+	if invoiceID != nil && *invoiceID > 0 {
+		lensSource := s.GetTicketLensSourceByInvoice(*invoiceID)
+		switch lensSource {
+		case "zeiss_only":
+			q = q.Where("id_vendor = ?", 69) // CARL ZEISS only
+		case "vision_web":
+			q = q.Where("id_vendor IN (SELECT DISTINCT vendor_id FROM vendor_location_account WHERE source = 'vision_web' AND vw_slo_id IS NOT NULL)")
+		// "custom" or "" — show all visible labs
+		}
+	}
+
 	var rows []vendorModel.Vendor
-	if err := s.db.Where("lab = true AND visible = true").Order("vendor_name").Find(&rows).Error; err != nil {
+	if err := q.Order("vendor_name").Find(&rows).Error; err != nil {
 		return nil, err
 	}
 

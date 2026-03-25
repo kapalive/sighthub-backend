@@ -174,7 +174,7 @@ func (s *Service) GetTicketByID(ticketID int64) (map[string]interface{}, error) 
 		"id_invoice":           invID,
 		"number_invoice":       invNumber,
 		"ship_to":              ticket.ShipTo,
-		"vw_order_id":          ticket.VwOrderID,
+		"order_id":             ticket.VwOrderID,
 	}
 	if ticket.DateCreate != nil {
 		resp["date"] = ticket.DateCreate.Format("2006-01-02")

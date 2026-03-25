@@ -50,6 +50,25 @@ func (s *Service) GetTicketLensSource(ticketID int64) string {
 	return source
 }
 
+func (s *Service) GetInvoiceIDByTicket(ticketID int64) int64 {
+	var invID int64
+	s.db.Raw("SELECT invoice_id FROM lab_ticket WHERE id_lab_ticket = ?", ticketID).Scan(&invID)
+	return invID
+}
+
+// GetTicketLensSourceByInvoice returns the lens source for an invoice directly
+func (s *Service) GetTicketLensSourceByInvoice(invoiceID int64) string {
+	var source string
+	s.db.Raw(`
+		SELECT COALESCE(l.source, 'custom')
+		FROM invoice_item_sale iis
+		JOIN lenses l ON l.id_lenses = iis.item_id
+		WHERE iis.invoice_id = ? AND iis.item_type = 'Lens'
+		LIMIT 1
+	`, invoiceID).Scan(&source)
+	return source
+}
+
 // EmployeeIDByUsername resolves username → employee.id_employee.
 func (s *Service) EmployeeIDByUsername(username string) (int64, error) {
 	var result struct{ IDEmployee int64 }

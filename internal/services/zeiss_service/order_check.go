@@ -1,6 +1,8 @@
 package zeiss_service
 
 import (
+	"context"
+	"encoding/json"
 	"fmt"
 
 	labTicketModel "sighthub-backend/internal/models/lab_ticket"
@@ -74,28 +76,85 @@ func (s *CatalogService) CheckZeissOrderRequirements(ticketID int64, employeeID 
 	}
 	add("commercial_code", "Lens Commercial Code (Zeiss)", "lab_ticket_lens", true, codeOK, codeVal)
 
-	// ── Coating (optional but common) ──
-	coatingOK := false
-	var coatingVal interface{}
+	// ── Treatments from invoice ──
+	var invoiceTreatments []map[string]interface{}
 	if ticket.InvoiceID > 0 {
 		type treatRow struct {
-			VwCode      *string
-			Description *string
+			VwCode      string
+			Description string
 		}
 		var treats []treatRow
 		s.db.Raw(`
 			SELECT lt.vw_code, lt.description
-			FROM lab_ticket_invoice_item ltii
-			JOIN invoice_item_sale iis ON iis.id_invoice_sale = ltii.invoice_item_id
+			FROM invoice_item_sale iis
 			JOIN lens_treatments lt ON lt.id_lens_treatments = iis.item_id AND iis.item_type = 'Treatment'
-			WHERE ltii.lab_ticket_id = ? AND lt.source = 'zeiss_only'
-		`, ticketID).Scan(&treats)
-		if len(treats) > 0 && treats[0].VwCode != nil {
-			coatingOK = true
-			coatingVal = *treats[0].VwCode
+			WHERE iis.invoice_id = ? AND lt.source = 'zeiss_only' AND lt.vw_code IS NOT NULL AND lt.vw_code != ''
+		`, ticket.InvoiceID).Scan(&treats)
+		for _, t := range treats {
+			invoiceTreatments = append(invoiceTreatments, map[string]interface{}{
+				"code":        t.VwCode,
+				"description": t.Description,
+			})
 		}
 	}
-	add("coating_code", "Coating (Zeiss)", "invoice_treatments", false, coatingOK, coatingVal)
+
+	// ── Check PCAT required treatments ──
+	var treatmentRequirements []map[string]interface{}
+	if codeOK && custOK {
+		commercialCode := fmt.Sprintf("%v", codeVal)
+		path := fmt.Sprintf("/public/api/catalogue/v1/lenses/treatment-options/%s?lensids=%s",
+			*status.CustomerNumber, commercialCode)
+		token, tokenErr := s.auth.GetToken(employeeID)
+		if tokenErr == nil {
+			body, fetchErr := s.pcatGET(context.Background(), token, path)
+			if fetchErr == nil {
+				var pcatTreats []pcatLensTreatments
+				if json.Unmarshal(body, &pcatTreats) == nil {
+					// Group by type, check necessity
+					typeRequired := make(map[string]bool) // "COATING" → true/false
+					for _, pt := range pcatTreats {
+						for _, opt := range pt.Options {
+							if opt.NecessityType == "REQUIRED" {
+								typeRequired[opt.Type] = true
+							} else if _, exists := typeRequired[opt.Type]; !exists {
+								typeRequired[opt.Type] = false
+							}
+						}
+					}
+					// Check which required types are fulfilled in invoice
+					invoiceCodes := make(map[string]bool)
+					for _, t := range invoiceTreatments {
+						invoiceCodes[t["code"].(string)] = true
+					}
+					// Get type for each invoice treatment from PCAT
+					codeToType := make(map[string]string)
+					for _, pt := range pcatTreats {
+						for _, opt := range pt.Options {
+							codeToType[opt.Code] = opt.Type
+						}
+					}
+					invoiceTypes := make(map[string]bool)
+					for _, t := range invoiceTreatments {
+						code := t["code"].(string)
+						if tp, ok := codeToType[code]; ok {
+							invoiceTypes[tp] = true
+						}
+					}
+					for tp, req := range typeRequired {
+						fulfilled := invoiceTypes[tp]
+						entry := map[string]interface{}{
+							"type":     tp,
+							"required": req,
+							"filled":   fulfilled,
+						}
+						treatmentRequirements = append(treatmentRequirements, entry)
+					}
+				}
+			}
+		}
+	}
+	add("treatments", "Treatments in Invoice", "invoice", false, len(invoiceTreatments) > 0, invoiceTreatments)
+	add("treatment_requirements", "Required Treatment Types (PCAT)", "zeiss_pcat", false, true, treatmentRequirements)
 
 	// ── RX Data ──
 	p := ticket.Powers
@@ -139,6 +198,15 @@ func (s *CatalogService) CheckZeissOrderRequirements(ticketID int64, employeeID 
 		if f.Required && !f.Filled {
 			ready = false
 			break
+		}
+	}
+	// Also check required treatment types
+	for _, tr := range treatmentRequirements {
+		if req, ok := tr["required"].(bool); ok && req {
+			if filled, ok := tr["filled"].(bool); ok && !filled {
+				ready = false
+				break
+			}
 		}
 	}
 

@@ -35,11 +35,21 @@ import (
 
 // ─── Service ─────────────────────────────────────────────────────────────────
 
+// ZeissAllowedTreatmentsFunc is a callback to get allowed Zeiss treatments for a lens
+type ZeissAllowedTreatmentsFunc func(employeeID int64, lensCode string, customerNumber string) ([]string, error)
+
 type Service struct {
-	db *gorm.DB
+	db                     *gorm.DB
+	zeissAllowedTreatments ZeissAllowedTreatmentsFunc
 }
 
 func New(db *gorm.DB) *Service { return &Service{db: db} }
+
+func (s *Service) DB() *gorm.DB { return s.db }
+
+func (s *Service) SetZeissAllowedTreatments(fn ZeissAllowedTreatmentsFunc) {
+	s.zeissAllowedTreatments = fn
+}
 
 // ─── Input DTOs ───────────────────────────────────────────────────────────────
 

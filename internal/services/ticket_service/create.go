@@ -36,6 +36,7 @@ type CreateTicketRequest struct {
 	IDRX              *int64 `json:"id_rx"`
 
 	// Frame
+	ItemSaleID     *int64  `json:"item_sale_id"`
 	POF                 bool    `json:"pof"`
 	ItemID              *int64  `json:"item_id"`
 	BValue              *int    `json:"b_value"`
@@ -415,6 +416,33 @@ func (s *Service) CreateTicket(username string, invoiceID int64, req *CreateTick
 			pofStr := "false"
 			frame.POF = &pofStr
 
+			// Check if frame_sale_item_id points to a misc item (no inventory lookup)
+			if req.ItemSaleID != nil {
+				var saleItem invoiceModel.InvoiceItemSale
+				if err := tx.First(&saleItem, *req.ItemSaleID).Error; err == nil {
+					if saleItem.ItemType == "misc" {
+						// Misc frame — just take description, no inventory lookup
+						s := "Frame in Store"
+						frame.Status = &s
+						frame.FrameName = &saleItem.Description
+						// Apply any manual overrides from request
+						if req.BrandName != nil { frame.BrandName = req.BrandName }
+						if req.MaterialsFrame != nil { frame.MaterialsFrame = req.MaterialsFrame }
+						if req.MaterialsTemple != nil { frame.MaterialsTemple = req.MaterialsTemple }
+						if req.Color != nil { frame.Color = req.Color }
+						if req.SizeLensWidth != nil { frame.SizeLensWidth = req.SizeLensWidth }
+						if req.SizeBridgeWidth != nil { frame.SizeBridgeWidth = req.SizeBridgeWidth }
+						if req.SizeTempleLength != nil { frame.SizeTempleLength = req.SizeTempleLength }
+						if req.FrameTypeMaterialID != nil { frame.FrameTypeMaterialID = req.FrameTypeMaterialID }
+						goto frameCreated
+					}
+					// Regular frame — use item_id from sale item
+					if saleItem.ItemID != nil {
+						req.ItemID = saleItem.ItemID
+					}
+				}
+			}
+
 			if req.ItemID != nil {
 				// Find inventory by id or SKU
 				itemIDVal := *req.ItemID
@@ -502,6 +530,7 @@ func (s *Service) CreateTicket(username string, invoiceID int64, req *CreateTick
 			}
 		}
 
+	frameCreated:
 		if err := tx.Create(frame).Error; err != nil {
 			tx.Rollback()
 			return nil, fmt.Errorf("create frame: %w", err)

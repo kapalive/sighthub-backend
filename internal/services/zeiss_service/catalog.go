@@ -543,6 +543,98 @@ func (s *CatalogService) importTreatments(token, customerNumber string, pcatLens
 	}
 }
 
+// ─── GetAllowedTreatments — returns treatments compatible with a specific Zeiss lens ──
+
+type AllowedTreatment struct {
+	ID          int64   `json:"id"`
+	ItemNbr     string  `json:"item_nbr"`
+	Description string  `json:"description"`
+	Price       *string `json:"price"`
+	VwCode      string  `json:"vw_code"`
+	Type        string  `json:"type"` // COATING or COLOR
+	PbKey       string  `json:"pb_key"`
+}
+
+func (s *CatalogService) GetAllowedTreatments(employeeID int64, lensCommercialCode string, customerNumber string) ([]AllowedTreatment, error) {
+	token, err := s.auth.GetToken(employeeID)
+	if err != nil {
+		return nil, fmt.Errorf("zeiss auth required")
+	}
+
+	// Fetch treatment options from PCAT for this lens
+	path := fmt.Sprintf("/public/api/catalogue/v1/lenses/treatment-options/%s?lensids=%s",
+		customerNumber, lensCommercialCode)
+	body, err := s.pcatGET(context.Background(), token, path)
+	if err != nil {
+		return nil, fmt.Errorf("fetch treatments: %w", err)
+	}
+
+	var treatments []pcatLensTreatments
+	if err := json.Unmarshal(body, &treatments); err != nil {
+		return nil, fmt.Errorf("parse treatments: %w", err)
+	}
+
+	// Collect allowed vw_codes
+	allowedCodes := make(map[string]string) // code → type (COATING/COLOR)
+	for _, t := range treatments {
+		for _, opt := range t.Options {
+			allowedCodes[opt.Code] = opt.Type
+		}
+	}
+
+	if len(allowedCodes) == 0 {
+		return []AllowedTreatment{}, nil
+	}
+
+	// Find matching treatments in our DB
+	codes := make([]string, 0, len(allowedCodes))
+	for c := range allowedCodes {
+		codes = append(codes, c)
+	}
+
+	type row struct {
+		ID          int64
+		ItemNbr     string
+		Description *string
+		Price       *float64
+		VwCode      *string
+	}
+	var rows []row
+	s.db.Table("lens_treatments").
+		Select("id_lens_treatments AS id, item_nbr, description, price, vw_code").
+		Where("vw_code IN ? AND vendor_id = ? AND source = ?", codes, ZeissVendorID, zeissSource).
+		Scan(&rows)
+
+	result := make([]AllowedTreatment, 0, len(rows))
+	for _, r := range rows {
+		desc := ""
+		if r.Description != nil {
+			desc = *r.Description
+		}
+		var priceStr *string
+		if r.Price != nil {
+			p := fmt.Sprintf("%.2f", *r.Price*2)
+			priceStr = &p
+		}
+		vwCode := ""
+		if r.VwCode != nil {
+			vwCode = *r.VwCode
+		}
+		treatType := allowedCodes[vwCode]
+		result = append(result, AllowedTreatment{
+			ID:          r.ID,
+			ItemNbr:     r.ItemNbr,
+			Description: desc,
+			Price:       priceStr,
+			VwCode:      vwCode,
+			Type:        treatType,
+			PbKey:       "Treatment",
+		})
+	}
+
+	return result, nil
+}
+
 // ─── pcatGET ────────────────────────────────────────────────────────────────
 
 func (s *CatalogService) pcatGET(ctx context.Context, token string, path string) ([]byte, error) {

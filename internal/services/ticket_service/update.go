@@ -456,73 +456,103 @@ func (s *Service) patchLens(lens *labTicketModel.LabTicketLens, pl *LensPayload,
 func (s *Service) applyFramePayload(tx *gorm.DB, ticket *labTicketModel.LabTicket, fp *FramePayload, emp *employees.Employee, loc *locationModel.Location) error {
 	frame := ticket.Frame
 
+	// Check if frame is from inventory (item_type='Frames') or misc (item_type='misc')
+	// If from inventory, only allow updating fields that are currently null
+	fromInventory := false
+	var itemType string
+	tx.Table("invoice_item_sale").Select("item_type").
+		Where("invoice_id = ? AND sale_key = 'Frames' AND item_type = 'Frames'", ticket.InvoiceID).
+		Limit(1).Scan(&itemType)
+	fromInventory = itemType == "Frames"
+
+	// Helper: only set if current value is nil (protect inventory data) or if misc frame
+	canOverwrite := func(current interface{}) bool {
+		if !fromInventory {
+			return true // misc frame — all editable
+		}
+		// inventory frame — only overwrite if currently nil
+		switch v := current.(type) {
+		case *string:
+			return v == nil || *v == ""
+		case *int:
+			return v == nil
+		case *int64:
+			return v == nil
+		default:
+			return true
+		}
+	}
+
 	// Sizes with aliases (string fields on frame)
-	if fp.SizeLensWidth != nil {
+	if fp.SizeLensWidth != nil && canOverwrite(frame.SizeLensWidth) {
 		frame.SizeLensWidth = fp.SizeLensWidth
-	} else if fp.AValue != nil {
+	} else if fp.AValue != nil && canOverwrite(frame.SizeLensWidth) {
 		s := fp.AValue.String()
 		frame.SizeLensWidth = &s
 	}
-	if fp.SizeBridgeWidth != nil {
+	if fp.SizeBridgeWidth != nil && canOverwrite(frame.SizeBridgeWidth) {
 		frame.SizeBridgeWidth = fp.SizeBridgeWidth
-	} else if fp.DBL != nil {
+	} else if fp.DBL != nil && canOverwrite(frame.SizeBridgeWidth) {
 		frame.SizeBridgeWidth = fp.DBL
 	}
-	if fp.SizeTempleLength != nil {
+	if fp.SizeTempleLength != nil && canOverwrite(frame.SizeTempleLength) {
 		frame.SizeTempleLength = fp.SizeTempleLength
-	} else if fp.Temple != nil {
+	} else if fp.Temple != nil && canOverwrite(frame.SizeTempleLength) {
 		frame.SizeTempleLength = fp.Temple
 	}
 
 	// B, ED, Circ with aliases (int fields on frame)
-	if fp.BValue != nil {
+	if fp.BValue != nil && canOverwrite(frame.BValue) {
 		frame.BValue = jsonNumToInt(fp.BValue)
-	} else if fp.BDim != nil {
+	} else if fp.BDim != nil && canOverwrite(frame.BValue) {
 		frame.BValue = jsonNumToInt(fp.BDim)
 	}
-	if fp.EDValue != nil {
+	if fp.EDValue != nil && canOverwrite(frame.EDValue) {
 		frame.EDValue = jsonNumToInt(fp.EDValue)
-	} else if fp.ED != nil {
+	} else if fp.ED != nil && canOverwrite(frame.EDValue) {
 		frame.EDValue = jsonNumToInt(fp.ED)
 	}
-	if fp.CircValue != nil {
+	if fp.CircValue != nil && canOverwrite(frame.CircValue) {
 		frame.CircValue = jsonNumToInt(fp.CircValue)
-	} else if fp.Circum != nil {
+	} else if fp.Circum != nil && canOverwrite(frame.CircValue) {
 		frame.CircValue = jsonNumToInt(fp.Circum)
 	}
 
-	// Simple fields
-	if fp.FrameName != nil {
+	// Simple fields — protect inventory data
+	if fp.FrameName != nil && canOverwrite(frame.FrameName) {
 		frame.FrameName = fp.FrameName
 	}
-	if fp.BrandName != nil {
+	if fp.BrandName != nil && canOverwrite(frame.BrandName) {
 		frame.BrandName = fp.BrandName
 	}
 	if fp.MaterialsFrame != nil {
 		frame.MaterialsFrame = fp.MaterialsFrame
 	}
-	if fp.MaterialsTemple != nil {
+	if fp.MaterialsFrame != nil && canOverwrite(frame.MaterialsFrame) {
+		frame.MaterialsFrame = fp.MaterialsFrame
+	}
+	if fp.MaterialsTemple != nil && canOverwrite(frame.MaterialsTemple) {
 		frame.MaterialsTemple = fp.MaterialsTemple
 	}
-	if fp.Color != nil {
+	if fp.Color != nil && canOverwrite(frame.Color) {
 		frame.Color = fp.Color
 	}
-	if fp.ModelTitleVariant != nil {
+	if fp.ModelTitleVariant != nil && canOverwrite(frame.ModelTitleVariant) {
 		frame.ModelTitleVariant = fp.ModelTitleVariant
 	}
-	if fp.FrameShapeID != nil {
+	if fp.FrameShapeID != nil && canOverwrite(frame.FrameShapeID) {
 		frame.FrameShapeID = fp.FrameShapeID
 	}
-	if fp.FrameTypeMaterialID != nil {
+	if fp.FrameTypeMaterialID != nil && canOverwrite(frame.FrameTypeMaterialID) {
 		frame.FrameTypeMaterialID = fp.FrameTypeMaterialID
 	}
-	if fp.Status != nil {
+	if fp.Status != nil && canOverwrite(frame.Status) {
 		frame.Status = fp.Status
 	}
-	if fp.VendorName != nil {
+	if fp.VendorName != nil && canOverwrite(frame.VendorName) {
 		frame.VendorName = fp.VendorName
 	}
-	if fp.ManufacturerName != nil {
+	if fp.ManufacturerName != nil && canOverwrite(frame.ManufacturerName) {
 		frame.ManufacturerName = fp.ManufacturerName
 	}
 	if fp.DropShip != nil {
