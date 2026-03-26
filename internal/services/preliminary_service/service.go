@@ -733,9 +733,17 @@ func (s *Service) GetPreliminary(examID int64) (map[string]interface{}, error) {
 	}
 
 	result := map[string]interface{}{
-		"exam_id":    examID,
-		"exists":     true,
-		"preliminary": prelim.ToMap(),
+		"exam_id":             examID,
+		"exists":              true,
+		"preliminary":         prelim.ToMap(),
+		"iris_color":          prelim.IrisColor,
+		"distance_cover_test": prelim.DistanceCoverTest,
+		"near_cover_test":     prelim.NearCoverTest,
+		"npc_test":            prelim.NpcTest,
+		"worth_4_dot":         prelim.Worth4Dot,
+		"stereo_vision":       prelim.StereoVision,
+		"fixation_disparity":  prelim.FixationDisparity,
+		"note":                prelim.Note,
 	}
 
 	loadSub := func(id *int64, dest interface{}) bool {

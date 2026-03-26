@@ -23,5 +23,5 @@ func RegisterEmailTemplateRoutes(db *gorm.DB, rdb *redis.Client, cfg *config.Con
 
 	api.HandleFunc("", h.GetAllTemplates).Methods("GET")
 	api.HandleFunc("/", h.GetAllTemplates).Methods("GET")
-	api.HandleFunc("/settings", h.SetOrgTemplate).Methods("POST")
+	api.HandleFunc("/settings", h.SetOrgTemplate).Methods("POST", "PUT")
 }
