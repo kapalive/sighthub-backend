@@ -342,6 +342,7 @@ func (h *Handler) InvoiceStatus(w http.ResponseWriter, r *http.Request) {
 		StatusName    *string    `gorm:"column:status_invoice_value"`
 		EmployeeFirst string     `gorm:"column:emp_first"`
 		EmployeeLast  string     `gorm:"column:emp_last"`
+		PatientID     *int64     `gorm:"column:patient_id"`
 		PatientFirst  string     `gorm:"column:pt_first"`
 		PatientLast   string     `gorm:"column:pt_last"`
 		PatientPhone  *string    `gorm:"column:pt_phone"`
@@ -361,7 +362,7 @@ func (h *Handler) InvoiceStatus(w http.ResponseWriter, r *http.Request) {
 			si.status_invoice_value,
 			e.first_name AS emp_first,
 			e.last_name AS emp_last,
-			lt.patient_id,
+			i.patient_id,
 			p.first_name AS pt_first,
 			p.last_name AS pt_last,
 			p.phone AS pt_phone,
@@ -456,6 +457,7 @@ func (h *Handler) InvoiceStatus(w http.ResponseWriter, r *http.Request) {
 		items = append(items, map[string]interface{}{
 			"id_invoice":     r.IDInvoice,
 			"number_invoice": r.NumberInvoice,
+			"patient_id":     r.PatientID,
 			"inv_date":       fmtDate(r.DateCreate),
 			"late":           r.Late,
 			"status_id":      r.StatusID,
