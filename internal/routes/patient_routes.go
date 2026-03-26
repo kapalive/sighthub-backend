@@ -207,6 +207,11 @@ func RegisterPatientRoutes(db *gorm.DB, rdb *redis.Client, cfg *config.Config, r
 		perm78(http.HandlerFunc(ivh.UnfinalizeInvoice)),
 	).Methods("PUT")
 
+	// Invoice status update
+	api.Handle("/invoice/{invoice_id:[0-9]+}/status",
+		perm62(http.HandlerFunc(ivh.UpdateInvoiceStatus)),
+	).Methods("PUT")
+
 	// Invoice detail, update items, delete
 	api.HandleFunc("/invoice/{invoice_id:[0-9]+}", ivh.GetInvoice).Methods("GET")
 	api.Handle("/invoice/{invoice_id:[0-9]+}",

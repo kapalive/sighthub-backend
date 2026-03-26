@@ -3,6 +3,7 @@
 package communication
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 	"net/http"
@@ -10,6 +11,7 @@ import (
 	"os"
 	"regexp"
 	"strings"
+	"text/template"
 )
 
 var nonDigitRe = regexp.MustCompile(`\D`)
@@ -75,4 +77,17 @@ func SendSMS(to, message string) SMSResult {
 		}
 	}
 	return SMSResult{Status: "accepted", StatusCode: resp.StatusCode}
+}
+
+// RenderSMSTemplate renders a Go text/template body with the given context map.
+func RenderSMSTemplate(body string, ctx map[string]string) (string, error) {
+	t, err := template.New("sms").Parse(body)
+	if err != nil {
+		return "", fmt.Errorf("invalid template: %w", err)
+	}
+	var buf bytes.Buffer
+	if err := t.Execute(&buf, ctx); err != nil {
+		return "", fmt.Errorf("render error: %w", err)
+	}
+	return buf.String(), nil
 }

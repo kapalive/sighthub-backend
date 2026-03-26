@@ -162,11 +162,11 @@ func NavigationPermission(db *gorm.DB) func(http.Handler) http.Handler {
 
 			// Load all active employee permissions + combinations
 			type row struct {
-				PermissionsID              int
-				SubBlockStoreID            *int
-				SubBlockWarehouseID        *int
-				SubBlockStoreStoreID       *int
-				SubBlockWarehouseWarehouseID *int
+				PermissionsID                int  `gorm:"column:permissions_id"`
+				SubBlockStoreID              *int `gorm:"column:permissions_sub_block_store_id"`
+				SubBlockWarehouseID          *int `gorm:"column:permissions_sub_block_warehouse_id"`
+				SubBlockStoreStoreID         *int `gorm:"column:sub_block_store_store_id"`
+				SubBlockWarehouseWarehouseID *int `gorm:"column:sub_block_warehouse_warehouse_id"`
 			}
 
 			var rows []row

@@ -657,8 +657,21 @@ func (s *Service) CreateAppointment(input CreateAppointmentInput) (*AppointmentD
 	formattedDate := desiredDate.Format("Monday, January 02, 2006")
 	formattedStart := strings.TrimLeft(startTime.Format("3:04 PM"), "0")
 	formattedEnd := strings.TrimLeft(endTime.Format("3:04 PM"), "0")
+
 	smsMessage := fmt.Sprintf("Your appointment with Dr. %s is scheduled on %s from %s to %s at %s.",
 		doctorName, formattedDate, formattedStart, formattedEnd, location.FullName)
+	// Try DB template
+	if tpl := s.getSMSTemplate("appointment", "confirmation"); tpl != "" {
+		if rendered, err := communication.RenderSMSTemplate(tpl, map[string]string{
+			"doctor":     doctorName,
+			"date":       formattedDate,
+			"start_time": formattedStart,
+			"end_time":   formattedEnd,
+			"location":   location.FullName,
+		}); err == nil {
+			smsMessage = rendered
+		}
+	}
 
 	if patient.Phone == nil {
 		warnings = append(warnings, "Patient has no phone number. SMS was not sent.")
@@ -1062,6 +1075,14 @@ func (s *Service) findOrCreateSchedule(doctorID int64, dayOfWeek string) (*sched
 	return &schedEntry, nil
 }
 
+func (s *Service) getSMSTemplate(category, name string) string {
+	var body string
+	s.db.Table("sms_template").
+		Where("category = ? AND name = ? AND active = true", category, name).
+		Pluck("body", &body)
+	return body
+}
+
 func (s *Service) logSMSCommunication(patientID int64, content, description string, empID, locID int) {
 	var commType generalModel.CommunicationType
 	if err := s.db.Where("communication_type = ?", "SMS").First(&commType).Error; err != nil {
@@ -1104,6 +1125,13 @@ func (s *Service) sendIntakeFormSMS(appointmentID int64, empID, locID int) *Inta
 	result.Link = &intakeURL
 
 	smsMessage := "To save time at your visit, please fill out the intake form before arrival: " + intakeURL
+	if tpl := s.getSMSTemplate("appointment", "intake_form"); tpl != "" {
+		if rendered, err := communication.RenderSMSTemplate(tpl, map[string]string{
+			"intake_url": intakeURL,
+		}); err == nil {
+			smsMessage = rendered
+		}
+	}
 
 	if appointment.Patient.Phone == nil {
 		result.Warnings = append(result.Warnings, "Patient has no phone number. SMS was not sent.")

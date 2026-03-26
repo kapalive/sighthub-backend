@@ -10,6 +10,8 @@ type NavigationItem struct {
 	Label             string  `gorm:"column:label;type:varchar(100);not null"    json:"label"`
 	Icon              *string `gorm:"column:icon;type:varchar(50)"               json:"icon,omitempty"`
 	OnClick           *string `gorm:"column:on_click;type:varchar(100)"          json:"on_click,omitempty"`
+	Position          *int    `gorm:"column:position"                            json:"position,omitempty"`
+	PermissionsID     *int    `gorm:"column:permissions_id"                      json:"permissions_id,omitempty"`
 }
 
 func (NavigationItem) TableName() string { return "navigation_item" }

@@ -38,7 +38,7 @@ func (s *Service) UpdateInvoiceStatus(invoiceID int64, statusInvoiceID int) (map
 
 func (s *Service) GetInvoiceStatuses() ([]map[string]interface{}, error) {
 	var statuses []invoices.StatusInvoice
-	s.db.Where("id_status_invoice IN ?", []int{24, 25, 26, 27}).
+	s.db.Where("status_type = 'internal'").
 		Order("id_status_invoice").Find(&statuses)
 
 	var result []map[string]interface{}

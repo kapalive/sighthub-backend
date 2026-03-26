@@ -140,6 +140,7 @@ func main() {
 	routes.RegisterReportLibraryRoutes(db, cache.RDB, cfg, router)
 	routes.RegisterReportSalesRoutes(db, cache.RDB, cfg, router)
 	routes.RegisterSaleRoutes(db, cache.RDB, cfg, router)
+	routes.RegisterOrdersRoutes(db, cache.RDB, cfg, router)
 	routes.RegisterSettingsRoutes(db, cache.RDB, cfg, router)
 	routes.RegisterVendorRoutes(db, cache.RDB, cfg, router)
 

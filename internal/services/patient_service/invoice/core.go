@@ -552,7 +552,7 @@ func (s *Service) GetInvoice(username string, invoiceID int64, groupByFrame bool
 	_ = emp
 
 	var inv invoices.Invoice
-	if err := s.db.Preload("Employee").Preload("PaymentMethod").Preload("Location").First(&inv, invoiceID).Error; err != nil {
+	if err := s.db.Preload("Employee").Preload("PaymentMethod").Preload("Location").Preload("StatusInvoice").First(&inv, invoiceID).Error; err != nil {
 		return nil, errors.New("invoice not found")
 	}
 
@@ -724,29 +724,35 @@ func (s *Service) GetInvoice(username string, invoiceID int64, groupByFrame bool
 		locationName = inv.Location.FullName
 	}
 
-	return map[string]interface{}{
-		"invoice_id":       strconv.FormatInt(inv.IDInvoice, 10),
-		"invoice_number":   inv.NumberInvoice,
-		"location":         locationName,
-		"sold_by":          creatorName,
-		"invoice_date":     inv.CreatedAt.Format("2006-01-02 15:04:05"),
-		"payment_method":   paymentMethodName,
-		"items":            itemsData,
-		"total_amount":     fmt.Sprintf("%.2f", inv.TotalAmount),
-		"final_amount":     fmt.Sprintf("%.2f", inv.FinalAmount),
-		"tax_amount":       fmt.Sprintf("%.2f", inv.TaxAmount),
-		"discount":         discount,
-		"pt_bal":           fmt.Sprintf("%.2f", inv.PTBal),
-		"ins_bal":          fmt.Sprintf("%.2f", inv.InsBal),
-		"pt_paid":          fmt.Sprintf("%.2f", ptPaid),
-		"ins_paid":         fmt.Sprintf("%.2f", insPaid),
-		"gift_card_balance": giftCardBal,
-		"due":              fmt.Sprintf("%.2f", inv.Due),
-		"notes":            inv.Notified,
-		"status_reason":    inv.Reason,
-		"insurance_policy": insuranceInfo,
-		"finalized":        inv.Finalized,
-	}, nil
+	result := map[string]interface{}{
+		"invoice_id":         strconv.FormatInt(inv.IDInvoice, 10),
+		"invoice_number":     inv.NumberInvoice,
+		"location":           locationName,
+		"sold_by":            creatorName,
+		"invoice_date":       inv.CreatedAt.Format("2006-01-02 15:04:05"),
+		"payment_method":     paymentMethodName,
+		"items":              itemsData,
+		"total_amount":       fmt.Sprintf("%.2f", inv.TotalAmount),
+		"final_amount":       fmt.Sprintf("%.2f", inv.FinalAmount),
+		"tax_amount":         fmt.Sprintf("%.2f", inv.TaxAmount),
+		"discount":           discount,
+		"pt_bal":             fmt.Sprintf("%.2f", inv.PTBal),
+		"ins_bal":            fmt.Sprintf("%.2f", inv.InsBal),
+		"pt_paid":            fmt.Sprintf("%.2f", ptPaid),
+		"ins_paid":           fmt.Sprintf("%.2f", insPaid),
+		"gift_card_balance":  giftCardBal,
+		"due":                fmt.Sprintf("%.2f", inv.Due),
+		"notes":              inv.Notified,
+		"status_reason":      inv.Reason,
+		"insurance_policy":   insuranceInfo,
+		"finalized":          inv.Finalized,
+		"status_invoice_id":  inv.StatusInvoiceID,
+		"status_invoice":     nil,
+	}
+	if inv.StatusInvoice != nil {
+		result["status_invoice"] = inv.StatusInvoice.StatusInvoiceValue
+	}
+	return result, nil
 }
 
 // ─── BuildInvoiceHTMLContext ───────────────────────────────────────────────────
@@ -972,7 +978,7 @@ func (s *Service) LookupBySKU(username, rawSKU string) (map[string]interface{}, 
 
 func (s *Service) GetInvoiceStatuses() ([]map[string]interface{}, error) {
 	var statuses []invoices.StatusInvoice
-	if err := s.db.Where("id_status_invoice NOT IN (24, 25, 26, 27)").
+	if err := s.db.Where("status_type = 'patient'").
 		Order("id_status_invoice").Find(&statuses).Error; err != nil {
 		return nil, err
 	}
@@ -984,6 +990,37 @@ func (s *Service) GetInvoiceStatuses() ([]map[string]interface{}, error) {
 		}
 	}
 	return result, nil
+}
+
+// ─── PUT /invoice/{id}/status ─────────────────────────────────────────────────
+
+func (s *Service) UpdateInvoiceStatus(invoiceID int64, statusInvoiceID int) (map[string]interface{}, error) {
+	var inv invoices.Invoice
+	if err := s.db.First(&inv, invoiceID).Error; err != nil {
+		return nil, fmt.Errorf("invoice not found")
+	}
+
+	var si invoices.StatusInvoice
+	if err := s.db.First(&si, statusInvoiceID).Error; err != nil {
+		return nil, fmt.Errorf("status not found")
+	}
+
+	// Only allow patient statuses from this endpoint
+	if si.StatusType != "patient" {
+		return nil, fmt.Errorf("cannot set internal/vendor status from this endpoint")
+	}
+
+	statusID := int64(statusInvoiceID)
+	inv.StatusInvoiceID = &statusID
+	if err := s.db.Save(&inv).Error; err != nil {
+		return nil, err
+	}
+
+	return map[string]interface{}{
+		"message":           "status updated",
+		"status_invoice_id": statusInvoiceID,
+		"status_invoice":    si.StatusInvoiceValue,
+	}, nil
 }
 
 // ─── PUT /invoice/{id} (add items) ───────────────────────────────────────────

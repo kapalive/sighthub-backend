@@ -37,11 +37,26 @@ func (h *Handler) Home(w http.ResponseWriter, r *http.Request) {
 	allowed := middleware.AllowedNavigationFromCtx(r.Context())
 
 	var items []general.NavigationItem
-	h.db.Order("id_navigation_item asc").Find(&items)
+	h.db.Order("position ASC, id_navigation_item ASC").Find(&items)
 
+	allowedPerms := middleware.AllowedPermIDsFromCtx(r.Context())
 	navItems := []map[string]interface{}{}
 	for _, item := range items {
 		itemPath := normalizePath(item.Path)
+
+		// If item has permissions_id, check if user has that permission
+		if item.PermissionsID != nil {
+			if _, ok := allowedPerms[*item.PermissionsID]; !ok {
+				continue
+			}
+			navItems = append(navItems, map[string]interface{}{
+				"name": item.Label,
+				"url":  itemPath,
+				"icon": item.Icon,
+			})
+			continue
+		}
+
 		if _, ok := allowed[itemPath]; ok {
 			navItems = append(navItems, map[string]interface{}{
 				"name": item.Label,
@@ -300,7 +315,7 @@ func (h *Handler) SearchInvoice(w http.ResponseWriter, r *http.Request) {
 				accessible = append(accessible, map[string]interface{}{
 					"id_invoice":     inv.IDInvoice,
 					"number_invoice": num,
-					"redirect_url":   fmt.Sprintf("/patient/%d/invoice/%d", inv.PatientID, inv.IDInvoice),
+					"redirect_url":   fmt.Sprintf("/patient/%d/invoice/%d", derefInt64(inv.PatientID), inv.IDInvoice),
 				})
 			}
 		}
@@ -795,6 +810,13 @@ func isDigits(s string) bool {
 		}
 	}
 	return len(s) > 0
+}
+
+func derefInt64(p *int64) int64 {
+	if p == nil {
+		return 0
+	}
+	return *p
 }
 
 func strVal(s *string) string {

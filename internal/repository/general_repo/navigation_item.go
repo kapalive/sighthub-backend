@@ -12,7 +12,7 @@ func NewNavigationItemRepo(db *gorm.DB) *NavigationItemRepo { return &Navigation
 
 func (r *NavigationItemRepo) GetAll() ([]general.NavigationItem, error) {
 	var items []general.NavigationItem
-	return items, r.DB.Find(&items).Error
+	return items, r.DB.Order("position ASC, id_navigation_item ASC").Find(&items).Error
 }
 
 func (r *NavigationItemRepo) GetByID(id int) (*general.NavigationItem, error) {

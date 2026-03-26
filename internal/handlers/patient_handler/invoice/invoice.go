@@ -222,6 +222,28 @@ func (h *Handler) GetInvoiceStatuses(w http.ResponseWriter, r *http.Request) {
 	jsonResponse(w, result, http.StatusOK)
 }
 
+// PUT /invoice/{invoice_id}/status
+func (h *Handler) UpdateInvoiceStatus(w http.ResponseWriter, r *http.Request) {
+	invoiceID, err := parseInvoiceID(r)
+	if err != nil {
+		jsonError(w, "invalid invoice_id", http.StatusBadRequest)
+		return
+	}
+	var body struct {
+		StatusInvoiceID int `json:"status_invoice_id"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil || body.StatusInvoiceID == 0 {
+		jsonError(w, "status_invoice_id is required", http.StatusBadRequest)
+		return
+	}
+	result, err := h.svc.UpdateInvoiceStatus(invoiceID, body.StatusInvoiceID)
+	if err != nil {
+		jsonError(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	jsonResponse(w, result, http.StatusOK)
+}
+
 // PUT /invoice/{invoice_id}
 func (h *Handler) AddItemsToInvoice(w http.ResponseWriter, r *http.Request) {
 	invoiceID, err := parseInvoiceID(r)
