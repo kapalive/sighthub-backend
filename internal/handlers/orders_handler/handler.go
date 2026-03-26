@@ -719,6 +719,8 @@ func (h *Handler) NotifyPatient(w http.ResponseWriter, r *http.Request) {
 		StatusSource string            `json:"status_source"` // "invoice" or "ticket"
 		StatusID     int               `json:"status_id"`
 		PatientID    int64             `json:"patient_id"`
+		InvoiceID    *int64            `json:"invoice_id"`
+		TicketID     *int64            `json:"ticket_id"`
 		Phone        *string           `json:"phone"`
 		Email        *string           `json:"email"`
 		SendSMS      bool              `json:"send_sms"`
@@ -840,6 +842,26 @@ func (h *Handler) NotifyPatient(w http.ResponseWriter, r *http.Request) {
 			} else {
 				result["email"] = map[string]interface{}{"status": "sent"}
 			}
+		}
+	}
+
+	// Record notified date if any notification was sent
+	smsSent := false
+	emailSent := false
+	if smsMap, ok := result["sms"].(map[string]interface{}); ok {
+		smsSent = smsMap["status"] == "sent"
+	}
+	if emailMap, ok := result["email"].(map[string]interface{}); ok {
+		emailSent = emailMap["status"] == "sent"
+	}
+	if smsSent || emailSent {
+		now := time.Now().Format("2006-01-02 15:04:05")
+		if body.StatusSource == "ticket" && body.TicketID != nil {
+			h.db.Table("lab_ticket").Where("id_lab_ticket = ?", *body.TicketID).Update("notified", now)
+			result["notified"] = now
+		} else if body.StatusSource == "invoice" && body.InvoiceID != nil {
+			h.db.Table("invoice").Where("id_invoice = ?", *body.InvoiceID).Update("notified", now)
+			result["notified"] = now
 		}
 	}
 

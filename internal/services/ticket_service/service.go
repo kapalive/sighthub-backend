@@ -164,6 +164,15 @@ func (s *Service) NotifyPatient(ticketID int64) (*NotifyResult, error) {
 		phoneTo = patient.Phone
 	}
 
+	// Resolve SMS template from notification map
+	var smsTemplateBody string
+	var smsTemplateID *int
+	s.db.Table("status_notification_map snm").
+		Select("snm.sms_template_id, st.body").
+		Joins("LEFT JOIN sms_template st ON st.id_sms_template = snm.sms_template_id").
+		Where("snm.status_source = 'ticket' AND snm.status_id = ? AND snm.active = true", ticket.LabTicketStatusID).
+		Row().Scan(&smsTemplateID, &smsTemplateBody)
+
 	// Schedule goroutine (replaces celery apply_async countdown=3600)
 	key := fmt.Sprintf("ticket_notify_%d", ticketID)
 	s.sched.Schedule(key, notifyDelay, func() {
@@ -181,9 +190,23 @@ func (s *Service) NotifyPatient(ticketID int64) (*NotifyResult, error) {
 			}
 		}
 		if phoneTo != nil {
+			smsVars := map[string]string{
+				"patient_name":  patientName,
+				"location":      locationName,
+				"ticket_number": orderNumber,
+			}
 			msg := fmt.Sprintf("Hi %s, order %s: %s. — %s", patientName, orderNumber, statusText, locationName)
+			if smsTemplateBody != "" {
+				if rendered, err := pkgComm.RenderSMSTemplate(smsTemplateBody, smsVars); err == nil {
+					msg = rendered
+				}
+			}
 			pkgComm.SendSMS(*phoneTo, msg)
 		}
+
+		// Record notified date
+		now := time.Now().Format("2006-01-02 15:04:05")
+		s.db.Table("lab_ticket").Where("id_lab_ticket = ?", ticketID).Update("notified", now)
 	})
 
 	return &NotifyResult{
