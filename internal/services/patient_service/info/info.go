@@ -233,6 +233,9 @@ func (s *Service) CreatePatient(username string, input CreatePatientInput) (map[
 		if err != nil {
 			return nil, errors.New("dob must be YYYY-MM-DD")
 		}
+		if t.After(time.Now()) {
+			return nil, errors.New("dob cannot be in the future")
+		}
 		patient.DOB = &t
 	}
 

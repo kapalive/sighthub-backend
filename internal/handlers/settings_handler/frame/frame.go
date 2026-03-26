@@ -67,7 +67,11 @@ func (h *Handler) UpdateShape(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := h.svc.UpdateFrameShape(pathID(r), body); err != nil {
-		jsonError(w, err.Error(), 400)
+		if err.Error() == "not found" {
+			jsonError(w, "not found", 404)
+		} else {
+			jsonError(w, err.Error(), 400)
+		}
 		return
 	}
 	jsonOK(w, map[string]string{"message": "Updated"})
@@ -119,7 +123,11 @@ func (h *Handler) UpdateTypeMaterial(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := h.svc.UpdateFrameTypeMaterial(pathID(r), body.Material); err != nil {
-		jsonError(w, err.Error(), 400)
+		if err.Error() == "not found" {
+			jsonError(w, "not found", 404)
+		} else {
+			jsonError(w, err.Error(), 400)
+		}
 		return
 	}
 	jsonOK(w, map[string]string{"message": "Updated"})

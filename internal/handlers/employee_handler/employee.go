@@ -136,7 +136,9 @@ func (h *Handler) AddEmployee(w http.ResponseWriter, r *http.Request) {
 	input.ParseLocationID()
 	id, err := h.svc.AddEmployee(username, input)
 	if err != nil {
-		if strings.Contains(err.Error(), "already exists") {
+		if strings.Contains(err.Error(), "already exists") ||
+			strings.Contains(err.Error(), "is required") ||
+			strings.Contains(err.Error(), "authentication is required") {
 			writeError(w, http.StatusBadRequest, err.Error())
 		} else {
 			writeError(w, http.StatusInternalServerError, err.Error())
@@ -164,7 +166,11 @@ func (h *Handler) UpdateEmployee(w http.ResponseWriter, r *http.Request) {
 	}
 	input.ParseLocationID()
 	if err := h.svc.UpdateEmployee(username, eid, input); err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
+		if strings.Contains(err.Error(), "not found") {
+			writeError(w, http.StatusNotFound, err.Error())
+		} else {
+			writeError(w, http.StatusInternalServerError, err.Error())
+		}
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]string{"message": "Employee updated successfully"})

@@ -1,6 +1,7 @@
 package settings_service
 
 import (
+	"errors"
 	"fmt"
 	"net/smtp"
 	"strings"
@@ -750,7 +751,14 @@ func (s *Service) CreateFrameShape(title string, desc *string) (map[string]inter
 }
 
 func (s *Service) UpdateFrameShape(id int, data map[string]interface{}) error {
-	return s.DB.Model(&frames.FrameShape{}).Where("id_frame_shape = ?", id).Updates(data).Error
+	res := s.DB.Model(&frames.FrameShape{}).Where("id_frame_shape = ?", id).Updates(data)
+	if res.Error != nil {
+		return res.Error
+	}
+	if res.RowsAffected == 0 {
+		return errors.New("not found")
+	}
+	return nil
 }
 
 func (s *Service) DeleteFrameShape(id int) error {
@@ -779,7 +787,14 @@ func (s *Service) CreateFrameTypeMaterial(material string) (map[string]interface
 }
 
 func (s *Service) UpdateFrameTypeMaterial(id int, material string) error {
-	return s.DB.Model(&frames.FrameTypeMaterial{}).Where("id_frame_type_material = ?", id).Update("material", material).Error
+	res := s.DB.Model(&frames.FrameTypeMaterial{}).Where("id_frame_type_material = ?", id).Update("material", material)
+	if res.Error != nil {
+		return res.Error
+	}
+	if res.RowsAffected == 0 {
+		return errors.New("not found")
+	}
+	return nil
 }
 
 func (s *Service) DeleteFrameTypeMaterial(id int) error {
@@ -840,7 +855,14 @@ func (s *Service) CreateAddServiceType(title string) (map[string]interface{}, er
 }
 
 func (s *Service) UpdateAddServiceType(id int, title string) error {
-	return s.DB.Model(&serviceModel.AdditionalServiceType{}).Where("id_add_service_type = ?", id).Update("title", title).Error
+	res := s.DB.Model(&serviceModel.AdditionalServiceType{}).Where("id_add_service_type = ?", id).Update("title", title)
+	if res.Error != nil {
+		return res.Error
+	}
+	if res.RowsAffected == 0 {
+		return errors.New("not found")
+	}
+	return nil
 }
 
 func (s *Service) DeleteAddServiceType(id int) error {

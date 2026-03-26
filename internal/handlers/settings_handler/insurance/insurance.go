@@ -128,6 +128,10 @@ func (h *Handler) CreatePaymentType(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, "Invalid JSON", 400)
 		return
 	}
+	if body.Name == "" {
+		jsonError(w, "name is required", 400)
+		return
+	}
 	data, err := h.svc.CreateInsurancePaymentType(body.Name, body.Description)
 	if err != nil {
 		jsonError(w, err.Error(), 400)
