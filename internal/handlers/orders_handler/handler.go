@@ -15,6 +15,7 @@ import (
 
 	"sighthub-backend/internal/middleware"
 	"sighthub-backend/pkg/communication"
+	"sighthub-backend/pkg/email"
 )
 
 type Handler struct{ db *gorm.DB }
@@ -664,6 +665,186 @@ func (h *Handler) logSMS(patientID int64, content, description string, empID, lo
 }
 
 // ── helpers ──
+
+// GET /api/orders/status-notification-map
+func (h *Handler) StatusNotificationMap(w http.ResponseWriter, r *http.Request) {
+	source := r.URL.Query().Get("source") // "invoice" or "ticket"
+
+	type row struct {
+		ID             int     `gorm:"column:id_status_notification_map"`
+		StatusSource   string  `gorm:"column:status_source"`
+		StatusID       int     `gorm:"column:status_id"`
+		SMSTemplateID  *int    `gorm:"column:sms_template_id"`
+		SMSName        *string `gorm:"column:sms_name"`
+		SMSBody        *string `gorm:"column:sms_body"`
+		EmailCategory  *string `gorm:"column:email_category"`
+		AutoSend       bool    `gorm:"column:auto_send"`
+	}
+
+	tx := h.db.Table("status_notification_map snm").
+		Select(`snm.id_status_notification_map, snm.status_source, snm.status_id,
+			snm.sms_template_id, st.name AS sms_name, st.body AS sms_body,
+			snm.email_category, snm.auto_send`).
+		Joins("LEFT JOIN sms_template st ON st.id_sms_template = snm.sms_template_id").
+		Where("snm.active = true")
+
+	if source != "" {
+		tx = tx.Where("snm.status_source = ?", source)
+	}
+
+	var rows []row
+	tx.Order("snm.status_source, snm.status_id").Find(&rows)
+
+	items := make([]map[string]interface{}, 0, len(rows))
+	for _, r := range rows {
+		items = append(items, map[string]interface{}{
+			"id":              r.ID,
+			"status_source":   r.StatusSource,
+			"status_id":       r.StatusID,
+			"sms_template_id": r.SMSTemplateID,
+			"sms_name":        r.SMSName,
+			"sms_body":        r.SMSBody,
+			"email_category":  r.EmailCategory,
+			"auto_send":       r.AutoSend,
+		})
+	}
+	jsonResp(w, items, http.StatusOK)
+}
+
+// POST /api/orders/notify
+func (h *Handler) NotifyPatient(w http.ResponseWriter, r *http.Request) {
+	emp := middleware.EmployeeFromCtx(r.Context())
+
+	var body struct {
+		StatusSource string            `json:"status_source"` // "invoice" or "ticket"
+		StatusID     int               `json:"status_id"`
+		PatientID    int64             `json:"patient_id"`
+		Phone        *string           `json:"phone"`
+		Email        *string           `json:"email"`
+		SendSMS      bool              `json:"send_sms"`
+		SendEmail    bool              `json:"send_email"`
+		Vars         map[string]string `json:"vars"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		jsonErr(w, "invalid JSON", http.StatusBadRequest)
+		return
+	}
+	if body.StatusSource == "" || body.StatusID == 0 || body.PatientID == 0 {
+		jsonErr(w, "status_source, status_id, patient_id required", http.StatusBadRequest)
+		return
+	}
+
+	// Get notification map
+	type mapRow struct {
+		SMSTemplateID *int    `gorm:"column:sms_template_id"`
+		EmailCategory *string `gorm:"column:email_category"`
+	}
+	var nmap mapRow
+	if err := h.db.Table("status_notification_map").
+		Where("status_source = ? AND status_id = ? AND active = true", body.StatusSource, body.StatusID).
+		Scan(&nmap).Error; err != nil {
+		jsonErr(w, "no notification mapping for this status", http.StatusNotFound)
+		return
+	}
+
+	// Fill default vars from patient
+	if body.Vars == nil {
+		body.Vars = map[string]string{}
+	}
+	if _, ok := body.Vars["patient_name"]; !ok {
+		var pt struct {
+			First string `gorm:"column:first_name"`
+			Last  string `gorm:"column:last_name"`
+		}
+		h.db.Table("patient").Where("id_patient = ?", body.PatientID).Scan(&pt)
+		body.Vars["patient_name"] = strings.TrimSpace(pt.First + " " + pt.Last)
+	}
+	// Fill location
+	if _, ok := body.Vars["location"]; !ok {
+		if emp != nil && emp.LocationID != nil {
+			var locName string
+			h.db.Table("location").Where("id_location = ?", *emp.LocationID).Pluck("full_name", &locName)
+			body.Vars["location"] = locName
+		}
+	}
+
+	result := map[string]interface{}{}
+	var locID int
+	if emp != nil && emp.LocationID != nil {
+		locID = int(*emp.LocationID)
+	}
+
+	// SMS
+	if body.SendSMS && nmap.SMSTemplateID != nil {
+		phone := ""
+		if body.Phone != nil && *body.Phone != "" {
+			phone = *body.Phone
+		} else {
+			h.db.Table("patient").Where("id_patient = ?", body.PatientID).Pluck("phone", &phone)
+		}
+		if phone == "" {
+			result["sms"] = map[string]interface{}{"status": "skipped", "reason": "no phone number"}
+		} else {
+			var tplBody string
+			h.db.Table("sms_template").Where("id_sms_template = ?", *nmap.SMSTemplateID).Pluck("body", &tplBody)
+			rendered, err := communication.RenderSMSTemplate(tplBody, body.Vars)
+			if err != nil {
+				result["sms"] = map[string]interface{}{"status": "error", "reason": err.Error()}
+			} else {
+				res := communication.SendSMS(phone, rendered)
+				if res.Status == "accepted" {
+					if emp != nil {
+						h.logSMS(body.PatientID, rendered, "SMS sent (status notification)", int(emp.IDEmployee), locID)
+					}
+					result["sms"] = map[string]interface{}{"status": "sent", "message": rendered}
+				} else {
+					result["sms"] = map[string]interface{}{"status": "failed", "reason": res.Error}
+				}
+			}
+		}
+	}
+
+	// Email
+	if body.SendEmail && nmap.EmailCategory != nil && *nmap.EmailCategory != "" {
+		emailAddr := ""
+		if body.Email != nil && *body.Email != "" {
+			emailAddr = *body.Email
+		} else {
+			h.db.Table("patient").Where("id_patient = ?", body.PatientID).Pluck("email", &emailAddr)
+		}
+		if emailAddr == "" {
+			result["email"] = map[string]interface{}{"status": "skipped", "reason": "no email address"}
+		} else {
+			ctx := map[string]interface{}{}
+			for k, v := range body.Vars {
+				ctx[k] = v
+			}
+			// Resolve template file from org_email_template by category
+			var templateFile string
+			h.db.Table("org_email_template oet").
+				Select("et.name").
+				Joins("JOIN email_template et ON et.id_email_template = oet.template_id").
+				Where("oet.category = ?", *nmap.EmailCategory).
+				Pluck("name", &templateFile)
+			if templateFile == "" {
+				// fallback to default for category
+				h.db.Table("email_template").Where("category = ? AND is_default = true", *nmap.EmailCategory).Pluck("name", &templateFile)
+			}
+			if templateFile == "" {
+				templateFile = "default"
+			}
+			locID64 := int64(locID)
+			err := email.SendViaDB(h.db, emailAddr, "Order Update", templateFile, ctx, &locID64)
+			if err != nil {
+				result["email"] = map[string]interface{}{"status": "failed", "reason": err.Error()}
+			} else {
+				result["email"] = map[string]interface{}{"status": "sent"}
+			}
+		}
+	}
+
+	jsonResp(w, result, http.StatusOK)
+}
 
 func fmtDate(t *time.Time) interface{} {
 	if t == nil {
