@@ -45,12 +45,18 @@ func RegisterPosTerminalRoutes(db *gorm.DB, rdb *redis.Client, cfg *config.Confi
 		perm80(http.HandlerFunc(h.DeleteTerminal)),
 	).Methods("DELETE")
 
-	// ─── POS Start / Commit (perm 64) ────────────────────────────────────────
+	// ─── POS Start / Commit / Refund / Void (perm 64) ───────────────────────
 	api.Handle("/invoice/{invoice_id:[0-9]+}/pos/start",
 		perm64(http.HandlerFunc(h.PosStart)),
 	).Methods("POST")
 	api.Handle("/invoice/{invoice_id:[0-9]+}/pos/commit",
 		perm64(http.HandlerFunc(h.PosCommit)),
+	).Methods("POST")
+	api.Handle("/invoice/{invoice_id:[0-9]+}/pos/refund",
+		perm64(http.HandlerFunc(h.PosRefund)),
+	).Methods("POST")
+	api.Handle("/invoice/{invoice_id:[0-9]+}/pos/void",
+		perm64(http.HandlerFunc(h.PosVoid)),
 	).Methods("POST")
 
 	// ─── SPIn Config (perm 80) ───────────────────────────────────────────────
@@ -60,8 +66,14 @@ func RegisterPosTerminalRoutes(db *gorm.DB, rdb *redis.Client, cfg *config.Confi
 	api.Handle("/pos/spin-config",
 		perm80(http.HandlerFunc(h.GetSpinConfig)),
 	).Methods("GET")
+	api.Handle("/pos/spin-config/toggle-sandbox",
+		perm80(http.HandlerFunc(h.ToggleSandbox)),
+	).Methods("POST")
 
-	// ─── Transaction detail (perm 64) ────────────────────────────────────────
+	// ─── Terminal status & transaction detail (perm 64) ──────────────────────
+	api.Handle("/pos/terminal-status",
+		perm64(http.HandlerFunc(h.CheckTerminalStatus)),
+	).Methods("GET")
 	api.Handle("/pos/tx/{tx_id:[0-9]+}",
 		perm64(http.HandlerFunc(h.GetTransaction)),
 	).Methods("GET")

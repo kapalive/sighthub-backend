@@ -11,7 +11,7 @@ import (
 type Inventory struct {
 	IDInventory          int64                      `gorm:"column:id_inventory;primaryKey"               json:"id_inventory"`
 	SKU                  string                     `gorm:"column:sku;type:varchar(12);not null"         json:"sku"`
-	CreatedDate          string                     `gorm:"column:created_date" json:"created_date"`
+	CreatedDate          *string                    `gorm:"column:created_date" json:"created_date,omitempty"`
 	StatusItemsInventory types.StatusItemsInventory `gorm:"column:status_items_inventory;not null"       json:"status_items_inventory"`
 	LocationID           int64                      `gorm:"column:location_id;not null"                  json:"location_id"`
 	ModelID              *int64                     `gorm:"column:model_id"                              json:"model_id,omitempty"`

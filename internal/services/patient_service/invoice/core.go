@@ -1381,6 +1381,11 @@ func (s *Service) AddItemsToInvoice(username string, invoiceID int64, input AddI
 				}
 			}
 
+			// Override description if explicitly provided in request
+			if d := strings.TrimSpace(itemData.Description); d != "" {
+				description = d
+			}
+
 			// Compute total and tax
 			total := round2(quantity*price - discount)
 			taxAmount := 0.0

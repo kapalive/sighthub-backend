@@ -40,9 +40,6 @@ type LabTicketPowers struct {
 	OSDT *string `gorm:"column:os_dt;type:varchar(6)" json:"os_dt,omitempty"`
 	ODNR *string `gorm:"column:od_nr;type:varchar(6)" json:"od_nr,omitempty"`
 	OSNR *string `gorm:"column:os_nr;type:varchar(6)" json:"os_nr,omitempty"`
-	OUDT *string `gorm:"column:ou_dt;type:varchar(6)" json:"ou_dt,omitempty"`
-	OUNR *string `gorm:"column:ou_nr;type:varchar(6)" json:"ou_nr,omitempty"`
-
 	ODBC *string `gorm:"column:od_bc;type:varchar(6)" json:"od_bc,omitempty"`
 	OSBC *string `gorm:"column:os_bc;type:varchar(6)" json:"os_bc,omitempty"`
 
@@ -83,9 +80,6 @@ func (l *LabTicketPowers) ToMap() map[string]interface{} {
 		"os_dt": l.OSDT,
 		"od_nr": l.ODNR,
 		"os_nr": l.OSNR,
-		"ou_dt": l.OUDT,
-		"ou_nr": l.OUNR,
-
 		"od_bc": l.ODBC,
 		"os_bc": l.OSBC,
 

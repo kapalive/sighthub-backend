@@ -223,6 +223,92 @@ func (h *Handler) GetTransaction(w http.ResponseWriter, r *http.Request) {
 	jsonResponse(w, result, http.StatusOK)
 }
 
+// POST /invoice/{invoice_id}/pos/refund
+func (h *Handler) PosRefund(w http.ResponseWriter, r *http.Request) {
+	el, err := h.getEL(r)
+	if err != nil {
+		jsonError(w, err.Error(), http.StatusNotFound)
+		return
+	}
+	invoiceID, err := strconv.ParseInt(mux.Vars(r)["invoice_id"], 10, 64)
+	if err != nil {
+		jsonError(w, "invalid invoice_id", http.StatusBadRequest)
+		return
+	}
+	var req posSvc.PosRefundRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		jsonError(w, "invalid JSON", http.StatusBadRequest)
+		return
+	}
+	result, err := h.svc.PosRefund(el, invoiceID, req)
+	if err != nil {
+		jsonError(w, err.Error(), httpStatus(err))
+		return
+	}
+	jsonResponse(w, result, http.StatusOK)
+}
+
+// POST /invoice/{invoice_id}/pos/void
+func (h *Handler) PosVoid(w http.ResponseWriter, r *http.Request) {
+	el, err := h.getEL(r)
+	if err != nil {
+		jsonError(w, err.Error(), http.StatusNotFound)
+		return
+	}
+	invoiceID, err := strconv.ParseInt(mux.Vars(r)["invoice_id"], 10, 64)
+	if err != nil {
+		jsonError(w, "invalid invoice_id", http.StatusBadRequest)
+		return
+	}
+	var req posSvc.PosVoidRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		jsonError(w, "invalid JSON", http.StatusBadRequest)
+		return
+	}
+	result, err := h.svc.PosVoid(el, invoiceID, req)
+	if err != nil {
+		jsonError(w, err.Error(), httpStatus(err))
+		return
+	}
+	jsonResponse(w, result, http.StatusOK)
+}
+
+// POST /pos/spin-config/toggle-sandbox
+func (h *Handler) ToggleSandbox(w http.ResponseWriter, r *http.Request) {
+	el, err := h.getEL(r)
+	if err != nil {
+		jsonError(w, err.Error(), http.StatusNotFound)
+		return
+	}
+	result, err := h.svc.ToggleSandbox(el)
+	if err != nil {
+		jsonError(w, err.Error(), httpStatus(err))
+		return
+	}
+	jsonResponse(w, result, http.StatusOK)
+}
+
+// GET /pos/terminal-status
+func (h *Handler) CheckTerminalStatus(w http.ResponseWriter, r *http.Request) {
+	el, err := h.getEL(r)
+	if err != nil {
+		jsonError(w, err.Error(), http.StatusNotFound)
+		return
+	}
+	var terminalID *int
+	if v := r.URL.Query().Get("terminal_id"); v != "" {
+		if id, err := strconv.Atoi(v); err == nil {
+			terminalID = &id
+		}
+	}
+	result, err := h.svc.CheckTerminalStatus(el, terminalID)
+	if err != nil {
+		jsonError(w, err.Error(), httpStatus(err))
+		return
+	}
+	jsonResponse(w, result, http.StatusOK)
+}
+
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 func (h *Handler) getEL(r *http.Request) (*posSvc.EmpLocation, error) {

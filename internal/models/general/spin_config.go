@@ -11,6 +11,7 @@ type SpinConfig struct {
 	TimeoutSec   int       `gorm:"column:timeout_sec;not null;default:125"                         json:"timeout_sec"`
 	AuthKey      string    `gorm:"column:auth_key;type:text;not null"                              json:"auth_key"`
 	Active       bool      `gorm:"column:active;not null;default:true"                             json:"active"`
+	IsSandbox    bool      `gorm:"column:is_sandbox;not null;default:true"                         json:"is_sandbox"`
 	CreatedAt    time.Time `gorm:"column:created_at;type:timestamptz;not null;default:now()"       json:"created_at"`
 	UpdatedAt    time.Time `gorm:"column:updated_at;type:timestamptz;not null;default:now()"       json:"updated_at"`
 	MerchantID   *string   `gorm:"column:merchant_id;type:varchar(64)"                             json:"merchant_id,omitempty"`

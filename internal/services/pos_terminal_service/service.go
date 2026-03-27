@@ -16,6 +16,7 @@ import (
 	"sighthub-backend/internal/models/location"
 	"sighthub-backend/internal/models/patients"
 	pkgActivity "sighthub-backend/pkg/activitylog"
+	"sighthub-backend/pkg/spin"
 )
 
 var (
@@ -317,11 +318,10 @@ func (s *Service) PosStart(el *EmpLocation, invoiceID int64, req PosStartRequest
 	if err != nil {
 		return nil, err
 	}
-	_ = cfg // will be used when SPIn integration is ready
 
 	refID := fmt.Sprintf("%d%d", time.Now().UnixNano(), inv.IDInvoice)
-	if len(refID) > 20 {
-		refID = refID[:20]
+	if len(refID) > 50 {
+		refID = refID[:50]
 	}
 
 	now := time.Now()
@@ -345,14 +345,66 @@ func (s *Service) PosStart(el *EmpLocation, invoiceID int64, req PosStartRequest
 		return nil, err
 	}
 
-	// TODO: SPIn XML call will go here when tokens/keys are available
-	// For now, transaction is created with status="pending"
+	// ── Call SPIn REST API ────────────────────────────────────────────────
+	spinClient := s.newSpinClient(cfg, terminal)
+	spinResp, spinErr := spinClient.Sale(dec2(amount), refID, invNum)
+
+	reqJSON, _ := json.Marshal(map[string]interface{}{
+		"Amount": dec2(amount), "ReferenceId": refID, "InvoiceNumber": invNum,
+		"Tpn": spinClient.TPN, "BaseURL": spinClient.BaseURL,
+	})
+	reqStr := string(reqJSON)
+	tx.SpinRequestXML = &reqStr
+
+	if spinErr != nil {
+		tx.Status = "failed"
+		errMsg := spinErr.Error()
+		tx.SpinRespMsg = &errMsg
+		s.db.Save(&tx)
+		return nil, fmt.Errorf("SPIn gateway error: %s", errMsg)
+	}
+
+	// Store raw response
+	tx.SpinResponseXML = &spinResp.RawJSON
+	rc := fmt.Sprintf("%d", spinResp.ResultCode)
+	tx.SpinResultCode = &rc
+	tx.SpinRespMsg = &spinResp.Message
+
+	if spinResp.AuthCode != "" {
+		tx.AuthorizationCode = &spinResp.AuthCode
+	}
+	if spinResp.RRN != "" {
+		tx.ReferenceNumber = &spinResp.RRN
+	}
+	if spinResp.Token != "" {
+		tx.SpinIposToken = &spinResp.Token
+	}
+	if spinResp.CardData != nil {
+		masked := fmt.Sprintf("****%s", spinResp.CardData.Last4)
+		tx.CardMaskedNumber = &masked
+		tx.PaymentMethod = &spinResp.CardData.CardType
+	}
+
+	if spinResp.IsApproved() {
+		tx.Status = "approved"
+		completedAt := time.Now()
+		tx.CompletedAt = &completedAt
+	} else {
+		tx.Status = "declined"
+		if spinResp.ResultCode == 2 {
+			tx.Status = "failed"
+		}
+	}
+
+	s.db.Save(&tx)
 
 	pkgActivity.Log(s.db, "pos", "payment_start",
 		pkgActivity.WithEntity(invoiceID),
 		pkgActivity.WithDetails(map[string]interface{}{
 			"amount":      fmt.Sprintf("%.2f", amount),
 			"terminal_id": terminal.IDPaymentTerminal,
+			"status":      tx.Status,
+			"result_code": rc,
 		}),
 	)
 
@@ -360,8 +412,11 @@ func (s *Service) PosStart(el *EmpLocation, invoiceID int64, req PosStartRequest
 		"ok":                     true,
 		"payment_transaction_id": tx.IDPaymentTransaction,
 		"status":                 tx.Status,
-		"message":                "Transaction created (SPIn integration pending)",
+		"message":                spinResp.Message,
 		"spin_ref_id":            tx.SpinRefID,
+		"authorization_code":     tx.AuthorizationCode,
+		"card_masked":            tx.CardMaskedNumber,
+		"card_type":              tx.PaymentMethod,
 	}, nil
 }
 
@@ -471,6 +526,7 @@ type ProvisionSpinConfigRequest struct {
 	TimeoutSec int    `json:"timeout_sec"`
 	Active     *bool  `json:"active"`
 	MerchantID string `json:"merchant_id"`
+	IsSandbox  *bool  `json:"is_sandbox"`
 }
 
 func (s *Service) ProvisionSpinConfig(el *EmpLocation, req ProvisionSpinConfigRequest) (map[string]interface{}, error) {
@@ -504,6 +560,9 @@ func (s *Service) ProvisionSpinConfig(el *EmpLocation, req ProvisionSpinConfigRe
 	cfg.MerchantID = &req.MerchantID
 	cfg.Active = active
 	cfg.UpdatedAt = time.Now()
+	if req.IsSandbox != nil {
+		cfg.IsSandbox = *req.IsSandbox
+	}
 
 	s.db.Save(&cfg)
 
@@ -530,10 +589,17 @@ func (s *Service) GetSpinConfig(el *EmpLocation) (map[string]interface{}, error)
 
 	maskedKey := maskSecret(cfg.AuthKey, 4)
 
+	mode := "production"
+	if cfg.IsSandbox {
+		mode = "sandbox"
+	}
+
 	return map[string]interface{}{
 		"ok":          true,
 		"location_id": locID,
 		"active":      cfg.Active,
+		"is_sandbox":  cfg.IsSandbox,
+		"mode":        mode,
 		"timeout_sec": cfg.TimeoutSec,
 		"spin_url":    cfg.SpinURL,
 		"merchant_id": cfg.MerchantID,
@@ -621,6 +687,322 @@ func (s *Service) getSpinConfig(locationID int64) (*general.SpinConfig, error) {
 		return nil, fmt.Errorf("%w: SPIn merchant_id is empty for this location", ErrBadRequest)
 	}
 	return &cfg, nil
+}
+
+// ─── POS Refund ──────────────────────────────────────────────────────────────
+
+type PosRefundRequest struct {
+	PaymentTransactionID int64 `json:"payment_transaction_id"`
+}
+
+func (s *Service) PosRefund(el *EmpLocation, invoiceID int64, req PosRefundRequest) (map[string]interface{}, error) {
+	if req.PaymentTransactionID == 0 {
+		return nil, fmt.Errorf("%w: payment_transaction_id is required", ErrBadRequest)
+	}
+
+	var origTx general.PaymentTransaction
+	if err := s.db.First(&origTx, req.PaymentTransactionID).Error; err != nil {
+		return nil, fmt.Errorf("%w: transaction not found", ErrNotFound)
+	}
+	if origTx.InvoiceID == nil || *origTx.InvoiceID != invoiceID {
+		return nil, fmt.Errorf("%w: transaction does not belong to this invoice", ErrForbidden)
+	}
+	if origTx.Status != "approved" {
+		return nil, fmt.Errorf("%w: can only refund approved transactions (current: %s)", ErrBadRequest, origTx.Status)
+	}
+
+	var inv invoices.Invoice
+	if err := s.db.First(&inv, invoiceID).Error; err != nil {
+		return nil, fmt.Errorf("%w: invoice not found", ErrNotFound)
+	}
+	locID := int64(el.Location.IDLocation)
+	if inv.LocationID != locID {
+		return nil, fmt.Errorf("%w: access denied", ErrForbidden)
+	}
+
+	terminal, err := s.getTerminalByID(origTx.PaymentTerminalID, locID)
+	if err != nil {
+		return nil, err
+	}
+	cfg, err := s.getSpinConfig(inv.LocationID)
+	if err != nil {
+		return nil, err
+	}
+
+	refID := fmt.Sprintf("R%d%d", time.Now().UnixNano(), origTx.IDPaymentTransaction)
+	if len(refID) > 50 {
+		refID = refID[:50]
+	}
+	invNum := fmt.Sprintf("%d", inv.IDInvoice)
+
+	now := time.Now()
+	refundTx := general.PaymentTransaction{
+		PaymentTerminalID: terminal.IDPaymentTerminal,
+		InvoiceID:         &inv.IDInvoice,
+		PaymentMethodID:   origTx.PaymentMethodID,
+		TransactionDate:   now,
+		CreatedAt:         now,
+		Amount:            origTx.Amount,
+		Currency:          "USD",
+		Status:            "pending",
+		SpinRefID:         refID,
+		SpinRegisterID:    terminal.SpinRegisterID,
+		SpinTPN:           terminal.SpinTPN,
+		SpinInvNum:        &invNum,
+	}
+	s.db.Create(&refundTx)
+
+	spinClient := s.newSpinClient(cfg, terminal)
+	spinResp, spinErr := spinClient.Return(origTx.Amount, refID, invNum)
+
+	reqJSON, _ := json.Marshal(map[string]interface{}{
+		"type": "return", "Amount": origTx.Amount, "ReferenceId": refID,
+		"original_tx_id": origTx.IDPaymentTransaction,
+	})
+	reqStr := string(reqJSON)
+	refundTx.SpinRequestXML = &reqStr
+
+	if spinErr != nil {
+		refundTx.Status = "failed"
+		errMsg := spinErr.Error()
+		refundTx.SpinRespMsg = &errMsg
+		s.db.Save(&refundTx)
+		return nil, fmt.Errorf("SPIn refund error: %s", errMsg)
+	}
+
+	refundTx.SpinResponseXML = &spinResp.RawJSON
+	rc := fmt.Sprintf("%d", spinResp.ResultCode)
+	refundTx.SpinResultCode = &rc
+	refundTx.SpinRespMsg = &spinResp.Message
+	if spinResp.AuthCode != "" {
+		refundTx.AuthorizationCode = &spinResp.AuthCode
+	}
+
+	if spinResp.IsApproved() {
+		refundTx.Status = "refunded"
+		completedAt := time.Now()
+		refundTx.CompletedAt = &completedAt
+
+		// Update original transaction status
+		origTx.Status = "refunded"
+		s.db.Save(&origTx)
+	} else {
+		refundTx.Status = "declined"
+	}
+	s.db.Save(&refundTx)
+
+	pkgActivity.Log(s.db, "pos", "payment_refund",
+		pkgActivity.WithEntity(invoiceID),
+		pkgActivity.WithDetails(map[string]interface{}{
+			"amount":      fmt.Sprintf("%.2f", origTx.Amount),
+			"original_tx": origTx.IDPaymentTransaction,
+			"refund_tx":   refundTx.IDPaymentTransaction,
+			"status":      refundTx.Status,
+		}),
+	)
+
+	return map[string]interface{}{
+		"ok":                     true,
+		"payment_transaction_id": refundTx.IDPaymentTransaction,
+		"status":                 refundTx.Status,
+		"message":                spinResp.Message,
+		"amount":                 fmt.Sprintf("%.2f", origTx.Amount),
+	}, nil
+}
+
+// ─── POS Void ────────────────────────────────────────────────────────────────
+
+type PosVoidRequest struct {
+	PaymentTransactionID int64 `json:"payment_transaction_id"`
+}
+
+func (s *Service) PosVoid(el *EmpLocation, invoiceID int64, req PosVoidRequest) (map[string]interface{}, error) {
+	if req.PaymentTransactionID == 0 {
+		return nil, fmt.Errorf("%w: payment_transaction_id is required", ErrBadRequest)
+	}
+
+	var origTx general.PaymentTransaction
+	if err := s.db.First(&origTx, req.PaymentTransactionID).Error; err != nil {
+		return nil, fmt.Errorf("%w: transaction not found", ErrNotFound)
+	}
+	if origTx.InvoiceID == nil || *origTx.InvoiceID != invoiceID {
+		return nil, fmt.Errorf("%w: transaction does not belong to this invoice", ErrForbidden)
+	}
+	if origTx.Status != "approved" {
+		return nil, fmt.Errorf("%w: can only void approved transactions (current: %s)", ErrBadRequest, origTx.Status)
+	}
+
+	var inv invoices.Invoice
+	if err := s.db.First(&inv, invoiceID).Error; err != nil {
+		return nil, fmt.Errorf("%w: invoice not found", ErrNotFound)
+	}
+	locID := int64(el.Location.IDLocation)
+	if inv.LocationID != locID {
+		return nil, fmt.Errorf("%w: access denied", ErrForbidden)
+	}
+
+	terminal, err := s.getTerminalByID(origTx.PaymentTerminalID, locID)
+	if err != nil {
+		return nil, err
+	}
+	cfg, err := s.getSpinConfig(inv.LocationID)
+	if err != nil {
+		return nil, err
+	}
+
+	spinClient := s.newSpinClient(cfg, terminal)
+	spinResp, spinErr := spinClient.Void(origTx.Amount, origTx.SpinRefID)
+
+	respJSON := ""
+	if spinErr != nil {
+		errMsg := spinErr.Error()
+		origTx.SpinRespMsg = &errMsg
+		s.db.Save(&origTx)
+		return nil, fmt.Errorf("SPIn void error: %s", errMsg)
+	}
+	respJSON = spinResp.RawJSON
+
+	rc := fmt.Sprintf("%d", spinResp.ResultCode)
+	origTx.SpinResultCode = &rc
+	origTx.SpinRespMsg = &spinResp.Message
+	origTx.SpinResponseXML = &respJSON
+
+	if spinResp.IsApproved() {
+		origTx.Status = "voided"
+		completedAt := time.Now()
+		origTx.CompletedAt = &completedAt
+	}
+	s.db.Save(&origTx)
+
+	pkgActivity.Log(s.db, "pos", "payment_void",
+		pkgActivity.WithEntity(invoiceID),
+		pkgActivity.WithDetails(map[string]interface{}{
+			"amount":    fmt.Sprintf("%.2f", origTx.Amount),
+			"tx_id":     origTx.IDPaymentTransaction,
+			"status":    origTx.Status,
+		}),
+	)
+
+	return map[string]interface{}{
+		"ok":                     true,
+		"payment_transaction_id": origTx.IDPaymentTransaction,
+		"status":                 origTx.Status,
+		"message":                spinResp.Message,
+	}, nil
+}
+
+// ─── Toggle Sandbox / Production ─────────────────────────────────────────────
+
+func (s *Service) ToggleSandbox(el *EmpLocation) (map[string]interface{}, error) {
+	locID := int64(el.Location.IDLocation)
+	var cfg general.SpinConfig
+	if err := s.db.Where("location_id = ?", locID).First(&cfg).Error; err != nil {
+		return nil, fmt.Errorf("%w: SPIn config not found", ErrNotFound)
+	}
+
+	cfg.IsSandbox = !cfg.IsSandbox
+	cfg.UpdatedAt = time.Now()
+
+	// Auto-switch URL
+	if cfg.IsSandbox {
+		u := spin.SandboxBaseURL
+		cfg.SpinURL = &u
+	} else {
+		u := spin.ProductionBaseURL
+		cfg.SpinURL = &u
+	}
+	s.db.Save(&cfg)
+
+	mode := "production"
+	if cfg.IsSandbox {
+		mode = "sandbox"
+	}
+
+	pkgActivity.Log(s.db, "pos", "toggle_sandbox",
+		pkgActivity.WithEntity(locID),
+		pkgActivity.WithDetails(map[string]interface{}{"mode": mode}),
+	)
+
+	return map[string]interface{}{
+		"ok":         true,
+		"is_sandbox": cfg.IsSandbox,
+		"mode":       mode,
+		"spin_url":   cfg.SpinURL,
+	}, nil
+}
+
+// ─── Terminal Status (ping) ──────────────────────────────────────────────────
+
+func (s *Service) CheckTerminalStatus(el *EmpLocation, terminalID *int) (map[string]interface{}, error) {
+	locID := int64(el.Location.IDLocation)
+
+	var terminal general.PaymentTerminal
+	if terminalID == nil || *terminalID == 0 {
+		if err := s.db.Where("location_id = ? AND is_default = true", locID).First(&terminal).Error; err != nil {
+			return nil, fmt.Errorf("%w: no default terminal", ErrBadRequest)
+		}
+	} else {
+		if err := s.db.First(&terminal, *terminalID).Error; err != nil {
+			return nil, fmt.Errorf("%w: terminal not found", ErrNotFound)
+		}
+	}
+	if terminal.LocationID == nil || *terminal.LocationID != locID {
+		return nil, fmt.Errorf("%w: access denied", ErrForbidden)
+	}
+
+	cfg, err := s.getSpinConfig(locID)
+	if err != nil {
+		return nil, err
+	}
+
+	spinClient := s.newSpinClient(cfg, &terminal)
+	spinResp, spinErr := spinClient.TerminalStatus()
+	if spinErr != nil {
+		return map[string]interface{}{
+			"ok":     false,
+			"online": false,
+			"error":  spinErr.Error(),
+		}, nil
+	}
+
+	return map[string]interface{}{
+		"ok":          true,
+		"online":      spinResp.ResultCode == 0,
+		"message":     spinResp.Message,
+		"result_code": spinResp.ResultCode,
+		"terminal_id": terminal.IDPaymentTerminal,
+	}, nil
+}
+
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
+func (s *Service) newSpinClient(cfg *general.SpinConfig, terminal *general.PaymentTerminal) *spin.Client {
+	baseURL := spin.SandboxBaseURL
+	if cfg.SpinURL != nil && *cfg.SpinURL != "" {
+		baseURL = *cfg.SpinURL
+	}
+	if !cfg.IsSandbox && baseURL == spin.SandboxBaseURL {
+		baseURL = spin.ProductionBaseURL
+	}
+
+	tpn := ""
+	if terminal.SpinTPN != nil {
+		tpn = *terminal.SpinTPN
+	}
+
+	timeout := time.Duration(cfg.TimeoutSec) * time.Second
+	return spin.NewClient(baseURL, cfg.AuthKey, tpn, timeout)
+}
+
+func (s *Service) getTerminalByID(terminalID int, locationID int64) (*general.PaymentTerminal, error) {
+	var terminal general.PaymentTerminal
+	if err := s.db.First(&terminal, terminalID).Error; err != nil {
+		return nil, fmt.Errorf("%w: terminal not found", ErrNotFound)
+	}
+	if terminal.LocationID == nil || *terminal.LocationID != locationID {
+		return nil, fmt.Errorf("%w: terminal belongs to a different location", ErrForbidden)
+	}
+	return &terminal, nil
 }
 
 func maskSecret(s string, keepLast int) string {

@@ -87,12 +87,14 @@ func (s *Service) AddOrderedItem(el *invoiceSvc.EmpLocation, req AddOrderedReque
 	empID := int64(el.Employee.IDEmployee)
 
 	// Create placeholder inventory item
+	nowStr := time.Now().Format("15:04:05")
 	item := invModel.Inventory{
 		LocationID:           locID,
 		ModelID:              &req.ModelID,
 		InvoiceID:            req.InvoiceID,
 		EmployeeID:           &empID,
 		StatusItemsInventory: "Ordered",
+		CreatedDate:          &nowStr,
 	}
 
 	if err := s.db.Create(&item).Error; err != nil {

@@ -93,9 +93,6 @@ type CreateTicketRequest struct {
 	OSDT             *string  `json:"os_dt"`
 	ODNR             *string  `json:"od_nr"`
 	OSNR             *string  `json:"os_nr"`
-	OUDT             *string  `json:"ou_dt"`
-	OUNR             *string  `json:"ou_nr"`
-
 	// Contacts (g_or_c == "c")
 	ODContLens                    *string  `json:"od_cont_lens"`
 	OSContLens                    *string  `json:"os_cont_lens"`
@@ -305,9 +302,6 @@ func (s *Service) CreateTicket(username string, invoiceID int64, req *CreateTick
 		overrideStrPtr(&powers.OSDT, req.OSDT)
 		overrideStrPtr(&powers.ODNR, req.ODNR)
 		overrideStrPtr(&powers.OSNR, req.OSNR)
-		overrideStrPtr(&powers.OUDT, req.OUDT)
-		overrideStrPtr(&powers.OUNR, req.OUNR)
-
 		if err := tx.Create(powers).Error; err != nil {
 			tx.Rollback()
 			return nil, fmt.Errorf("create powers: %w", err)

@@ -394,6 +394,9 @@ func (h *Handler) InvPBLensList(w http.ResponseWriter, r *http.Request) {
 	if v := q.Get("search"); v != "" {
 		f.Search = &v
 	}
+	if v := q.Get("source"); v != "" {
+		f.Source = &v
+	}
 	if v := qint(q.Get("page")); v != nil {
 		f.Page = *v
 	} else {

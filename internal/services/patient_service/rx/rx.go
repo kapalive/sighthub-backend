@@ -110,7 +110,7 @@ type UpdateRxInput struct {
 // ─── GET /rx/amidoctor ────────────────────────────────────────────────────────
 
 func (s *Service) AmIDoctor(username string) (map[string]interface{}, error) {
-	emp, _, err := s.getEmployeeAndLocation(username)
+	emp, loc, err := s.getEmployeeAndLocation(username)
 	if err != nil || emp == nil {
 		return nil, errors.New("employee not found")
 	}
@@ -120,10 +120,16 @@ func (s *Service) AmIDoctor(username string) (map[string]interface{}, error) {
 		return nil, nil // not a doctor
 	}
 
+	var locationName *string
+	if loc != nil {
+		locationName = &loc.FullName
+	}
+
 	result := map[string]interface{}{
-		"doctor": "Dr. " + emp.FirstName + " " + emp.LastName,
-		"npi":    nil,
-		"ein":    nil,
+		"doctor":   "Dr. " + emp.FirstName + " " + emp.LastName,
+		"npi":      nil,
+		"ein":      nil,
+		"location": locationName,
 	}
 
 	// Look up NPI/EIN from doctor_npi_number

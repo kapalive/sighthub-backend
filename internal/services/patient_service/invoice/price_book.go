@@ -39,6 +39,7 @@ type InvPBLensFilters struct {
 	SpecialFeatureID *int
 	SeriesID         *int
 	Search           *string
+	Source           *string
 	Page             int
 	PerPage          int
 }
@@ -70,6 +71,11 @@ type InvPBLensResponse struct {
 
 func (s *Service) InvoicePBLenses(invoiceID int64, f InvPBLensFilters) (*InvPBLensResponse, error) {
 	source := s.getInvoiceLensSource(invoiceID)
+
+	// If no lens in invoice yet, use frontend-provided source
+	if source == "" && f.Source != nil && *f.Source != "" {
+		source = *f.Source
+	}
 
 	if f.Page < 1 {
 		f.Page = 1

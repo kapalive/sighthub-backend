@@ -126,7 +126,7 @@ func (r *InventoryRepo) Create(inp CreateInventoryInput) (*inventory.Inventory, 
 		OrdersLensID:         inp.OrdersLensID,
 		VariantCRSLProductID: inp.VariantCRSLProductID,
 		StatusItemsInventory: inp.Status,
-		CreatedDate:          time.Now(),
+		CreatedDate:          ptrStr(time.Now().Format("15:04:05")),
 	}
 	inv.GenerateSKU()
 
@@ -204,3 +204,5 @@ func (r *InventoryRepo) GenerateSKU(modelID int64) string {
 func (r *InventoryRepo) IsNotFound(err error) bool {
 	return errors.Is(err, gorm.ErrRecordNotFound)
 }
+
+func ptrStr(s string) *string { return &s }

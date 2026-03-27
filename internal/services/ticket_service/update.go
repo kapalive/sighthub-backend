@@ -79,8 +79,6 @@ type PowersPayload struct {
 	OSDT        *string  `json:"os_dt"`
 	ODNR        *string  `json:"od_nr"`
 	OSNR        *string  `json:"os_nr"`
-	OUDT        *string  `json:"ou_dt"`
-	OUNR        *string  `json:"ou_nr"`
 }
 
 type LensPayload struct {
@@ -402,8 +400,6 @@ func (s *Service) patchPowers(p *labTicketModel.LabTicketPowers, pl *PowersPaylo
 	overrideStrPtr(&p.OSDT, pl.OSDT)
 	overrideStrPtr(&p.ODNR, pl.ODNR)
 	overrideStrPtr(&p.OSNR, pl.OSNR)
-	overrideStrPtr(&p.OUDT, pl.OUDT)
-	overrideStrPtr(&p.OUNR, pl.OUNR)
 }
 
 // ── Lens helpers ─────────────────────────────────────────────────────────────

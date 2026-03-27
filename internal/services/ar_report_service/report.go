@@ -78,7 +78,7 @@ type BalanceDueGroup struct {
 	Invoices     []BalanceDueInvoice `json:"invoices"`
 }
 
-func (s *Service) GetBalanceDue(username string, locationID int, periodMonths int) ([]BalanceDueGroup, error) {
+func (s *Service) GetBalanceDue(username string, locationID int, periodMonths int, startDate, endDate string) ([]BalanceDueGroup, error) {
 	type row struct {
 		IDInvoice         int64      `gorm:"column:id_invoice"`
 		NumberInvoice     string     `gorm:"column:number_invoice"`
@@ -123,8 +123,10 @@ func (s *Service) GetBalanceDue(username string, locationID int, periodMonths in
 		WHERE i.location_id = ?
 		  AND i.number_invoice LIKE 'S%%'
 		  AND (? = 0 OR i.date_create >= NOW() - MAKE_INTERVAL(months => ?))
+		  AND (? = '' OR i.date_create >= ?::date)
+		  AND (? = '' OR i.date_create < (?::date + INTERVAL '1 day'))
 		ORDER BY i.employee_id, i.date_create DESC
-	`, locationID, periodMonths, periodMonths).Scan(&rows).Error
+	`, locationID, periodMonths, periodMonths, startDate, startDate, endDate, endDate).Scan(&rows).Error
 	if err != nil {
 		return nil, err
 	}
@@ -618,6 +620,7 @@ func (s *Service) CloseCountSheet(username string, idCountSheet int) error {
 type InvoiceItem struct {
 	InvoiceID     int64   `json:"invoice_id"`
 	NumberInvoice string  `json:"number_invoice"`
+	PatientID     *int64  `json:"patient_id"`
 	PatientName   *string `json:"patient_name"`
 	Date          *string `json:"date"`
 	Due           float64 `json:"due"`
@@ -786,6 +789,7 @@ func (s *Service) invoiceToItem(inv *invoices.Invoice) InvoiceItem {
 	item := InvoiceItem{
 		InvoiceID:     inv.IDInvoice,
 		NumberInvoice: inv.NumberInvoice,
+		PatientID:     inv.PatientID,
 		Due:           inv.Due,
 	}
 	d := inv.DateCreate.Format(time.RFC3339)

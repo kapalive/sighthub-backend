@@ -85,6 +85,7 @@ const (
 	StatusInventorySOLD                  StatusItemsInventory = "SOLD"
 	StatusInventoryMissing               StatusItemsInventory = "Missing"
 	StatusInventoryRemoved               StatusItemsInventory = "Removed"
+	StatusInventoryOrdered               StatusItemsInventory = "Ordered"
 )
 
 // ===== Return reason (vendor) =====

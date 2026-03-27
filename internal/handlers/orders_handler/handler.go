@@ -928,3 +928,123 @@ func jsonErr(w http.ResponseWriter, msg string, code int) {
 	w.WriteHeader(code)
 	fmt.Fprintf(w, `{"error":%q}`, msg)
 }
+
+// ─── GET /api/orders/order-list ──────────────────────────────────────────────
+
+func (h *Handler) OrderList(w http.ResponseWriter, r *http.Request) {
+	emp := middleware.EmployeeFromCtx(r.Context())
+
+	var currentLocationID int
+	if emp != nil && emp.LocationID != nil {
+		currentLocationID = int(*emp.LocationID)
+	}
+
+	q := r.URL.Query()
+
+	// location_id: default = current employee location
+	locationID := currentLocationID
+	if v := q.Get("location_id"); v != "" {
+		if id, err := strconv.Atoi(v); err == nil && id > 0 {
+			locationID = id
+		}
+	}
+
+	// vendor_id filter (optional)
+	var vendorID *int
+	if v := q.Get("vendor_id"); v != "" {
+		if id, err := strconv.Atoi(v); err == nil && id > 0 {
+			vendorID = &id
+		}
+	}
+
+	type row struct {
+		IDInventory    int64   `gorm:"column:id_inventory"`
+		SKU            string  `gorm:"column:sku"`
+		LocationID     int     `gorm:"column:location_id"`
+		LocationName   string  `gorm:"column:location_name"`
+		ModelID        *int64  `gorm:"column:model_id"`
+		ModelTitle     *string `gorm:"column:model_title"`
+		ProductID      *int64  `gorm:"column:product_id"`
+		ProductTitle   *string `gorm:"column:product_title"`
+		BrandID        *int64  `gorm:"column:brand_id"`
+		BrandName      *string `gorm:"column:brand_name"`
+		VendorID       *int64  `gorm:"column:vendor_id"`
+		VendorName     *string `gorm:"column:vendor_name"`
+		InvoiceID      int64   `gorm:"column:invoice_id"`
+		NumberInvoice  *string `gorm:"column:number_invoice"`
+		PatientID      *int64  `gorm:"column:patient_id"`
+		PatientName    *string `gorm:"column:patient_name"`
+		SellingPrice   *float64 `gorm:"column:pb_selling_price"`
+	}
+
+	dbq := h.db.Table("inventory i").
+		Select(`i.id_inventory, i.sku, i.location_id,
+			loc.full_name AS location_name,
+			i.model_id,
+			m.title_variant AS model_title,
+			pr.id_product AS product_id,
+			pr.title_product AS product_title,
+			b.id_brand AS brand_id,
+			b.brand_name,
+			v.id_vendor AS vendor_id,
+			v.vendor_name,
+			i.invoice_id,
+			inv.number_invoice,
+			inv.patient_id,
+			CONCAT(pat.first_name, ' ', pat.last_name) AS patient_name,
+			pb.pb_selling_price`).
+		Joins("LEFT JOIN location loc ON loc.id_location = i.location_id").
+		Joins("LEFT JOIN model m ON m.id_model = i.model_id").
+		Joins("LEFT JOIN product pr ON pr.id_product = m.product_id").
+		Joins("LEFT JOIN brand b ON b.id_brand = pr.brand_id").
+		Joins("LEFT JOIN vendor v ON v.id_vendor = pr.vendor_id").
+		Joins("LEFT JOIN invoice inv ON inv.id_invoice = i.invoice_id").
+		Joins("LEFT JOIN patient pat ON pat.id_patient = inv.patient_id").
+		Joins("LEFT JOIN price_book pb ON pb.inventory_id = i.id_inventory").
+		Where("i.status_items_inventory = ?", "Ordered")
+
+	if locationID > 0 {
+		dbq = dbq.Where("i.location_id = ?", locationID)
+	}
+	if vendorID != nil {
+		dbq = dbq.Where("v.id_vendor = ?", *vendorID)
+	}
+
+	dbq = dbq.Order("i.id_inventory DESC")
+
+	var rows []row
+	if err := dbq.Scan(&rows).Error; err != nil {
+		jsonErr(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	items := make([]map[string]interface{}, len(rows))
+	for i, r := range rows {
+		var priceStr *string
+		if r.SellingPrice != nil {
+			s := fmt.Sprintf("%.2f", *r.SellingPrice)
+			priceStr = &s
+		}
+		items[i] = map[string]interface{}{
+			"id_inventory":    r.IDInventory,
+			"sku":             r.SKU,
+			"location_id":     r.LocationID,
+			"location":        r.LocationName,
+			"model_id":        r.ModelID,
+			"model_title":     r.ModelTitle,
+			"product_id":      r.ProductID,
+			"product_title":   r.ProductTitle,
+			"brand_id":        r.BrandID,
+			"brand_name":      r.BrandName,
+			"vendor_id":       r.VendorID,
+			"vendor_name":     r.VendorName,
+			"invoice_id":      r.InvoiceID,
+			"number_invoice":  r.NumberInvoice,
+			"patient_id":      r.PatientID,
+			"patient_name":    r.PatientName,
+			"selling_price":   priceStr,
+		}
+	}
+
+	jsonResp(w, items, http.StatusOK)
+}

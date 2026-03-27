@@ -20,6 +20,7 @@ func RegisterOrdersRoutes(db *gorm.DB, rdb *redis.Client, cfg *config.Config, r 
 	api := r.PathPrefix("/api/orders").Subrouter()
 	api.Use(jwtMW, permMW)
 
+	api.HandleFunc("/order-list", h.OrderList).Methods("GET")
 	api.HandleFunc("/locations", h.Locations).Methods("GET")
 	api.HandleFunc("/ticket-statuses", h.TicketStatuses).Methods("GET")
 	api.HandleFunc("/invoice-statuses", h.InvoiceStatuses).Methods("GET")
