@@ -44,7 +44,6 @@ func (h *Handler) ListCompanies(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) CreateCompany(w http.ResponseWriter, r *http.Request) {
 	var body struct {
 		CompanyName string `json:"company_name"`
-		CoverageID  *int   `json:"insurance_coverage_type_id"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		jsonError(w, "Invalid JSON", 400)
@@ -54,7 +53,7 @@ func (h *Handler) CreateCompany(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, "company_name is required", 400)
 		return
 	}
-	data, err := h.svc.CreateInsuranceCompany(body.CompanyName, body.CoverageID)
+	data, err := h.svc.CreateInsuranceCompany(body.CompanyName)
 	if err != nil {
 		jsonError(w, err.Error(), 400)
 		return

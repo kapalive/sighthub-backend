@@ -239,9 +239,10 @@ type NoteDetailResult struct {
 }
 
 type InsuranceInfo struct {
-	CompanyName *string `json:"company_name"`
-	GroupNumber *string `json:"group_number"`
-	HolderType  *string `json:"holder_type"`
+	CompanyName  *string `json:"company_name"`
+	CoverageName *string `json:"coverage_name"`
+	GroupNumber  *string `json:"group_number"`
+	HolderType   *string `json:"holder_type"`
 }
 
 type RecallInfo struct {
@@ -730,15 +731,17 @@ func (s *Service) GetPatientInfo(patientID int64) (*PatientInfoResult, error) {
 
 	// Insurance via raw SQL
 	var ins struct {
-		CompanyName string  `gorm:"column:company_name"`
-		GroupNumber *string `gorm:"column:group_number"`
-		HolderType  *string `gorm:"column:holder_type"`
+		CompanyName  string  `gorm:"column:company_name"`
+		CoverageName *string `gorm:"column:coverage_name"`
+		GroupNumber  *string `gorm:"column:group_number"`
+		HolderType   *string `gorm:"column:holder_type"`
 	}
 	s.db.Raw(`
-		SELECT ic.company_name, ip.group_number, ihp.holder_type
+		SELECT ic.company_name, ict.coverage_name, ip.group_number, ihp.holder_type
 		FROM insurance_company ic
 		JOIN insurance_policy ip ON ip.insurance_company_id = ic.id_insurance_company
 		JOIN insurance_holder_patients ihp ON ip.id_insurance_policy = ihp.insurance_policy_id
+		LEFT JOIN insurance_coverage_types ict ON ict.id_insurance_coverage_type = ip.insurance_coverage_type_id
 		WHERE ihp.patient_id = ?
 		LIMIT 1
 	`, patientID).Scan(&ins)
@@ -782,9 +785,10 @@ func (s *Service) GetPatientInfo(patientID int64) (*PatientInfoResult, error) {
 			"dob":            dobStr,
 		},
 		Insurance: InsuranceInfo{
-			CompanyName: &ins.CompanyName,
-			GroupNumber: ins.GroupNumber,
-			HolderType:  ins.HolderType,
+			CompanyName:  &ins.CompanyName,
+			CoverageName: ins.CoverageName,
+			GroupNumber:  ins.GroupNumber,
+			HolderType:   ins.HolderType,
 		},
 		Recall: recallInfo,
 	}, nil

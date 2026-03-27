@@ -89,6 +89,16 @@ func (h *Handler) GetInsuranceCompanies(w http.ResponseWriter, r *http.Request) 
 	jsonResponse(w, http.StatusOK, result)
 }
 
+// GET /insurance-coverage-types
+func (h *Handler) GetInsuranceCoverageTypes(w http.ResponseWriter, r *http.Request) {
+	result, err := h.svc.GetInsuranceCoverageTypes()
+	if err != nil {
+		jsonResponse(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		return
+	}
+	jsonResponse(w, http.StatusOK, result)
+}
+
 // GET /insurance-payment-types
 func (h *Handler) GetInsurancePaymentTypes(w http.ResponseWriter, r *http.Request) {
 	result, err := h.svc.GetInsurancePaymentTypes()

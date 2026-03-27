@@ -13,18 +13,13 @@ type InsuranceCompany struct {
 	City               *string `gorm:"column:city;type:varchar(50)"                   json:"city,omitempty"`
 	State              *string `gorm:"column:state;type:varchar(2)"                   json:"state,omitempty"`
 	ZipCode            *string `gorm:"column:zip_code;type:varchar(10)"               json:"zip_code,omitempty"`
-
-	IDInsuranceCoverageType *int `gorm:"column:id_insurance_coverage_type" json:"id_insurance_coverage_type,omitempty"`
-
-	// Relation
-	InsuranceCoverageType *InsuranceCoverageType `gorm:"foreignKey:IDInsuranceCoverageType;references:IDInsuranceCoverageType" json:"-"`
 }
 
 func (InsuranceCompany) TableName() string { return "insurance_company" }
 
 // ToMap — аналог Python to_dict()
 func (c *InsuranceCompany) ToMap() map[string]interface{} {
-	m := map[string]interface{}{
+	return map[string]interface{}{
 		"id_insurance_company": c.IDInsuranceCompany,
 		"company_name":         c.CompanyName,
 		"contact_number":       c.ContactNumber,
@@ -35,22 +30,6 @@ func (c *InsuranceCompany) ToMap() map[string]interface{} {
 		"state":                c.State,
 		"zip_code":             c.ZipCode,
 	}
-
-	// Всегда отдаём id_insurance_coverage_type (число или null)
-	if c.IDInsuranceCoverageType != nil {
-		m["id_insurance_coverage_type"] = *c.IDInsuranceCoverageType
-	} else {
-		m["id_insurance_coverage_type"] = nil
-	}
-
-	// coverage_name (или null)
-	if c.InsuranceCoverageType != nil {
-		m["coverage_name"] = c.InsuranceCoverageType.CoverageName
-	} else {
-		m["coverage_name"] = nil
-	}
-
-	return m
 }
 
 func (c *InsuranceCompany) String() string {

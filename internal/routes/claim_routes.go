@@ -23,6 +23,7 @@ func RegisterClaimRoutes(db *gorm.DB, rdb *redis.Client, cfg *config.Config, r *
 	// Invoices
 	api.HandleFunc("/invoices", h.GetInsuranceInvoices).Methods("GET")
 	api.HandleFunc("/insurance-companies", h.GetInsuranceCompanies).Methods("GET")
+	api.HandleFunc("/insurance-coverage-types", h.GetInsuranceCoverageTypes).Methods("GET")
 	api.HandleFunc("/insurance-payment-types", h.GetInsurancePaymentTypes).Methods("GET")
 	api.HandleFunc("/invoices/{invoice_id:[0-9]+}/insurance-payment", h.GetInvoicePaymentSummary).Methods("GET")
 	api.HandleFunc("/invoices/{invoice_id:[0-9]+}/insurance-payment", h.AddInsurancePayment).Methods("POST")

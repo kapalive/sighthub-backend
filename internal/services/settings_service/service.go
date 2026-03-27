@@ -874,29 +874,13 @@ func (s *Service) DeleteAddServiceType(id int) error {
 // ══════════════════════════════════════════════════════════════════════════════
 
 func (s *Service) ListInsuranceCompanies() ([]map[string]interface{}, error) {
-	rows, err := s.DB.Raw(`
-		SELECT ic.id_insurance_company, ic.company_name, ic.id_insurance_coverage_type,
-		       ict.coverage_name
-		FROM insurance_company ic
-		LEFT JOIN insurance_coverage_types ict ON ic.id_insurance_coverage_type = ict.id_insurance_coverage_type
-		ORDER BY ic.company_name`).Rows()
-	if err != nil {
+	var companies []insurance.InsuranceCompany
+	if err := s.DB.Order("company_name").Find(&companies).Error; err != nil {
 		return nil, err
 	}
-	defer rows.Close()
-	var out []map[string]interface{}
-	for rows.Next() {
-		var id int
-		var name string
-		var covID *int
-		var covName *string
-		rows.Scan(&id, &name, &covID, &covName)
-		out = append(out, map[string]interface{}{
-			"insurance_company_id":        id,
-			"company_name":               name,
-			"id_insurance_coverage_type":  covID,
-			"coverage_name":              covName,
-		})
+	out := make([]map[string]interface{}, len(companies))
+	for i, c := range companies {
+		out[i] = c.ToMap()
 	}
 	return out, nil
 }
@@ -916,40 +900,22 @@ func (s *Service) ListCoverageTypes() ([]map[string]interface{}, error) {
 	return out, nil
 }
 
-func (s *Service) CreateInsuranceCompany(name string, coverageID *int) (map[string]interface{}, error) {
-	if coverageID != nil {
-		var exists bool
-		s.DB.Raw(`SELECT EXISTS(SELECT 1 FROM insurance_coverage_types WHERE id_insurance_coverage_type = ?)`, *coverageID).Row().Scan(&exists)
-		if !exists {
-			return nil, fmt.Errorf("Invalid 'insurance_coverage_type_id'")
-		}
-	}
-
+func (s *Service) CreateInsuranceCompany(name string) (map[string]interface{}, error) {
 	// dedup
-	q := s.DB.Model(&insurance.InsuranceCompany{}).Where("LOWER(company_name) = LOWER(?)", name)
-	if coverageID == nil {
-		q = q.Where("id_insurance_coverage_type IS NULL")
-	} else {
-		q = q.Where("id_insurance_coverage_type = ?", *coverageID)
-	}
 	var count int64
-	q.Count(&count)
+	s.DB.Model(&insurance.InsuranceCompany{}).Where("LOWER(company_name) = LOWER(?)", name).Count(&count)
 	if count > 0 {
 		return nil, fmt.Errorf("Insurance company already exists")
 	}
 
-	c := insurance.InsuranceCompany{CompanyName: name, IDInsuranceCoverageType: coverageID}
+	c := insurance.InsuranceCompany{CompanyName: name}
 	if err := s.DB.Create(&c).Error; err != nil {
 		return nil, err
 	}
-	resp := map[string]interface{}{
+	return map[string]interface{}{
 		"message":              "Insurance company added successfully",
 		"insurance_company_id": c.IDInsuranceCompany,
-	}
-	if coverageID != nil {
-		resp["insurance_coverage_type_id"] = *coverageID
-	}
-	return resp, nil
+	}, nil
 }
 
 func (s *Service) UpdateInsuranceCompany(id int, data map[string]interface{}) (map[string]interface{}, error) {
@@ -963,35 +929,16 @@ func (s *Service) UpdateInsuranceCompany(id int, data map[string]interface{}) (m
 		newName = strings.TrimSpace(fmt.Sprintf("%v", v))
 	}
 
-	newCovID := c.IDInsuranceCoverageType
-	for _, key := range []string{"id_insurance_coverage_type", "insurance_coverage_type_id", "id_type_insurance_policy"} {
-		if v, ok := data[key]; ok && v != nil {
-			covID := toInt(v, 0)
-			if covID > 0 {
-				newCovID = &covID
-			} else {
-				newCovID = nil
-			}
-			break
-		}
-	}
-
 	// dedup
-	q := s.DB.Model(&insurance.InsuranceCompany{}).
-		Where("id_insurance_company != ? AND LOWER(company_name) = LOWER(?)", id, newName)
-	if newCovID == nil {
-		q = q.Where("id_insurance_coverage_type IS NULL")
-	} else {
-		q = q.Where("id_insurance_coverage_type = ?", *newCovID)
-	}
 	var count int64
-	q.Count(&count)
+	s.DB.Model(&insurance.InsuranceCompany{}).
+		Where("id_insurance_company != ? AND LOWER(company_name) = LOWER(?)", id, newName).
+		Count(&count)
 	if count > 0 {
 		return nil, fmt.Errorf("Insurance company already exists")
 	}
 
 	c.CompanyName = newName
-	c.IDInsuranceCoverageType = newCovID
 
 	for _, f := range []string{"contact_number", "contact_email", "address", "address_line_2", "city", "state", "zip_code"} {
 		if v, ok := data[f]; ok {
@@ -1017,19 +964,7 @@ func (s *Service) UpdateInsuranceCompany(id int, data map[string]interface{}) (m
 
 	s.DB.Save(&c)
 
-	var covName *string
-	if c.IDInsuranceCoverageType != nil {
-		var cn string
-		s.DB.Raw(`SELECT coverage_name FROM insurance_coverage_types WHERE id_insurance_coverage_type = ?`, *c.IDInsuranceCoverageType).Row().Scan(&cn)
-		covName = &cn
-	}
-
-	return map[string]interface{}{
-		"insurance_company_id":       c.IDInsuranceCompany,
-		"company_name":              c.CompanyName,
-		"id_insurance_coverage_type": c.IDInsuranceCoverageType,
-		"coverage_name":             covName,
-	}, nil
+	return c.ToMap(), nil
 }
 
 func (s *Service) DeleteInsuranceCompany(id int) error {
@@ -1049,8 +984,8 @@ func (s *Service) ListInsuranceTypes() ([]map[string]interface{}, error) {
 	out := make([]map[string]interface{}, len(items))
 	for i, it := range items {
 		out[i] = map[string]interface{}{
-			"id_type_insurance_policy": it.IDInsuranceCoverageType,
-			"type_name":               it.CoverageName,
+			"id_insurance_coverage_type": it.IDInsuranceCoverageType,
+			"coverage_name":              it.CoverageName,
 		}
 	}
 	return out, nil

@@ -171,10 +171,17 @@ func (h *Handler) CreateInsurancePolicy(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	// Coverage from company
+	// Coverage type from request
 	var coverageID *int
-	if company.IDInsuranceCoverageType != nil {
-		coverageID = company.IDInsuranceCoverageType
+	if covRaw, ok := data["insurance_coverage_type_id"]; ok && covRaw != nil {
+		covID, err := toInt64(covRaw)
+		if err == nil && covID > 0 {
+			id := int(covID)
+			var cov insModel.InsuranceCoverageType
+			if h.DB.First(&cov, id).Error == nil {
+				coverageID = &id
+			}
+		}
 	}
 
 	active := true
@@ -290,23 +297,14 @@ func (h *Handler) GetCoverageTypes(w http.ResponseWriter, r *http.Request) {
 // GET /api/patient/insurance/companies
 func (h *Handler) GetCompanies(w http.ResponseWriter, r *http.Request) {
 	var companies []insModel.InsuranceCompany
-	h.DB.Preload("InsuranceCoverageType").Order("company_name ASC").Find(&companies)
+	h.DB.Order("company_name ASC").Find(&companies)
 
 	result := make([]map[string]interface{}, 0, len(companies))
 	for _, c := range companies {
-		name := c.CompanyName
-		if c.InsuranceCoverageType != nil && c.InsuranceCoverageType.CoverageName != "" {
-			name = c.InsuranceCoverageType.CoverageName + ": " + c.CompanyName
-		}
-
-		item := map[string]interface{}{
+		result = append(result, map[string]interface{}{
 			"id_insurance_company": c.IDInsuranceCompany,
-			"company_name":         name,
-		}
-		if c.InsuranceCoverageType != nil {
-			item["id_insurance_coverage_type"] = c.InsuranceCoverageType.IDInsuranceCoverageType
-		}
-		result = append(result, item)
+			"company_name":         c.CompanyName,
+		})
 	}
 	jsonOK(w, result)
 }
@@ -327,7 +325,7 @@ func (h *Handler) GetInsurancePolicyByID(w http.ResponseWriter, r *http.Request)
 
 	var policy insModel.InsurancePolicy
 	if err := h.DB.
-		Preload("InsuranceCompany.InsuranceCoverageType").
+		Preload("InsuranceCompany").
 		Preload("InsuranceCoverageType").
 		First(&policy, idInsurance).Error; err != nil {
 		jsonError(w, "Insurance policy not found", http.StatusNotFound)
@@ -341,14 +339,6 @@ func (h *Handler) GetInsurancePolicyByID(w http.ResponseWriter, r *http.Request)
 	}
 
 	policyCov := policy.InsuranceCoverageType
-	var companyCov *insModel.InsuranceCoverageType
-	if company != nil {
-		companyCov = company.InsuranceCoverageType
-	}
-	effectiveCov := policyCov
-	if effectiveCov == nil {
-		effectiveCov = companyCov
-	}
 
 	// Get all holders for this policy
 	var holders []patients.InsuranceHolderPatients
@@ -382,18 +372,10 @@ func (h *Handler) GetInsurancePolicyByID(w http.ResponseWriter, r *http.Request)
 		currentHolder = map[string]interface{}{}
 	}
 
-	var policyCovID, policyCovName, companyCovID, companyCovName, effectiveCovID, effectiveCovName interface{}
+	var policyCovID, policyCovName interface{}
 	if policyCov != nil {
 		policyCovID = policyCov.IDInsuranceCoverageType
 		policyCovName = policyCov.CoverageName
-	}
-	if companyCov != nil {
-		companyCovID = companyCov.IDInsuranceCoverageType
-		companyCovName = companyCov.CoverageName
-	}
-	if effectiveCov != nil {
-		effectiveCovID = effectiveCov.IDInsuranceCoverageType
-		effectiveCovName = effectiveCov.CoverageName
 	}
 
 	var companyIDVal interface{}
@@ -414,10 +396,6 @@ func (h *Handler) GetInsurancePolicyByID(w http.ResponseWriter, r *http.Request)
 			"back_photo":                    policy.BackPhoto,
 			"insurance_coverage_type_id":    policyCovID,
 			"insurance_coverage_type_name":  policyCovName,
-			"company_coverage_type_id":      companyCovID,
-			"company_coverage_type_name":    companyCovName,
-			"effective_coverage_type_id":    effectiveCovID,
-			"effective_coverage_type_name":  effectiveCovName,
 		},
 		"current_holder": currentHolder,
 		"holders":        holdersList,
@@ -490,9 +468,6 @@ func (h *Handler) UpdateInsurancePolicy(w http.ResponseWriter, r *http.Request) 
 			return
 		}
 		policy.InsuranceCompanyID = int(compID)
-		if !coverageOverride {
-			policy.InsuranceCoverageTypeID = comp.IDInsuranceCoverageType
-		}
 	}
 
 	if coverageOverride {

@@ -174,6 +174,23 @@ func (s *Service) GetInsuranceCompanies() ([]map[string]interface{}, error) {
 	return result, nil
 }
 
+// ── GET /insurance-coverage-types ──────────────────────────────────────────────
+
+func (s *Service) GetInsuranceCoverageTypes() ([]map[string]interface{}, error) {
+	var types []insuranceModel.InsuranceCoverageType
+	if err := s.db.Order("coverage_name").Find(&types).Error; err != nil {
+		return nil, err
+	}
+	result := make([]map[string]interface{}, len(types))
+	for i, t := range types {
+		result[i] = map[string]interface{}{
+			"id_insurance_coverage_type": t.IDInsuranceCoverageType,
+			"coverage_name":              t.CoverageName,
+		}
+	}
+	return result, nil
+}
+
 // ── GET /insurance-payment-types ──────────────────────────────────────────────
 
 func (s *Service) GetInsurancePaymentTypes() ([]map[string]interface{}, error) {

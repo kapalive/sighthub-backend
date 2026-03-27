@@ -48,6 +48,7 @@ func RegisterSaleRoutes(db *gorm.DB, rdb *redis.Client, cfg *config.Config, r *m
 
 	// Insurance
 	api.HandleFunc("/insurance", h.GetInsuranceCompanies).Methods("GET")
+	api.HandleFunc("/insurance/coverage_types", h.GetInsuranceCoverageTypes).Methods("GET")
 
 	perm45 := middleware.ActivePermission(db, 45)
 	api.Handle("/insurance_report", perm45(http.HandlerFunc(h.InsuranceReport))).Methods("GET")

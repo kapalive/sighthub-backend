@@ -366,8 +366,8 @@ func (h *Handler) GetInsuranceTypes(w http.ResponseWriter, r *http.Request) {
 	result := make([]map[string]interface{}, 0, len(types))
 	for _, t := range types {
 		result = append(result, map[string]interface{}{
-			"id_type_insurance_policy": t.IDInsuranceCoverageType,
-			"type_name":                t.CoverageName,
+			"id_insurance_coverage_type": t.IDInsuranceCoverageType,
+			"coverage_name":              t.CoverageName,
 		})
 	}
 	jsonResponse(w, result, http.StatusOK)

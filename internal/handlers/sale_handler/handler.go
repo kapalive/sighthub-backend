@@ -451,6 +451,27 @@ func (h *Handler) GetInsuranceCompanies(w http.ResponseWriter, r *http.Request) 
 	jsonOK(w, data)
 }
 
+// ── GET /insurance/coverage_types ────────────────────────────────────────────
+
+func (h *Handler) GetInsuranceCoverageTypes(w http.ResponseWriter, r *http.Request) {
+	var types []struct {
+		ID   int    `gorm:"column:id_insurance_coverage_type"`
+		Name string `gorm:"column:coverage_name"`
+	}
+	if err := h.db.Table("insurance_coverage_types").Order("coverage_name").Find(&types).Error; err != nil {
+		jsonError(w, err.Error(), 500)
+		return
+	}
+	result := make([]map[string]interface{}, len(types))
+	for i, t := range types {
+		result[i] = map[string]interface{}{
+			"id_insurance_coverage_type": t.ID,
+			"coverage_name":              t.Name,
+		}
+	}
+	jsonOK(w, result)
+}
+
 // ── GET /insurance_report ───────────────────────────────────────────────────
 
 func (h *Handler) InsuranceReport(w http.ResponseWriter, r *http.Request) {
