@@ -1,0 +1,427 @@
+{
+  "info": {
+    "_postman_id": "ff214595-ffc9-47a3-92a8-af1e6228ea0f",
+    "name": "VisionWeb: ROSIGHTHUB _03232026",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "_exporter_id": "6449127"
+  },
+  "item": [
+    {
+      "name": "User Accounts",
+      "item": [
+        {
+          "name": "QA",
+          "item": [
+            {
+              "name": "UserAccountsService",
+              "request": {
+                "auth": {
+                  "type": "noauth"
+                },
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "text/xml",
+                    "type": "text"
+                  },
+                  {
+                    "key": "soapAction",
+                    "value": "getUserProfileByLoginRequest",
+                    "type": "text"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "<soapenv:Envelope xmlns:soapenv=\"http://schemas.xmlsoap.org/soap/envelope/\" xmlns:web=\"http://webservices.login.visionweb.com\">\r\n   <soapenv:Header/>\r\n   <soapenv:Body>\r\n      <web:getUserProfileByLogin>\r\n         <web:username>SighthubCustomer</web:username>\r\n         <web:password>vision2020</web:password>\r\n         <web:refid>ROSIGHTHUB</web:refid>\r\n      </web:getUserProfileByLogin>\r\n   </soapenv:Body>\r\n</soapenv:Envelope>"
+                },
+                "url": {
+                  "raw": "https://www.visionwebqa.com/services/services/UserAccountsService",
+                  "protocol": "https",
+                  "host": [
+                    "www",
+                    "visionwebqa",
+                    "com"
+                  ],
+                  "path": [
+                    "services",
+                    "services",
+                    "UserAccountsService"
+                  ]
+                }
+              },
+              "response": []
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Catalog Download",
+      "item": [
+        {
+          "name": "QA",
+          "item": [
+            {
+              "name": "Supplier Catalog Token",
+              "event": [
+                {
+                  "listen": "prerequest",
+                  "script": {
+                    "exec": [
+                      ""
+                    ],
+                    "type": "text/javascript",
+                    "packages": {},
+                    "requests": {}
+                  }
+                },
+                {
+                  "listen": "test",
+                  "script": {
+                    "exec": [
+                      "var jsonData = JSON.parse(responseBody);\r",
+                      "postman.setEnvironmentVariable(\"access_token\", jsonData.access_token);"
+                    ],
+                    "type": "text/javascript",
+                    "packages": {},
+                    "requests": {}
+                  }
+                }
+              ],
+              "request": {
+                "auth": {
+                  "type": "basic",
+                  "basic": [
+                    {
+                      "key": "username",
+                      "value": "qademo",
+                      "type": "string"
+                    },
+                    {
+                      "key": "password",
+                      "value": "xNH3L7K1wl9lezUZQwdA",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/x-www-form-urlencoded"
+                  },
+                  {
+                    "key": "Cache-Control",
+                    "value": "no-cache"
+                  }
+                ],
+                "body": {
+                  "mode": "urlencoded",
+                  "urlencoded": [
+                    {
+                      "key": "grant_type",
+                      "value": "client_credentials",
+                      "type": "text"
+                    },
+                    {
+                      "key": "scope",
+                      "value": "VisionWeb.Catalog.Api",
+                      "type": "text"
+                    }
+                  ]
+                },
+                "url": {
+                  "raw": "https://regauth.visionweb.com/connect/token",
+                  "protocol": "https",
+                  "host": [
+                    "regauth",
+                    "visionweb",
+                    "com"
+                  ],
+                  "path": [
+                    "connect",
+                    "token"
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Supplier Catalog Download SUP1",
+              "request": {
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{access_token}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "https://regapi.visionweb.com/catalog/catalog/Catalog/1161/SUP1",
+                  "protocol": "https",
+                  "host": [
+                    "regapi",
+                    "visionweb",
+                    "com"
+                  ],
+                  "path": [
+                    "catalog",
+                    "catalog",
+                    "Catalog",
+                    "1161",
+                    "SUP1"
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Supplier Catalog Download SUP7",
+              "request": {
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{access_token}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "https://regapi.visionweb.com/catalog/catalog/Catalog/1161/SUP7",
+                  "protocol": "https",
+                  "host": [
+                    "regapi",
+                    "visionweb",
+                    "com"
+                  ],
+                  "path": [
+                    "catalog",
+                    "catalog",
+                    "Catalog",
+                    "1161",
+                    "SUP7"
+                  ]
+                }
+              },
+              "response": []
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Send Orders",
+      "item": [
+        {
+          "name": "QA",
+          "item": [
+            {
+              "name": "Send RX Order_TriSupreme1161",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "text/xml"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "<soapenv:Envelope xmlns:soapenv=\"http://schemas.xmlsoap.org/soap/envelope/\" xmlns:ser=\"http://services.visionweb.com\">\r\n   <soapenv:Header/>\r\n   <soapenv:Body>\r\n      <ser:UploadFile>\r\n         <ser:username>SighthubQA</ser:username>\r\n         <ser:pswd>vision</ser:pswd>\r\n         <ser:filestring><![CDATA[\r\n<VWOrder>\r\n<!--ORDER IDENTIFIER-->\r\n  <Item>\r\n    <FieldName>Username</FieldName>\r\n    <FieldValue>SighthubCustomer</FieldValue>\r\n  </Item>\r\n  <Item>\r\n    <FieldName>Password</FieldName>\r\n    <FieldValue>vision2020</FieldValue>\r\n  </Item>\r\n  <Item>\r\n    <FieldName>OrderId</FieldName>\r\n    <FieldValue>ID123456_2</FieldValue>\r\n  </Item>\r\n  <Item>\r\n    <FieldName>PONumber</FieldName>\r\n    <FieldValue>ID123456</FieldValue>\r\n  </Item>\r\n  <Item>\r\n    <FieldName>SupplierName</FieldName>\r\n    <FieldValue>1161</FieldValue>\r\n  </Item>\r\n  <Item>\r\n    <FieldName>BillAccount</FieldName>\r\n    <FieldValue>2126655051</FieldValue>\r\n  </Item>\r\n  <Item>\r\n    <FieldName>ShipAccount</FieldName>\r\n    <FieldValue>2126655051</FieldValue>\r\n  </Item>\r\n  <Item>\r\n    <FieldName>JobType</FieldName>\r\n    <FieldValue>Frame To Come</FieldValue>\r\n  </Item>\r\n  <Item>\r\n    <FieldName>Eyes</FieldName>\r\n    <FieldValue>B</FieldValue>\r\n  </Item>\r\n<!--PATIENT NAME RX-->\r\n  <Item>\r\n    <FieldName>PatLastName</FieldName>\r\n    <FieldValue>TestLast</FieldValue>\r\n  </Item>\r\n  <Item>\r\n    <FieldName>PatFirstName</FieldName>\r\n    <FieldValue>TestFirst</FieldValue>\r\n  </Item>\r\n  <Item>\r\n    <FieldName>RESph</FieldName>\r\n    <FieldValue>+1.00</FieldValue>\r\n  </Item>\r\n  <Item>\r\n    <FieldName>RECyl</FieldName>\r\n    <FieldValue>-0.25</FieldValue>\r\n  </Item>\r\n  <Item>\r\n    <FieldName>REAxis</FieldName>\r\n    <FieldValue>90</FieldValue>\r\n  </Item>\r\n  <Item>\r\n    <FieldName>REDistPD</FieldName>\r\n    <FieldValue>30</FieldValue>\r\n  </Item>\r\n  <Item>\r\n    <FieldName>RENearPD</FieldName>\r\n    <FieldValue>28</FieldValue>\r\n  </Item>\r\n  <Item>\r\n    <FieldName>REHorizPrismValue</FieldName>\r\n    <FieldValue>0.75</FieldValue>\r\n  </Item>\r\n  <Item>\r\n    <FieldName>REHorizPrismDirection</FieldName>\r\n    <FieldValue>IN</FieldValue>\r\n  </Item>\r\n  <Item>\r\n    <FieldName>REVerticalPrismValue</FieldName>\r\n    <FieldValue>1.25</FieldValue>\r\n  </Item>\r\n  <Item>\r\n    <FieldName>REVerticalPrismDirection</FieldName>\r\n    <FieldValue>UP</FieldValue>\r\n  </Item>\r\n  <Item>\r\n    <FieldName>REAdd</FieldName>\r\n    <FieldValue>2.25</FieldValue>\r\n  </Item>\r\n  <Item>\r\n    <FieldName>RESegHeight</FieldName>\r\n    <FieldValue>20.2</FieldValue>\r\n  </Item>\r\n  <Item>\r\n    <FieldName>REOpticalCenter</FieldName>\r\n    <FieldValue>21.2</FieldValue>\r\n  </Item>\r\n  <Item>\r\n    <FieldName>LESph</FieldName>\r\n    <FieldValue>+2.00</FieldValue>\r\n  </Item>\r\n  <Item>\r\n    <FieldName>LECyl</FieldName>\r\n    <FieldValue>-0.50</FieldValue>\r\n  </Item>\r\n  <Item>\r\n    <FieldName>LEAxis</FieldName>\r\n    <FieldValue>75</FieldValue>\r\n  </Item>\r\n  <Item>\r\n    <FieldName>LEDistPD</FieldName>\r\n    <FieldValue>29</FieldValue>\r\n  </Item>\r\n  <Item>\r\n    <FieldName>LENearPD</FieldName>\r\n    <FieldValue>27</FieldValue>\r\n  </Item>\r\n  <Item>\r\n    <FieldName>LEHorizPrismValue</FieldName>\r\n    <FieldValue>1.50</FieldValue>\r\n  </Item>\r\n  <Item>\r\n    <FieldName>LEHorizPrismDirection</FieldName>\r\n    <FieldValue>OUT</FieldValue>\r\n  </Item>\r\n  <Item>\r\n    <FieldName>LEVerticalPrismValue</FieldName>\r\n    <FieldValue>1.75</FieldValue>\r\n  </Item>\r\n  <Item>\r\n    <FieldName>LEVerticalPrismDirection</FieldName>\r\n    <FieldValue>DOWN</FieldValue>\r\n  </Item>\r\n  <Item>\r\n    <FieldName>LEAdd</FieldName>\r\n    <FieldValue>2.25</FieldValue>\r\n  </Item>\r\n  <Item>\r\n    <FieldName>LESegHeight</FieldName>\r\n    <FieldValue>20.3</FieldValue>\r\n  </Item>\r\n  <Item>\r\n    <FieldName>LEOpticalCenter</FieldName>\r\n    <FieldValue>21.3</FieldValue>\r\n  </Item>\r\n<!--LENS SPECIFICATION-->\r\n  <Item>\r\n    <FieldName>RELensDesign</FieldName>\r\n    <FieldValue>VXXFIT</FieldValue>\r\n  </Item>\r\n  <Item>\r\n    <FieldName>RELensMaterial</FieldName>\r\n    <FieldValue>PO-58-NONE-NONE-00</FieldValue>\r\n  </Item>\r\n  <Item>\r\n    <FieldName>RETreatment1</FieldName>\r\n    <FieldValue>AR-AR</FieldValue>\r\n  </Item>\r\n  <Item>\r\n    <FieldName>RETreatment2</FieldName>\r\n    <FieldValue>EDGE-EP</FieldValue>\r\n  </Item>\r\n  <Item>\r\n    <FieldName>RETreatment3</FieldName>\r\n    <FieldValue>TINT-SC</FieldValue>\r\n  </Item>\r\n  <Item>\r\n    <FieldName>RETreatmentComments</FieldName>\r\n    <FieldValue>Blue 3</FieldValue>\r\n  </Item>\r\n  <Item>\r\n    <FieldName>LELensDesign</FieldName>\r\n    <FieldValue>VXXFIT</FieldValue>\r\n  </Item>\r\n  <Item>\r\n    <FieldName>LELensMaterial</FieldName>\r\n    <FieldValue>PO-58-NONE-NONE-00</FieldValue>\r\n  </Item>\r\n  <Item>\r\n    <FieldName>LETreatment1</FieldName>\r\n    <FieldValue>AR-AR</FieldValue>\r\n  </Item>\r\n  <Item>\r\n    <FieldName>LETreatment2</FieldName>\r\n    <FieldValue>EDGE-EP</FieldValue>\r\n  </Item>\r\n  <Item>\r\n    <FieldName>LETreatment3</FieldName>\r\n    <FieldValue>TINT-SC</FieldValue>\r\n  </Item>\r\n  <Item>\r\n    <FieldName>LETreatmentComments</FieldName>\r\n    <FieldValue>Blue 3</FieldValue>\r\n  </Item>\r\n<!--FRAME SPECIFICATION-->\r\n  <Item>\r\n    <FieldName>FrameType</FieldName>\r\n    <FieldValue>METAL</FieldValue>\r\n  </Item>\r\n  <Item>\r\n    <FieldName>ABox</FieldName>\r\n    <FieldValue>55</FieldValue>\r\n  </Item>\r\n  <Item>\r\n    <FieldName>BBox</FieldName>\r\n    <FieldValue>31</FieldValue>\r\n  </Item>\r\n  <Item>\r\n    <FieldName>Dbl</FieldName>\r\n    <FieldValue>18</FieldValue>\r\n  </Item>\r\n  <Item>\r\n    <FieldName>ED</FieldName>\r\n    <FieldValue>57</FieldValue>\r\n  </Item>\r\n  <Item>\r\n    <FieldName>Eye</FieldName>\r\n    <FieldValue>60</FieldValue>\r\n  </Item>\r\n  <Item>\r\n    <FieldName>FrameTempleLength</FieldName>\r\n    <FieldValue>135</FieldValue>\r\n  </Item>\r\n  <Item>\r\n    <FieldName>FrameSKU</FieldName>\r\n    <FieldValue>123456789</FieldValue>\r\n  </Item>\r\n  <Item>\r\n    <FieldName>FrameManufacturer</FieldName>\r\n    <FieldValue>Mfg</FieldValue>\r\n  </Item>\r\n  <Item>\r\n    <FieldName>FrameModel</FieldName>\r\n    <FieldValue>Model</FieldValue>\r\n  </Item>\r\n  <Item>\r\n    <FieldName>FrameColor</FieldName>\r\n    <FieldValue>Color</FieldValue>\r\n  </Item>\r\n<!--SPECIAL INSTRUCTIONS-->\r\n  <Item>\r\n    <FieldName>SpecialInstructions1</FieldName>\r\n    <FieldValue>TestingSpecialInstructions</FieldValue>\r\n  </Item>\r\n<!--ADDITIONAL PARAMETERS-->\r\n  <Item>\r\n    <FieldName>PantoAngle</FieldName>\r\n    <FieldValue>4.2</FieldValue>\r\n  </Item>\r\n  <Item>\r\n    <FieldName>WrapAngle</FieldName>\r\n    <FieldValue>6.9</FieldValue>\r\n  </Item>\r\n  <Item>\r\n    <FieldName>REBaseCurve</FieldName>\r\n    <FieldValue>8</FieldValue>\r\n  </Item>\r\n  <Item>\r\n    <FieldName>LEBaseCurve</FieldName>\r\n    <FieldValue>8</FieldValue>\r\n  </Item>\r\n  <Item>\r\n    <FieldName>RightVertexDistance</FieldName>\r\n    <FieldValue>16</FieldValue>\r\n  </Item>\r\n  <Item>\r\n    <FieldName>LeftVertexDistance</FieldName>\r\n    <FieldValue>16.5</FieldValue>\r\n  </Item>\r\n</VWOrder>]]></ser:filestring>\r\n         <ser:subordid>1234567</ser:subordid>\r\n         <ser:refid>ROSIGHTHUB</ser:refid>\r\n         <ser:guid></ser:guid>\r\n         <ser:msgguid>64hts6y3gv233gav3ccgn6duxz4q_1</ser:msgguid>\r\n         <ser:sloid>9992</ser:sloid>\r\n         <ser:cbsid></ser:cbsid>\r\n         <ser:ordtype></ser:ordtype>\r\n         <ser:filename></ser:filename>\r\n      </ser:UploadFile>\r\n   </soapenv:Body>\r\n</soapenv:Envelope>"
+                },
+                "url": {
+                  "raw": "https://services.visionwebqa.com/FileUpload.asmx",
+                  "protocol": "https",
+                  "host": [
+                    "services",
+                    "visionwebqa",
+                    "com"
+                  ],
+                  "path": [
+                    "FileUpload.asmx"
+                  ]
+                }
+              },
+              "response": []
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Order Status Receive",
+      "item": [
+        {
+          "name": "QA",
+          "item": [
+            {
+              "name": "Status Token",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "exec": [
+                      "var jsonData = JSON.parse(responseBody);\r",
+                      "postman.setEnvironmentVariable(\"access_token\", jsonData.access_token);"
+                    ],
+                    "type": "text/javascript",
+                    "packages": {},
+                    "requests": {}
+                  }
+                }
+              ],
+              "request": {
+                "auth": {
+                  "type": "basic",
+                  "basic": [
+                    {
+                      "key": "username",
+                      "value": "qademo",
+                      "type": "string"
+                    },
+                    {
+                      "key": "password",
+                      "value": "xNH3L7K1wl9lezUZQwdA",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/x-www-form-urlencoded",
+                    "type": "text"
+                  },
+                  {
+                    "key": "Cache-Control",
+                    "value": "no-cache"
+                  }
+                ],
+                "body": {
+                  "mode": "urlencoded",
+                  "urlencoded": [
+                    {
+                      "key": "grant_type",
+                      "value": "client_credentials",
+                      "type": "text"
+                    },
+                    {
+                      "key": "scope",
+                      "value": "VW.OP.Order.WebApi",
+                      "type": "text"
+                    }
+                  ]
+                },
+                "url": {
+                  "raw": "https://regauth.visionweb.com/connect/token",
+                  "protocol": "https",
+                  "host": [
+                    "regauth",
+                    "visionweb",
+                    "com"
+                  ],
+                  "path": [
+                    "connect",
+                    "token"
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Order Status",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json",
+                    "type": "text"
+                  },
+                  {
+                    "key": "username",
+                    "value": "Sighthubcustomer",
+                    "type": "text"
+                  },
+                  {
+                    "key": "password",
+                    "value": "vision2020",
+                    "type": "text"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\r\n   \"OrderIds\": [\r\n      \"SP10WA62\"\r\n   ]\r\n}"
+                },
+                "url": {
+                  "raw": "https://regapi.visionweb.com/order/OrderTracking/GetTrackingUpdates",
+                  "protocol": "https",
+                  "host": [
+                    "regapi",
+                    "visionweb",
+                    "com"
+                  ],
+                  "path": [
+                    "order",
+                    "OrderTracking",
+                    "GetTrackingUpdates"
+                  ]
+                }
+              },
+              "response": []
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{access_token}}",
+        "type": "string"
+      }
+    ]
+  },
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          ""
+        ]
+      }
+    },
+    {
+      "listen": "test",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          ""
+        ]
+      }
+    }
+  ]
+}
