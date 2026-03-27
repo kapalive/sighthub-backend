@@ -96,6 +96,52 @@ func (h *Handler) ListCoverageTypes(w http.ResponseWriter, r *http.Request) {
 	jsonOK(w, data)
 }
 
+func (h *Handler) CreateCoverageType(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		CoverageName string `json:"coverage_name"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		jsonError(w, "Invalid JSON", 400)
+		return
+	}
+	if body.CoverageName == "" {
+		jsonError(w, "coverage_name is required", 400)
+		return
+	}
+	data, err := h.svc.CreateCoverageType(body.CoverageName)
+	if err != nil {
+		jsonError(w, err.Error(), 400)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(201)
+	json.NewEncoder(w).Encode(data)
+}
+
+func (h *Handler) UpdateCoverageType(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		CoverageName string `json:"coverage_name"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		jsonError(w, "Invalid JSON", 400)
+		return
+	}
+	data, err := h.svc.UpdateCoverageType(pathID(r), body.CoverageName)
+	if err != nil {
+		jsonError(w, err.Error(), 400)
+		return
+	}
+	jsonOK(w, data)
+}
+
+func (h *Handler) DeleteCoverageType(w http.ResponseWriter, r *http.Request) {
+	if err := h.svc.DeleteCoverageType(pathID(r)); err != nil {
+		jsonError(w, err.Error(), 400)
+		return
+	}
+	jsonOK(w, map[string]string{"message": "Deleted"})
+}
+
 // ── Insurance Types ────────────────────────────────────────────────────────
 
 func (h *Handler) ListInsuranceTypes(w http.ResponseWriter, r *http.Request) {

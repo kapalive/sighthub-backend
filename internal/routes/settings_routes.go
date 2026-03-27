@@ -170,6 +170,9 @@ func RegisterSettingsRoutes(db *gorm.DB, rdb *redis.Client, cfg *config.Config, 
 
 	// ── Insurance Coverage Types ───────────────────────────────────────────
 	api.HandleFunc("/insurance/coverage_types", hIns.ListCoverageTypes).Methods("GET")
+	api.HandleFunc("/insurance/coverage_types", hIns.CreateCoverageType).Methods("POST")
+	api.HandleFunc("/insurance/coverage_types/{id:[0-9]+}", hIns.UpdateCoverageType).Methods("PUT")
+	api.HandleFunc("/insurance/coverage_types/{id:[0-9]+}", hIns.DeleteCoverageType).Methods("DELETE")
 
 	// ── Insurance Types ────────────────────────────────────────────────────
 	api.HandleFunc("/insurance/types", hIns.ListInsuranceTypes).Methods("GET")

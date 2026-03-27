@@ -900,6 +900,54 @@ func (s *Service) ListCoverageTypes() ([]map[string]interface{}, error) {
 	return out, nil
 }
 
+func (s *Service) CreateCoverageType(name string) (map[string]interface{}, error) {
+	var count int64
+	s.DB.Model(&insurance.InsuranceCoverageType{}).Where("LOWER(coverage_name) = LOWER(?)", name).Count(&count)
+	if count > 0 {
+		return nil, fmt.Errorf("Coverage type already exists")
+	}
+	ct := insurance.InsuranceCoverageType{CoverageName: name}
+	if err := s.DB.Create(&ct).Error; err != nil {
+		return nil, err
+	}
+	return map[string]interface{}{
+		"message":                    "Coverage type added successfully",
+		"id_insurance_coverage_type": ct.IDInsuranceCoverageType,
+		"coverage_name":              ct.CoverageName,
+	}, nil
+}
+
+func (s *Service) UpdateCoverageType(id int, name string) (map[string]interface{}, error) {
+	var ct insurance.InsuranceCoverageType
+	if err := s.DB.First(&ct, id).Error; err != nil {
+		return nil, fmt.Errorf("Coverage type not found")
+	}
+	if name != "" {
+		var count int64
+		s.DB.Model(&insurance.InsuranceCoverageType{}).
+			Where("id_insurance_coverage_type != ? AND LOWER(coverage_name) = LOWER(?)", id, name).
+			Count(&count)
+		if count > 0 {
+			return nil, fmt.Errorf("Coverage type already exists")
+		}
+		ct.CoverageName = name
+	}
+	s.DB.Save(&ct)
+	return map[string]interface{}{
+		"id_insurance_coverage_type": ct.IDInsuranceCoverageType,
+		"coverage_name":              ct.CoverageName,
+	}, nil
+}
+
+func (s *Service) DeleteCoverageType(id int) error {
+	var count int64
+	s.DB.Raw("SELECT COUNT(*) FROM insurance_policy WHERE insurance_coverage_type_id = ?", id).Row().Scan(&count)
+	if count > 0 {
+		return fmt.Errorf("Cannot delete. Coverage type is used in existing insurance policies.")
+	}
+	return s.DB.Delete(&insurance.InsuranceCoverageType{}, id).Error
+}
+
 func (s *Service) CreateInsuranceCompany(name string) (map[string]interface{}, error) {
 	// dedup
 	var count int64
